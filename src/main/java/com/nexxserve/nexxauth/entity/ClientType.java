@@ -5,12 +5,14 @@ package com.nexxserve.nexxauth.entity;
  * {@link com.nexxserve.nexxauth.security.ClientTokenFilter}:
  * <ul>
  *   <li>{@code WEB} — never authenticated; only the organisation login/register
- *       endpoints; CORS origins apply.</li>
+ *       endpoints, unless the request carries a valid org-user JWT (then the
+ *       user proceeds under their own roles); CORS origins apply.</li>
  *   <li>{@code SERVER} — always authenticated with a static client token; full
  *       access to its organisation's endpoints.</li>
  *   <li>{@code ANDROID}/{@code IOS} — {@code requireAuthentication} is
  *       configurable: without auth they are restricted to login/register (like
- *       web clients); with auth they get full organisation access.</li>
+ *       web clients, and likewise let a valid org-user JWT through); with auth
+ *       they get full organisation access.</li>
  * </ul>
  */
 public enum ClientType {

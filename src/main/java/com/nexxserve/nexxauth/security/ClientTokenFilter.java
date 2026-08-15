@@ -29,10 +29,14 @@ import java.util.regex.Pattern;
  *       the request (scoped to the client's organisation) for the full org
  *       API;</li>
  *   <li>clients that do not require authentication (web, and apps without
- *       auth) may only reach the organisation login/register endpoints.</li>
+ *       auth) may reach the organisation login/register endpoints anonymously,
+ *       and — when the request also carries a valid org-user JWT (already set
+ *       by the {@link OrgJwtAuthenticationFilter}) — the org user proceeds to
+ *       the org API under their own roles/permissions instead of being blocked.</li>
  * </ul>
  * Runs after the JWT filters, so a present {@code X-Client-Id} always wins
- * over a bearer JWT.
+ * over a bearer JWT for auth-required clients; for no-auth clients a valid
+ * org-user JWT takes precedence (the client identity is not used for access).
  */
 @Component
 public class ClientTokenFilter extends OncePerRequestFilter {
@@ -90,6 +94,15 @@ public class ClientTokenFilter extends OncePerRequestFilter {
             return;
         }
 
+        // No-auth client (web, or apps without auth): the client itself cannot
+        // reach the org API beyond login/register, but a valid org-user JWT
+        // (authenticated earlier by OrgJwtAuthenticationFilter) proceeds under
+        // that user's own roles/permissions.
+        if (isOrgUserAuthenticated()) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         if (!ORG_AUTH_PATH.matcher(request.getRequestURI()).matches()) {
             write(response, HttpStatus.FORBIDDEN,
                     "This client type can only access the organisation login and register endpoints",
@@ -97,6 +110,12 @@ public class ClientTokenFilter extends OncePerRequestFilter {
             return;
         }
         filterChain.doFilter(request, response);
+    }
+
+    /** True when the request already carries a valid org-user JWT. */
+    private boolean isOrgUserAuthenticated() {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null && authentication.getPrincipal() instanceof OrgUserPrincipal;
     }
 
     private Long parseId(String raw) {

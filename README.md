@@ -302,7 +302,7 @@ detector, so a stale device cannot kill the user's newer sessions).
 
 ## Testing
 
-- **99 unit/integration tests** — `./gradlew test` (H2 in PostgreSQL mode; Flyway
+- **100 unit/integration tests** — `./gradlew test` (H2 in PostgreSQL mode; Flyway
   migrations run on the test schema). Includes a **hardening suite** that proves
   every malformed input (broken JSON, wrong types, invalid enums, out-of-range
   values, path type mismatches, null-in-list, oversized bodies) yields a clean

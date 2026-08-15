@@ -269,6 +269,63 @@ class OrganisationClientIntegrationTest {
     }
 
     @Test
+    void webClientLetsAuthenticatedOrgUserThrough() throws Exception {
+        String boss = register("client-webuser@nexx.io", "Client Web User Platform");
+        String platform = createOrg(boss, ORG_SLUG);
+        String clients = clientsPath(platform);
+        String users = usersPath(platform);
+        String orgAuth = "/api/v1/platforms/" + platform + "/auth";
+
+        long webId = createClient(boss, clients, "Web", "WEB", null);
+        String orgPath = "/api/v1/platforms/" + platform + "/organisations/" + ORG_SLUG;
+        long orgId = objectMapper.readTree(mockMvc.perform(get(orgPath)
+                        .header("Authorization", bearer(boss)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString()).get("id").asLong();
+
+        // an org user holding READ permission
+        long roleId = objectMapper.readTree(mockMvc.perform(post(orgPath + "/roles")
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("name", "reader", "permissions",
+                                List.of("ORGANISATION_USER_READ")))))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString()).get("id").asLong();
+        long readerId = objectMapper.readTree(mockMvc.perform(post(orgAuth + "/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("organisationId", orgId, "identifier", "alice",
+                                "password", "password1", "firstName", "A", "lastName", "L"))))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString()).get("user").get("id").asLong();
+        mockMvc.perform(patch(orgPath + "/users/" + readerId)
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("roleIds", List.of(roleId)))))
+                .andExpect(status().isOk());
+        String aliceToken = objectMapper.readTree(mockMvc.perform(post(orgAuth + "/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("organisationId", orgId, "identifier", "alice", "password", "password1"))))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString()).get("accessToken").asText();
+
+        // the web client alone is still blocked from the org API
+        mockMvc.perform(get(users).header("X-Client-Id", String.valueOf(webId)))
+                .andExpect(status().isForbidden());
+
+        // but with a valid org-user JWT, the user proceeds under their own roles
+        mockMvc.perform(get(users)
+                        .header("X-Client-Id", String.valueOf(webId))
+                        .header("Authorization", bearer(aliceToken)))
+                .andExpect(status().isOk());
+
+        // a disabled/unknown org-user token is still blocked (no org auth set)
+        mockMvc.perform(get(users)
+                        .header("X-Client-Id", String.valueOf(webId))
+                        .header("Authorization", bearer("nx_not-a-real-token")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void corsAppliesPerClient() throws Exception {
         String boss = register("client-cors@nexx.io", "Client Cors Platform");
         String platform = createOrg(boss, ORG_SLUG);
