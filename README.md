@@ -22,6 +22,7 @@ error shape.
 - [Security & hardening](#security--hardening)
 - [Observability](#observability)
 - [Testing](#testing)
+- [CI/CD](#cicd)
 - [Versioning](#versioning)
 - [Flow documentation](#flow-documentation)
 
@@ -315,6 +316,11 @@ detector, so a stale device cannot kill the user's newer sessions).
   every malformed input (broken JSON, wrong types, invalid enums, out-of-range
   values, path type mismatches, null-in-list, oversized bodies) yields a clean
   4xx — never a 500.
+- **Redis rate-limit tests** (`@Tag("redis")`) — verify the shared Redis-backed
+  bucket store end to end (429 + `Retry-After` over real Redis). Excluded from the
+  default run (no Redis needed); run with `./gradlew test -PincludeRedisTests`
+  against a running Redis on `localhost:6379` (CI does this against its Redis
+  service).
 - **167-check live smoke suite** — `scripts/smoke-test.sh` exercises every flow
   with curl against a running instance and greps the app log for the audit trail:
   ```bash
@@ -329,6 +335,27 @@ detector, so a stale device cannot kill the user's newer sessions).
   checks). Note: two Postgres-only issues were caught this way — a lazy config
   insert inside a read-only transaction (fixed) and an org `auth-config` GET on an
   org without a config row; both had been tolerated by H2.
+
+## CI/CD
+
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main` and every
+pull request:
+
+- **Backend** — `./gradlew test` (H2), `./gradlew build`, and **OWASP
+  Dependency-Check** (`./gradlew dependencyCheckAnalyze`) for CVE scanning. The
+  SARIF output is uploaded to GitHub code scanning; the HTML report is kept as a
+  build artifact. Build fails only on CRITICAL (CVSS ≥ 9) findings — the NVD feed
+  is cached between runs.
+- **Web** — `bun run lint` and `bun run build`.
+- **End-to-end** — Playwright (`bun run test:e2e`) against the real backend on
+  PostgreSQL 16 + Redis 7 services. The e2e backend runs with
+  `app.rate-limit.store=redis`, so the shared Redis rate-limit path is exercised
+  in CI alongside the tagged Redis integration tests (run via
+  `-PincludeRedisTests`).
+
+**Dependabot** (`.github/dependabot.yml`) opens weekly update PRs for Gradle
+dependencies, web (npm/Bun) dependencies, and the GitHub Actions themselves,
+keeping the dependency set (and the CVE surface) current.
 
 ## Versioning
 
