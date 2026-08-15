@@ -14,6 +14,10 @@ package com.nexxserve.nexxauth.entity;
  *       web clients, and likewise let a valid org-user JWT through); with auth
  *       they get full organisation access.</li>
  * </ul>
+ * When no {@code X-Client-Id} is present at all, organisation access is default-deny
+ * for an org user from a foreign origin — a client must be configured for external
+ * browser access; the same-origin/server path (admin console, server-side portal)
+ * is exempt.
  */
 public enum ClientType {
     WEB,

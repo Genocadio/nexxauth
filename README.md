@@ -290,7 +290,15 @@ detector, so a stale device cannot kill the user's newer sessions).
   payload cannot be parsed into memory (DoS protection).
 - **`X-Request-Id`** — accepted or generated, echoed on the response and placed in
   the MDC for log correlation.
-- **Stateless API** — no server-side sessions, CSRF disabled, CORS not enabled.
+- **Stateless API** — no server-side sessions, CSRF disabled.
+- **Client-gated org API (default-deny origins)** — organisation endpoints are
+  locked behind clients. A request with `X-Client-Id` follows that client's
+  configured CORS origins and access rules. With **no** `X-Client-Id`, an org
+  user from a foreign `Origin` is rejected (403) — external browser access
+  requires a client; only the self/server path passes (the admin console as a
+  platform user, and the server-side org portal with no `Origin` header). Per-
+  client CORS headers come from `ClientCorsFilter` (trusted origins are echoed,
+  others get none and are blocked by the browser).
 
 ## Observability
 
@@ -302,7 +310,7 @@ detector, so a stale device cannot kill the user's newer sessions).
 
 ## Testing
 
-- **100 unit/integration tests** — `./gradlew test` (H2 in PostgreSQL mode; Flyway
+- **101 unit/integration tests** — `./gradlew test` (H2 in PostgreSQL mode; Flyway
   migrations run on the test schema). Includes a **hardening suite** that proves
   every malformed input (broken JSON, wrong types, invalid enums, out-of-range
   values, path type mismatches, null-in-list, oversized bodies) yields a clean

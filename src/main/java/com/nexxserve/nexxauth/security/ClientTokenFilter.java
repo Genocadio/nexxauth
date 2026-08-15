@@ -21,7 +21,9 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 /**
- * Enforces the client access rules for requests carrying {@code X-Client-Id}:
+ * Enforces the client access rules for organisation endpoints.
+ * <p>
+ * <b>With {@code X-Client-Id}:</b>
  * <ul>
  *   <li>unknown or disabled clients are rejected (401/403);</li>
  *   <li>clients that require authentication must present their static token as
@@ -34,6 +36,12 @@ import java.util.regex.Pattern;
  *       by the {@link OrgJwtAuthenticationFilter}) — the org user proceeds to
  *       the org API under their own roles/permissions instead of being blocked.</li>
  * </ul>
+ * <b>Without {@code X-Client-Id} (default-deny):</b> an org user from a foreign
+ * origin (a browser {@code Origin} that is not this server's own) is rejected
+ * with 403 — external browser access to an organisation's API requires a client.
+ * The self/server path passes through: the admin console (a platform user, no
+ * org token) and the server-side org portal (no {@code Origin} header).
+ * <p>
  * Runs after the JWT filters, so a present {@code X-Client-Id} always wins
  * over a bearer JWT for auth-required clients; for no-auth clients a valid
  * org-user JWT takes precedence (the client identity is not used for access).
@@ -61,6 +69,16 @@ public class ClientTokenFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
         String clientIdHeader = request.getHeader(CLIENT_ID_HEADER);
         if (clientIdHeader == null) {
+            // No client id: a cross-origin org user is not allowed "outside"
+            // (a client must be configured for external browser access). The
+            // self/server path (no foreign Origin — the admin console as a
+            // platform user, and the server-side org portal) passes through.
+            if (isOrgUserAuthenticated() && isCrossOrigin(request)) {
+                write(response, HttpStatus.FORBIDDEN,
+                        "Organisation access from a foreign origin requires a client id",
+                        request.getRequestURI());
+                return;
+            }
             filterChain.doFilter(request, response);
             return;
         }
@@ -116,6 +134,32 @@ public class ClientTokenFilter extends OncePerRequestFilter {
     private boolean isOrgUserAuthenticated() {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication != null && authentication.getPrincipal() instanceof OrgUserPrincipal;
+    }
+
+    /** True when the request carries an {@code Origin} that is not this server's
+     * own (an absent origin — curl, server-to-server, same-tab navigation — or a
+     * matching same-origin header counts as self). */
+    private boolean isCrossOrigin(HttpServletRequest request) {
+        String origin = request.getHeader("Origin");
+        if (origin == null || origin.isBlank()) {
+            return false;
+        }
+        String own = ownOrigin(request);
+        return own == null || !origin.equals(own);
+    }
+
+    private static String ownOrigin(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-Host");
+        String host = forwarded != null && !forwarded.isBlank() ? forwarded
+                : request.getServerName();
+        if (host == null || host.isBlank()) {
+            return null;
+        }
+        String scheme = request.getScheme();
+        int port = request.getServerPort();
+        String portSuffix = (scheme.equals("https") && port == 443) || (scheme.equals("http") && port == 80)
+                ? "" : ":" + port;
+        return scheme + "://" + host + portSuffix;
     }
 
     private Long parseId(String raw) {

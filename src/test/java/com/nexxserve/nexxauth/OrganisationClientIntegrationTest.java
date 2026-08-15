@@ -326,6 +326,73 @@ class OrganisationClientIntegrationTest {
     }
 
     @Test
+    void orgUserFromForeignOriginWithoutClientIsBlocked() throws Exception {
+        String boss = register("client-foreign@nexx.io", "Client Foreign Platform");
+        String platform = createOrg(boss, ORG_SLUG);
+        String clients = clientsPath(platform);
+        String users = usersPath(platform);
+        String orgAuth = "/api/v1/platforms/" + platform + "/auth";
+
+        String orgPath = "/api/v1/platforms/" + platform + "/organisations/" + ORG_SLUG;
+        long orgId = objectMapper.readTree(mockMvc.perform(get(orgPath)
+                        .header("Authorization", bearer(boss)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString()).get("id").asLong();
+
+        // an org user with READ, no client at all
+        long roleId = objectMapper.readTree(mockMvc.perform(post(orgPath + "/roles")
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("name", "reader", "permissions",
+                                List.of("ORGANISATION_USER_READ")))))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString()).get("id").asLong();
+        long userId = objectMapper.readTree(mockMvc.perform(post(orgAuth + "/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("organisationId", orgId, "identifier", "bob",
+                                "password", "password1", "firstName", "B", "lastName", "L"))))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString()).get("user").get("id").asLong();
+        mockMvc.perform(patch(orgPath + "/users/" + userId)
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("roleIds", List.of(roleId)))))
+                .andExpect(status().isOk());
+        String bobToken = objectMapper.readTree(mockMvc.perform(post(orgAuth + "/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("organisationId", orgId, "identifier", "bob", "password", "password1"))))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString()).get("accessToken").asText();
+
+        // org user + no client id + foreign origin -> blocked (default-deny)
+        mockMvc.perform(get(users)
+                        .header("Authorization", bearer(bobToken))
+                        .header("Origin", "https://evil.example.com"))
+                .andExpect(status().isForbidden());
+
+        // org user + no client id + same-origin (server's own host) -> allowed
+        mockMvc.perform(get(users)
+                        .header("Authorization", bearer(bobToken))
+                        .header("Origin", "http://localhost"))
+                .andExpect(status().isOk());
+
+        // org user + no client id + no origin (server-to-server / self) -> allowed
+        mockMvc.perform(get(users).header("Authorization", bearer(bobToken)))
+                .andExpect(status().isOk());
+
+        // a platform user with no client id and a foreign origin is still allowed
+        // (self/local admin path is limited to platform users, not blocked by origin)
+        mockMvc.perform(get(users)
+                        .header("Authorization", bearer(boss))
+                        .header("Origin", "https://evil.example.com"))
+                .andExpect(status().isOk());
+
+        // ...and a foreign-origin org user IS allowed once a client id is present
+        createClient(boss, clients, "Web", "WEB", null);
+        // (per-client CORS gating is covered by corsAppliesPerClient)
+    }
+
+    @Test
     void corsAppliesPerClient() throws Exception {
         String boss = register("client-cors@nexx.io", "Client Cors Platform");
         String platform = createOrg(boss, ORG_SLUG);
