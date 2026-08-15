@@ -1,0 +1,105 @@
+package com.nexxserve.nexxauth.security;
+
+import com.nexxserve.nexxauth.exception.ErrorResponseWriter;
+import com.nexxserve.nexxauth.util.ClientIps;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.Optional;
+
+/**
+ * Applies the per-IP token bucket to the credential-based endpoints
+ * (login/register/refresh, incl. org auth) and the public slug-suggestions
+ * lookup before any auth work happens, so brute-force attempts are throttled
+ * cheaply. Blocked requests get a 429 with a {@code Retry-After} header and
+ * the unified error body.
+ */
+@Component
+@Order(Ordered.HIGHEST_PRECEDENCE + 10)
+public class RateLimitFilter extends OncePerRequestFilter {
+
+    private static final String LOGIN_PATH = "/api/v1/auth/login";
+    private static final String REGISTER_PATH = "/api/v1/auth/register";
+    private static final String REFRESH_PATH = "/api/v1/auth/refresh";
+    private static final String SUGGESTIONS_PATH = "/api/v1/slug-suggestions";
+    // Org-level auth (variable platform slug) shares the same brute-force
+    // protection; the path identifies the endpoint for the bucket key.
+    private static final String ORG_AUTH_PREFIX = "/api/v1/platforms/";
+
+    private final RateLimitService rateLimitService;
+    private final RateLimitProperties properties;
+    private final ErrorResponseWriter errorResponseWriter;
+
+    public RateLimitFilter(RateLimitService rateLimitService, RateLimitProperties properties,
+                           ErrorResponseWriter errorResponseWriter) {
+        this.rateLimitService = rateLimitService;
+        this.properties = properties;
+        this.errorResponseWriter = errorResponseWriter;
+    }
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
+        String path = request.getRequestURI();
+        RateLimitProperties.Limit limit = limitFor(path);
+
+        // Credential endpoints are POST-only; the public slug-suggestions
+        // lookup is a GET that still needs the same per-IP protection.
+        boolean rateLimited = limit != null
+                && (HttpMethod.POST.matches(request.getMethod())
+                || (HttpMethod.GET.matches(request.getMethod()) && SUGGESTIONS_PATH.equals(path)));
+
+        if (rateLimited) {
+            Optional<Long> retryAfter = rateLimitService.tryConsume(endpointFor(path) + ":"
+                    + ClientIps.resolve(request, properties.isUseForwardedFor()), limit);
+            if (retryAfter.isPresent()) {
+                response.setHeader(HttpHeaders.RETRY_AFTER, retryAfter.get().toString());
+                errorResponseWriter.write(response, HttpStatus.TOO_MANY_REQUESTS,
+                        "Too many requests, please try again later", path);
+                return;
+            }
+        }
+        filterChain.doFilter(request, response);
+    }
+
+    private RateLimitProperties.Limit limitFor(String path) {
+        if (LOGIN_PATH.equals(path) || isOrgAuth(path, "login")) {
+            return properties.getLogin();
+        }
+        if (REGISTER_PATH.equals(path) || isOrgAuth(path, "register")) {
+            return properties.getRegister();
+        }
+        if (REFRESH_PATH.equals(path) || isOrgAuth(path, "refresh")) {
+            return properties.getRefresh();
+        }
+        if (SUGGESTIONS_PATH.equals(path)) {
+            return properties.getSuggestions();
+        }
+        return null;
+    }
+
+    private boolean isOrgAuth(String path, String endpoint) {
+        return path.startsWith(ORG_AUTH_PREFIX) && path.endsWith("/auth/" + endpoint);
+    }
+
+    private String endpointFor(String path) {
+        String endpoint = path.substring(path.lastIndexOf('/') + 1);
+        // Org auth is a separate auth system: give it its own bucket so
+        // brute-forcing org logins cannot exhaust the platform budget (and
+        // vice versa).
+        if (path.startsWith(ORG_AUTH_PREFIX)) {
+            return "org-" + endpoint;
+        }
+        return endpoint;
+    }
+}

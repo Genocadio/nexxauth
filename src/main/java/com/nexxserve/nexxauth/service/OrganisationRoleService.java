@@ -1,0 +1,124 @@
+package com.nexxserve.nexxauth.service;
+
+import com.nexxserve.nexxauth.dto.request.CreateOrganisationRoleRequest;
+import com.nexxserve.nexxauth.dto.request.UpdateOrganisationRoleRequest;
+import com.nexxserve.nexxauth.dto.response.OrganisationRoleResponse;
+import com.nexxserve.nexxauth.entity.Organisation;
+import com.nexxserve.nexxauth.entity.OrganisationRole;
+import com.nexxserve.nexxauth.entity.Platform;
+import com.nexxserve.nexxauth.entity.Permission;
+import com.nexxserve.nexxauth.exception.BadRequestException;
+import com.nexxserve.nexxauth.exception.ConflictException;
+import com.nexxserve.nexxauth.exception.ResourceNotFoundException;
+import com.nexxserve.nexxauth.mapper.OrganisationRoleMapper;
+import com.nexxserve.nexxauth.repository.OrganisationRoleRepository;
+import com.nexxserve.nexxauth.security.OrgActor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+/**
+ * Organisation roles: named groups of app-fixed permissions. A role may have
+ * zero permissions. Roles are organisation-scoped and mean nothing at the
+ * platform level.
+ */
+@Service
+public class OrganisationRoleService {
+
+    private final OrganisationRoleRepository roleRepository;
+    private final PlatformAccess platformAccess;
+    private final OrganisationAccess organisationAccess;
+    private final OrganisationRoleMapper roleMapper;
+
+    public OrganisationRoleService(OrganisationRoleRepository roleRepository, PlatformAccess platformAccess,
+                                   OrganisationAccess organisationAccess, OrganisationRoleMapper roleMapper) {
+        this.roleRepository = roleRepository;
+        this.platformAccess = platformAccess;
+        this.organisationAccess = organisationAccess;
+        this.roleMapper = roleMapper;
+    }
+
+    @Transactional(readOnly = true)
+    public List<OrganisationRoleResponse> list(String platformSlug, String organisationSlug,
+                                               OrgActor requester) {
+        Organisation organisation = resolve(platformSlug, organisationSlug, requester, false);
+        return roleRepository.findByOrganisationIdOrderByCreatedAtAsc(organisation.getId()).stream()
+                .map(roleMapper::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public OrganisationRoleResponse get(String platformSlug, String organisationSlug, Long roleId,
+                                        OrgActor requester) {
+        Organisation organisation = resolve(platformSlug, organisationSlug, requester, false);
+        return roleMapper.toResponse(findRole(organisation, roleId));
+    }
+
+    @Transactional
+    public OrganisationRoleResponse create(String platformSlug, String organisationSlug, OrgActor requester,
+                                           CreateOrganisationRoleRequest request) {
+        Organisation organisation = resolve(platformSlug, organisationSlug, requester, true);
+        if (roleRepository.existsByOrganisationIdAndName(organisation.getId(), request.name())) {
+            throw new ConflictException("A role named " + request.name()
+                    + " already exists in this organisation");
+        }
+        OrganisationRole role = roleMapper.toEntity(request);
+        role.setOrganisation(organisation);
+        rejectNullPermissions(request.permissions());
+        return roleMapper.toResponse(roleRepository.save(role));
+    }
+
+    @Transactional
+    public OrganisationRoleResponse update(String platformSlug, String organisationSlug, Long roleId,
+                                           OrgActor requester, UpdateOrganisationRoleRequest request) {
+        Organisation organisation = resolve(platformSlug, organisationSlug, requester, true);
+        OrganisationRole role = findRole(organisation, roleId);
+
+        if (request.name() != null && !request.name().equals(role.getName())) {
+            if (roleRepository.existsByOrganisationIdAndName(organisation.getId(), request.name())) {
+                throw new ConflictException("A role named " + request.name()
+                        + " already exists in this organisation");
+            }
+            role.setName(request.name());
+        }
+        if (request.permissions() != null) {
+            rejectNullPermissions(request.permissions());
+            role.setPermissions(request.permissions());
+        }
+        return roleMapper.toResponse(roleRepository.save(role));
+    }
+
+    @Transactional
+    public void delete(String platformSlug, String organisationSlug, Long roleId, OrgActor requester) {
+        Organisation organisation = resolve(platformSlug, organisationSlug, requester, true);
+        roleRepository.delete(findRole(organisation, roleId));
+    }
+
+    /** A null element in the permission set would fail the NOT NULL join-table
+     * constraint with a confusing 409; reject it up front with a clear 400. */
+    private void rejectNullPermissions(java.util.Set<Permission> permissions) {
+        if (permissions != null && permissions.contains(null)) {
+            throw new BadRequestException("Permissions may not contain null values");
+        }
+    }
+
+    private OrganisationRole findRole(Organisation organisation, Long roleId) {
+        return roleRepository.findByIdAndOrganisationId(roleId, organisation.getId())
+                .orElseThrow(() -> ResourceNotFoundException.of("Organisation role", roleId));
+    }
+
+    private Organisation resolve(String platformSlug, String organisationSlug, OrgActor requester,
+                                 boolean write) {
+        Platform platform = platformAccess.findPlatform(platformSlug);
+        if (write) {
+            // Role management stays a platform super-user action (there is no
+            // role-management permission in the app-fixed set).
+            platformAccess.requireSuperUser(platform, requester);
+        } else {
+            organisationAccess.requireRead(platform, organisationAccess.findOrganisation(platform, organisationSlug),
+                    requester);
+        }
+        return organisationAccess.findOrganisation(platform, organisationSlug);
+    }
+}

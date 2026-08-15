@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: nexxauth-postgres
+    environment:
+      POSTGRES_DB: nexxauth
+      POSTGRES_USER: nexxauth
+      POSTGRES_PASSWORD: nexxauth
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexxauth -d nexxauth"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: nexxauth-redis
+    ports:
+      - "6379:6379"
+    # Only needed when app.rate-limit.store=redis; kept here so the shared
+    # bucket store is one `docker compose up` away.
+
+volumes:
+  postgres-data:
