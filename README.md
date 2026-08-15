@@ -22,6 +22,7 @@ error shape.
 - [Security & hardening](#security--hardening)
 - [Observability](#observability)
 - [Testing](#testing)
+- [Versioning](#versioning)
 - [Flow documentation](#flow-documentation)
 
 ---
@@ -54,7 +55,7 @@ row per org) but never to none; org users are never platform users.
 |---|---|---|
 | Endpoints | `/api/v1/auth/*` | `/api/v1/platforms/{slug}/auth/*` |
 | Identifier | email (unique globally) | username or email (unique per org) |
-| Access token | HS512 (shared secret) | RS256 (per-org keypair, `kid` in header) |
+| Access token | HS256 (shared secret) | RS256 (per-org keypair, `kid` in header) |
 | Refresh token | rotating + reuse detection | rotating + reuse detection |
 | Roles | `SUPER_USER` / `READ_ONLY` (platform-wide) | any number of org roles → permissions |
 | Password policy | app-fixed (8–72) | per-org `auth-config` (length, expiry, history) |
@@ -69,7 +70,7 @@ inside their own organisation.
 
 - **Java 21 / Spring Boot 4.1** — Web MVC, Security, Data JPA, Validation, Actuator, Flyway
 - **PostgreSQL 16** via Docker Compose (H2 in PostgreSQL mode for tests)
-- **JWT** — `jjwt` 0.12 (platform HS512; per-org RS256 with key rotation)
+- **JWT** — `jjwt` 0.12 (platform HS256; per-org RS256 with key rotation)
 - **MapStruct 1.6** + Lombok — no hand-written DTO mapping
 - **Bucket4j + Caffeine** — in-memory token-bucket rate limiting
 - **Flyway** — versioned schema migrations (`src/main/resources/db/migration`, 7 migrations, 14 tables)
@@ -117,7 +118,7 @@ Overridable via environment variables.
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `JWT_SECRET` | dev secret (base64, 512-bit) | HS512 platform signing key — **must** be set in prod |
+| `JWT_SECRET` | dev secret (base64, 384-bit) | HS256 platform signing key — **must** be set in prod |
 | `app.jwt.access-token-ttl` | `15m` | access token lifetime |
 | `app.jwt.refresh-token-ttl` | `7d` | refresh token lifetime |
 | `app.rate-limit.enabled` | `true` | master switch |
@@ -125,9 +126,17 @@ Overridable via environment variables.
 | `app.rate-limit.register.capacity` / `refill-per-minute` | `3` / `1` | platform + org register bucket |
 | `app.rate-limit.refresh.capacity` / `refill-per-minute` | `10` / `2` | platform + org refresh bucket |
 | `app.rate-limit.use-forwarded-for` | `false` | set `true` only behind a trusted proxy that sets `X-Forwarded-For` |
+| `app.rate-limit.store` | `in-memory` | bucket store: `in-memory` (single instance, Caffeine) or `redis` (shared store for horizontal scaling — see below) |
 | `app.http.max-body-bytes` | `65536` | max request body size (larger → 413, DoS guard) |
 | `management.server.port` | `8081` | actuator port (health/info/liveness/readiness) |
 | `spring.jpa.hibernate.ddl-auto` | `validate` | schema is owned by Flyway; Hibernate only validates |
+
+**Rate-limit store & scaling.** The default `in-memory` store (Caffeine) keeps each
+instance's buckets local — correct for a single instance. To share buckets across
+horizontally scaled instances, set `app.rate-limit.store=redis` and point it at the
+Redis instance (`app.rate-limit.redis.host/port/password/ssl`); the repo's
+`compose.yaml` includes a `redis` service for this. Only the Redis-backed store gives
+correct per-IP throttling once more than one instance serves traffic.
 
 **Production:** `SPRING_PROFILES_ACTIVE=prod` switches to ECS-structured JSON logging
 (console + rotating file at `/var/log/nexxauth/nexxauth.log`, 50 MB × 14) and tones
@@ -235,7 +244,7 @@ never direct permissions. A role may have zero permissions. Enforcement matrix:
 
 ## Tokens
 
-**Access token.** Platform (15 min, fixed): HS512-signed with `sub` = user id, plus
+**Access token.** Platform (15 min, fixed): HS256-signed with `sub` = user id, plus
 `email`, `role`, `platformId`, `platformSlug`, `type: access`. Org: RS256-signed
 with the **organisation's own keypair**, `kid` in the JOSE header, claims:
 
@@ -293,7 +302,7 @@ detector, so a stale device cannot kill the user's newer sessions).
 
 ## Testing
 
-- **70 unit/integration tests** — `./gradlew test` (H2 in PostgreSQL mode; Flyway
+- **99 unit/integration tests** — `./gradlew test` (H2 in PostgreSQL mode; Flyway
   migrations run on the test schema). Includes a **hardening suite** that proves
   every malformed input (broken JSON, wrong types, invalid enums, out-of-range
   values, path type mismatches, null-in-list, oversized bodies) yields a clean
@@ -312,6 +321,21 @@ detector, so a stale device cannot kill the user's newer sessions).
   checks). Note: two Postgres-only issues were caught this way — a lazy config
   insert inside a read-only transaction (fixed) and an org `auth-config` GET on an
   org without a config row; both had been tolerated by H2.
+
+## Versioning
+
+Semantic versioning (`MAJOR.MINOR.PATCH`), tracked in `build.gradle`:
+
+- **MAJOR** — breaking API or behaviour changes (endpoint contract, token format,
+  auth semantics). A new major requires migrating clients.
+- **MINOR** — backwards-compatible features and additions.
+- **PATCH** — backwards-compatible bug fixes.
+
+Current: **1.0.0** (first release). Release versions are tagged in git
+(`v1.0.0`, `v1.1.0`, …). Pre-release builds use a `-SNAPSHOT` suffix (e.g.
+`1.1.0-SNAPSHOT`) while in development and drop it at release. The build version
+flows into `/actuator/info` (`info.app.version`) and the prod ECS log service
+version, so running instances report the exact build they came from.
 
 ## Flow documentation
 

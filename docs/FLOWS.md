@@ -49,7 +49,7 @@ OrgJwtAuthenticationFilter   ③ only on /api/v1/platforms/*/organisations/... :
                         org user against the DB, load roles + permissions
   │
   ▼
-JwtAuthenticationFilter      ④ parse platform token (HS512), re-validate platform
+JwtAuthenticationFilter      ④ parse platform token (HS256), re-validate platform
                         user against the DB, load ROLE_*
   │
   ▼
@@ -115,7 +115,7 @@ POST /api/v1/auth/login
      (and `PLATFORM_DISABLED` when disabled) + 401. Same error for both cases so
      the endpoint never reveals which one failed (no user enumeration).
    - success → audit `PLATFORM_LOGIN_SUCCESS`.
-3. **Tokens issued** — access token (HS512) + a new opaque refresh token stored
+3. **Tokens issued** — access token (HS256) + a new opaque refresh token stored
    hashed in `refresh_tokens` (7-day TTL). Returns 200 with the same shape as
    register.
 
@@ -228,11 +228,11 @@ Mirror of the platform flow, on the org endpoints and the org's refresh-token ta
 
 ## 9. Issuing a platform access token
 
-`JwtService.generateAccessToken(user)` (HS512, shared `JWT_SECRET`):
+`JwtService.generateAccessToken(user)` (HS256, shared `JWT_SECRET`):
 
 ```json
 // header
-{ "alg": "HS512" }
+{ "alg": "HS256" }
 // payload
 { "sub": "12", "iss": "nexxauth", "email": "ada@nexx.io",
   "role": "SUPER_USER", "platformId": 1, "platformSlug": "analytical-engines",
