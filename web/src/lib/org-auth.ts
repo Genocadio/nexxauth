@@ -1,0 +1,127 @@
+/**
+ * Server-only organisation auth. The org portal authenticates with signed
+ * httpOnly cookies instead of Redux/localStorage, so all of its API traffic
+ * happens server-side: server actions (login/logout), a session route handler
+ * (verify/refresh) and the Next proxy gate.
+ *
+ * Never import this module from client code — it reads `process.env` and is
+ * only safe in the Node runtime.
+ */
+
+import { API_BASE_URL } from "@/lib/constants";
+import { decodeJwtPayload } from "@/lib/jwt";
+import type { OrganisationUserResponse, OrgAuthResponse } from "@/types/api";
+import type { LogoutRequest, OrgLoginRequest, RefreshTokenRequest } from "@/types/requests";
+
+/** httpOnly cookies carrying the org session (access + rotating refresh). */
+export const ORG_ACCESS_COOKIE = "org_access_token";
+export const ORG_REFRESH_COOKIE = "org_refresh_token";
+
+/** Upper bound for the session cookies; the backend enforces the real TTL. */
+export const ORG_COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
+
+export const orgCookieOptions = {
+  httpOnly: true,
+  sameSite: "lax" as const,
+  secure: process.env.NODE_ENV === "production",
+  path: "/org",
+  maxAge: ORG_COOKIE_MAX_AGE,
+};
+
+/**
+ * Absolute base URL of the backend for server-side calls (browser requests go
+ * through the same-origin /api/v1 proxy instead). Override API_SERVER_URL to
+ * point at a remote backend in production.
+ */
+const API_SERVER_URL = process.env.API_SERVER_URL ?? "http://localhost:8080";
+
+const apiPath = (path: string) => `${API_SERVER_URL}${API_BASE_URL}${path}`;
+
+/** Claims carried by the org access token (see backend OrgJwtService). */
+export interface OrgJwtClaims {
+  orgId?: number;
+  orgSlug?: string;
+  roles?: string[];
+}
+
+/** The organisation slug from the access token claims, if any. */
+export function orgSlugFromToken(accessToken: string): string | undefined {
+  return decodeJwtPayload<OrgJwtClaims>(accessToken)?.orgSlug;
+}
+
+type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string; status: number };
+
+async function postJson<T>(path: string, body: unknown, token?: string): Promise<ApiResult<T>> {
+  let res: Response;
+  try {
+    res = await fetch(apiPath(path), {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    return { ok: false, error: "Could not reach the server. Please try again.", status: 0 };
+  }
+  if (!res.ok) {
+    return { ok: false, error: await errorMessage(res), status: res.status };
+  }
+  if (res.status === 204) return { ok: true, data: undefined as T };
+  return { ok: true, data: (await res.json()) as T };
+}
+
+async function errorMessage(res: Response): Promise<string> {
+  try {
+    const payload = (await res.json()) as { message?: string };
+    if (payload.message) return payload.message;
+  } catch {
+    // non-JSON body — fall back to the status text
+  }
+  return res.statusText || "Request failed";
+}
+
+/** POST /platforms/{slug}/auth/login */
+export function serverOrgLogin(platformSlug: string, body: OrgLoginRequest): Promise<ApiResult<OrgAuthResponse>> {
+  return postJson<OrgAuthResponse>(`/platforms/${platformSlug}/auth/login`, body);
+}
+
+/** POST /platforms/{slug}/auth/refresh — rotates the refresh token. */
+export function serverOrgRefresh(platformSlug: string, refreshToken: string): Promise<ApiResult<OrgAuthResponse>> {
+  const body: RefreshTokenRequest = { refreshToken };
+  return postJson<OrgAuthResponse>(`/platforms/${platformSlug}/auth/refresh`, body);
+}
+
+/** POST /platforms/{slug}/auth/logout — best effort (204 on success). */
+export function serverOrgLogout(platformSlug: string, refreshToken: string): Promise<ApiResult<void>> {
+  const body: LogoutRequest = { refreshToken };
+  return postJson<void>(`/platforms/${platformSlug}/auth/logout`, body);
+}
+
+/** GET /platforms/{slug}/organisations/{orgSlug}/users/me */
+export function serverOrgMe(
+  platformSlug: string,
+  organisationSlug: string,
+  accessToken: string,
+): Promise<ApiResult<OrganisationUserResponse>> {
+  return getJson<OrganisationUserResponse>(
+    `/platforms/${platformSlug}/organisations/${organisationSlug}/users/me`,
+    accessToken,
+  );
+}
+
+async function getJson<T>(path: string, token: string): Promise<ApiResult<T>> {
+  let res: Response;
+  try {
+    res = await fetch(apiPath(path), {
+      method: "GET",
+      headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    return { ok: false, error: "Could not reach the server. Please try again.", status: 0 };
+  }
+  if (!res.ok) return { ok: false, error: await errorMessage(res), status: res.status };
+  return { ok: true, data: (await res.json()) as T };
+}
