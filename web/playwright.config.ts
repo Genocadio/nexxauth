@@ -14,7 +14,11 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
-  workers: 3,
+  // One worker: the suite shares a single platform (global setup) and the
+  // console now forces any organisation that hasn't finished onboarding back
+  // into its wizard. Parallel workers creating seeded orgs would redirect each
+  // other's pages to onboarding, so the suite runs serially to stay deterministic.
+  workers: 1,
   retries: 1,
   reporter: [["list"]],
   use: {

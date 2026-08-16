@@ -1,8 +1,12 @@
 import { expect, seedOrganisation, test } from "./fixtures";
-import { uniqueSlug } from "./api";
+import { uniqueSlug, updateOrganisation } from "./api";
 
 test.describe("organisation management", () => {
-  test("creates an organisation and opens its detail page", async ({ authedPage }) => {
+  test("creates an organisation and launches its onboarding wizard", async ({
+    authedPage,
+    platform,
+    request,
+  }) => {
     const slug = uniqueSlug("org");
     await authedPage.goto("/console/organisations");
     await authedPage.getByRole("button", { name: "New organisation" }).first().click();
@@ -12,6 +16,19 @@ test.describe("organisation management", () => {
     await authedPage.getByLabel("Slug").fill(slug);
     await authedPage.getByRole("button", { name: "Create organisation" }).click();
 
+    // A brand-new organisation hasn't been set up yet, so its onboarding
+    // wizard launches automatically — no manual switch or banner click.
+    await expect(authedPage).toHaveURL(new RegExp(`/console/onboarding/.*org=${slug}`));
+    // The wizard resumes at step 2 (identifiers) since the org already exists.
+    await expect(authedPage.getByText("How should your users sign in?")).toBeVisible();
+
+    // Mark the org as fully set up via the API so the shared platform stays
+    // onboarded for the rest of the suite, then verify the list + detail page.
+    await updateOrganisation(request, platform.session.accessToken, platform.platformSlug, slug, {
+      onboardingStep: 8,
+    });
+
+    await authedPage.goto("/console/organisations");
     await expect(authedPage.getByText(`Org ${slug}`).first()).toBeVisible();
     await authedPage.getByRole("link", { name: `Org ${slug}` }).click();
     await expect(authedPage).toHaveURL(new RegExp(slug));

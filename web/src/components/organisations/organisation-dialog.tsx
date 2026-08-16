@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,6 +29,7 @@ interface OrganisationDialogProps {
 export function OrganisationDialog({ platformSlug, open, onOpenChange }: OrganisationDialogProps) {
   const create = useCreateOrganisation(platformSlug);
   const form = useForm(createOrganisationSchema, { name: "", slug: "", description: "" });
+  const router = useRouter();
 
   useEffect(() => {
     if (open) form.reset();
@@ -36,12 +38,15 @@ export function OrganisationDialog({ platformSlug, open, onOpenChange }: Organis
 
   const submit = async () => {
     const data = form.values;
-    await create.mutateAsync({
+    const created = await create.mutateAsync({
       name: data.name,
       slug: data.slug?.trim() || undefined,
       description: data.description?.trim() || undefined,
     });
     onOpenChange(false);
+    // A brand-new organisation hasn't been set up yet — launch its onboarding
+    // wizard immediately (onboarding is mandatory before the console is usable).
+    router.push(`/console/onboarding/${platformSlug}?org=${created.slug}`);
   };
 
   return (

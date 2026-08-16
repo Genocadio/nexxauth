@@ -1,4 +1,5 @@
 import { ConsoleShell, RequirePlatformAuth } from "@/components/layout/console-shell";
+import { OnboardingGate } from "@/components/layout/onboarding-gate";
 import { BackendOriginProvider } from "@/lib/backend-url";
 
 // Read BACKEND_PUBLIC_URL at runtime (not baked at build time) so the
@@ -9,7 +10,9 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   return (
     <BackendOriginProvider value={process.env.BACKEND_PUBLIC_URL ?? ""}>
       <RequirePlatformAuth>
-        <ConsoleShell>{children}</ConsoleShell>
+        <OnboardingGate>
+          <ConsoleShell>{children}</ConsoleShell>
+        </OnboardingGate>
       </RequirePlatformAuth>
     </BackendOriginProvider>
   );

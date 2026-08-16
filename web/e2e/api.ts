@@ -130,6 +130,34 @@ export async function createOrganisation(
   return res.json as unknown as OrgBody;
 }
 
+/**
+ * Partial update of an organisation. Used by the e2e seeding to mark seeded
+ * organisations as fully onboarded (onboardingStep 8) — the console forces
+ * incomplete organisations through their onboarding wizard, which would block
+ * tests that exercise an already-configured organisation.
+ */
+export async function updateOrganisation(
+  api: APIRequestContext,
+  token: string,
+  platformSlug: string,
+  organisationSlug: string,
+  body: { onboardingStep?: number },
+): Promise<OrgBody> {
+  const res = await api.patch(`${API_BASE}/${platformSlug}/organisations/${organisationSlug}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: body,
+  });
+  const text = await res.text();
+  let json: Record<string, unknown> | null = null;
+  try {
+    json = text ? (JSON.parse(text) as Record<string, unknown>) : null;
+  } catch {
+    // non-JSON body — the status check below reports it
+  }
+  if (res.status() !== 200) fail("update organisation", { status: res.status(), json, text });
+  return json as unknown as OrgBody;
+}
+
 interface RoleBody {
   id: number;
   name: string;

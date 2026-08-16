@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AtSign,
@@ -35,16 +35,19 @@ import type { OrganisationResponse } from "@/types/api";
 import type { ClientType, UserFieldType } from "@/types/enums";
 
 /**
- * First-run setup wizard for a fresh platform. Guides the owner through the
- * first organisation: sign-in identifiers, user fields, authentication,
- * sessions, the first client and its keys. Progress is persisted on the
- * organisation (`onboardingStep` 1..7, 8 = complete), so the wizard resumes
- * exactly where the user left off.
+ * Setup wizard for an organisation that hasn't finished onboarding yet. It is
+ * reached after registering a fresh platform (no org yet → step 1 creates
+ * one), after creating an organisation (launched with ?org=), and is forced
+ * by the console onboarding gate whenever any organisation is incomplete.
+ * Progress is persisted on the organisation (`onboardingStep` 1..7,
+ * 8 = complete), so the wizard resumes exactly where the user left off.
  */
 export default function OnboardingPage() {
   const { platformSlug } = useParams<{ platformSlug: string }>();
   const router = useRouter();
   const qc = useQueryClient();
+  const searchParams = useSearchParams();
+  const orgParam = searchParams.get("org");
 
   const orgsQuery = useQuery({
     queryKey: ["onboarding-orgs", platformSlug],
@@ -55,7 +58,20 @@ export default function OnboardingPage() {
   const [advancedStep, setAdvancedStep] = useState<number | null>(null);
   const [created, setCreated] = useState<OrganisationResponse | null>(null);
 
-  const org = created ?? orgsQuery.data?.[0] ?? null;
+  // The wizard targets the organisation it was launched for (?org=), falling
+  // back to the first organisation that hasn't completed onboarding, then to
+  // the first overall (fresh platform). A `created` org (step 1) always wins.
+  const org = useMemo(() => {
+    if (created) return created;
+    const list = orgsQuery.data;
+    if (!list || list.length === 0) return null;
+    if (orgParam) {
+      const match = list.find((o) => o.slug === orgParam);
+      if (match) return match;
+    }
+    return list.find((o) => (o.onboardingStep ?? 0) < 8) ?? list[0];
+  }, [created, orgsQuery.data, orgParam]);
+
   // Resume where the user left off: no org → step 1 (create); otherwise the
   // persisted onboardingStep (2 when the org was created outside the wizard).
   const step = advancedStep ?? (org ? (org.onboardingStep ?? 2) : 1);

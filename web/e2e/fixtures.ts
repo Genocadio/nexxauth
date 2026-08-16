@@ -7,6 +7,7 @@ import {
   createRole,
   createUserField,
   uniqueSlug,
+  updateOrganisation,
   type PlatformSetup,
 } from "./api";
 import { AUTH_FILE } from "./global-setup";
@@ -57,6 +58,12 @@ export async function seedOrganisation(
       name,
       slug,
       description: "created by e2e seeding",
+    });
+    // Mark the org as fully onboarded — the console forces incomplete
+    // organisations through their onboarding wizard, which would block tests
+    // that exercise an already-configured organisation.
+    await updateOrganisation(api, platform.session.accessToken, platform.platformSlug, slug, {
+      onboardingStep: 8,
     });
     return { id: created.id, slug, name };
   } finally {
