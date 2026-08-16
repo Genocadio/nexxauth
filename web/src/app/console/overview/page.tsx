@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { CopyButton } from "@/components/shared/copy-button";
 import { useOrganisations, usePlatform, usePlatformUsers } from "@/hooks/queries";
 import { resolvePlatformApiUrl } from "@/lib/api-url";
+import { useBackendOrigin } from "@/lib/backend-url";
 import { formatDate } from "@/lib/constants";
 import { ROLE_META } from "@/types/enums";
 
@@ -19,6 +20,7 @@ export default function OverviewPage() {
   const platform = usePlatform();
   const users = usePlatformUsers();
   const organisations = useOrganisations();
+  const backendOrigin = useBackendOrigin();
 
   const loading = platform.isLoading || users.isLoading || organisations.isLoading;
   const error = platform.error ?? users.error ?? organisations.error;
@@ -26,7 +28,9 @@ export default function OverviewPage() {
   const platformData = platform.data;
   const userCount = platformData?.userCount ?? users.data?.length ?? 0;
   const orgCount = organisations.data?.length ?? 0;
-  const apiUrl = platformData ? resolvePlatformApiUrl(platformData.apiBaseUrl, platformData.slug) : null;
+  const projectUrl = platformData
+    ? resolvePlatformApiUrl(platformData.apiBaseUrl, platformData.slug, backendOrigin)
+    : null;
 
   return (
     <div className="space-y-8">
@@ -65,9 +69,9 @@ export default function OverviewPage() {
               <CardTitle className="text-base">Platform details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 text-sm">
-              {apiUrl ? (
+              {projectUrl ? (
                 <>
-                  <UrlRow label="API URL" value={apiUrl} />
+                  <UrlRow label="Project URL" value={projectUrl} />
                   <Separator />
                 </>
               ) : null}

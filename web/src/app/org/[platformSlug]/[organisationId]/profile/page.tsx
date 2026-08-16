@@ -1,14 +1,14 @@
 import { ShieldCheck } from "lucide-react";
 import { redirect } from "next/navigation";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { OrgLogoutButton } from "@/components/org/org-logout-button";
 import { CopyButton } from "@/components/shared/copy-button";
 import { InitialsAvatar } from "@/components/shared/initials-avatar";
 import { UserRoles } from "@/components/shared/status-badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { organisationApiUrl, platformApiUrl } from "@/lib/api-url";
-import { API_BASE_URL, formatDate } from "@/lib/constants";
+import { platformApiUrl } from "@/lib/api-url";
+import { formatDate } from "@/lib/constants";
 import { ORG_ACCESS_COOKIE, orgSlugFromToken } from "@/lib/org-auth";
 import { fetchOrgSession } from "@/lib/org-session";
 import { fullName, type OrganisationUserResponse } from "@/types/api";
@@ -38,18 +38,8 @@ export default async function OrgProfilePage({
   const organisationSlug =
     orgSlugFromToken(cookieStore.get(ORG_ACCESS_COOKIE)?.value ?? "") ?? `#${organisationId}`;
 
-  // Public API origin when announced (BACKEND_PUBLIC_URL); otherwise the
-  // same-origin proxy base so the URL is always usable and copyable.
-  const h = await headers();
-  const proto = h.get("x-forwarded-proto") ?? "http";
-  const host = h.get("host") ?? "localhost:3000";
-  const backendOrigin = process.env.BACKEND_PUBLIC_URL ?? "";
-  const platformBase =
-    platformApiUrl(backendOrigin, platformSlug) ?? `${proto}://${host}${API_BASE_URL}/${platformSlug}`;
-  const apiUrl =
-    platformBase && !organisationSlug.startsWith("#")
-      ? organisationApiUrl(platformBase, organisationSlug)
-      : null;
+  // The project base URL — `BACKEND_PUBLIC_URL` + slug. Never a /api/v1 path.
+  const projectUrl = platformApiUrl(process.env.BACKEND_PUBLIC_URL ?? "", platformSlug);
 
   return (
     <OrgProfile
@@ -57,7 +47,7 @@ export default async function OrgProfilePage({
       organisationSlug={organisationSlug}
       platformSlug={platformSlug}
       organisationId={organisationId}
-      apiUrl={apiUrl}
+      projectUrl={projectUrl}
     />
   );
 }
@@ -67,13 +57,13 @@ function OrgProfile({
   organisationSlug,
   platformSlug,
   organisationId,
-  apiUrl,
+  projectUrl,
 }: {
   user: OrganisationUserResponse;
   organisationSlug: string;
   platformSlug: string;
   organisationId: number;
-  apiUrl: string | null;
+  projectUrl: string | null;
 }) {
   const name = fullName(user);
 
@@ -93,7 +83,7 @@ function OrgProfile({
             <CardDescription>{user?.email ?? user?.username ?? "Organisation user"}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            {apiUrl ? <UrlRow label="API URL" value={apiUrl} /> : null}
+            {projectUrl ? <UrlRow label="Project URL" value={projectUrl} /> : null}
             <Row label="Username" value={user?.username ?? "—"} />
             <Row label="Email" value={user?.email ?? "—"} />
             <Row label="Status" value={user?.enabled ? "Active" : "Disabled"} />

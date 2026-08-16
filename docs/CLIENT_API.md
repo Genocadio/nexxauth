@@ -48,21 +48,23 @@ endpoints (platform auth) remain under `https://auth.example.com/api/v1/auth/*`.
 
 Every request uses JSON (`Content-Type: application/json`).
 
-> **Finding your API URL** — the dashboards always show the exact base to use,
-> copyable, no `/api/v1` in sight (Supabase-style):
+> **Finding your URL** — the dashboards show the platform URL (your **project
+> base**) copyable, no `/api/v1` in sight (Supabase-style):
 >
-> - **Platform dashboard** (console → Overview) shows the platform API base:
+> - **Platform dashboard** (console → Overview) and the **organisation
+>   dashboards** (console → organisation → Overview, and the org portal
+>   profile) all show the same platform base:
 >   `https://auth.example.com/acme`
-> - **Organisation dashboards** (console → organisation → Overview, and the org
->   portal profile) show the organisation API base:
->   `https://auth.example.com/acme/organisations/{organisationSlug}`
->   (the platform base is shown alongside in the console).
 >
-> The value is derived from the deployment's `BACKEND_PUBLIC_URL` plus the
-> platform slug (the backend also returns it as `apiBaseUrl` in `GET /{slug}`).
-> When `BACKEND_PUBLIC_URL` is not configured, the dashboards fall back to the
-> same-origin proxy base (`https://{console-origin}/api/v1/{slug}`) so a usable,
-> copyable URL is always available.
+> That is the project base URL — every other management endpoint lives under it
+> (org auth at `.../acme/auth/*`, the org API at
+> `.../acme/organisations/{organisationSlug}/*`, keys at
+> `.../acme/organisations/{organisationSlug}/keys`).
+>
+> The value is derived from `BACKEND_PUBLIC_URL` plus the platform slug (the
+> backend also returns it as `apiBaseUrl` in `GET /{slug}`). When neither the
+> backend nor the web app knows the public origin, the dashboards omit the row —
+> they never show a `/api/v1` URL.
 
 Common headers:
 

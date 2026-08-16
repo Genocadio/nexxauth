@@ -131,12 +131,12 @@ Overridable via environment variables.
 | `app.http.max-body-bytes` | `65536` | max request body size (larger → 413, DoS guard) |
 | `management.server.port` | `8081` | actuator port (health/info/liveness/readiness) |
 | `spring.jpa.hibernate.ddl-auto` | `validate` | schema is owned by Flyway; Hibernate only validates |
-| `BACKEND_PUBLIC_URL` | — | public origin of the API (e.g. `https://auth.example.com`). Drives the copiable **API URL** shown on the platform/org dashboards (`BACKEND_PUBLIC_URL` + platform slug, Supabase-style) and returned as `apiBaseUrl` in `GET /{slug}`. Unset → the dashboards fall back to the same-origin proxy base so a URL is always shown |
+| `BACKEND_PUBLIC_URL` | — | public origin of the API (e.g. `https://auth.example.com`). Drives the copyable platform/project URL shown on the dashboards (`BACKEND_PUBLIC_URL` + platform slug — no `/api/v1`, Supabase-style) and returned as `apiBaseUrl` in `GET /{slug}`. Unset → the row is omitted |
 
-**Dashboards API URL.** Each platform lives at `BACKEND_PUBLIC_URL/{slug}`; each
-organisation at `BACKEND_PUBLIC_URL/{slug}/organisations/{organisationSlug}`.
-The console overview and org dashboards show these copyable (no `/api/v1`
-prefix) so clients have the exact base to call. See `docs/CLIENT_API.md`.
+**Dashboards API URL.** Each platform's project base is `BACKEND_PUBLIC_URL/{slug}`;
+all org endpoints live under it (`/organisations/{organisationSlug}/...`). The
+console overview and org dashboards show the project base copyable (no `/api/v1`
+prefix) so clients have the exact origin to call. See `docs/CLIENT_API.md`.
 
 **Rate-limit store & scaling.** The default `in-memory` store (Caffeine) keeps each
 instance's buckets local — correct for a single instance. To share buckets across

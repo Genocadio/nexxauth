@@ -21,7 +21,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useUpdateOrganisation } from "@/hooks/mutations";
 import { useOrganisation, usePlatform } from "@/hooks/queries";
 import { useForm } from "@/hooks/use-form";
-import { organisationApiUrl, resolvePlatformApiUrl } from "@/lib/api-url";
+import { resolvePlatformApiUrl } from "@/lib/api-url";
+import { useBackendOrigin } from "@/lib/backend-url";
 import { formatDate } from "@/lib/constants";
 import { updateOrganisationSchema } from "@/lib/validation";
 
@@ -33,17 +34,13 @@ interface OrgOverviewTabProps {
 export function OrgOverviewTab({ platformSlug, organisationSlug }: OrgOverviewTabProps) {
   const org = useOrganisation(organisationSlug);
   const platform = usePlatform();
+  const backendOrigin = useBackendOrigin();
 
   const [editOpen, setEditOpen] = useState(false);
   const update = useUpdateOrganisation(platformSlug, organisationSlug);
 
-  // Resolved from platform data only, so the rows never render during SSR (the
-  // client then fills in the absolute URL once the query resolves) — avoiding a
-  // hydration mismatch from the window.location fallback.
-  const platformBase = platform.data
-    ? resolvePlatformApiUrl(platform.data.apiBaseUrl, platformSlug)
-    : null;
-  const apiUrl = platformBase ? organisationApiUrl(platformBase, organisationSlug) : null;
+  // The project base URL is the platform URL; all org endpoints live under it.
+  const projectUrl = resolvePlatformApiUrl(platform.data?.apiBaseUrl, platformSlug, backendOrigin);
 
   const form = useForm(updateOrganisationSchema, {
     name: org.data?.name ?? "",
@@ -70,8 +67,7 @@ export function OrgOverviewTab({ platformSlug, organisationSlug }: OrgOverviewTa
           <CardDescription>Identity and sign-in behaviour of this organisation.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
-          {platformBase ? <UrlRow label="Platform API URL" value={platformBase} /> : null}
-          {apiUrl ? <UrlRow label="Organisation API URL" value={apiUrl} /> : null}
+          {projectUrl ? <UrlRow label="Project URL" value={projectUrl} /> : null}
           <DetailRow label="Name" value={data.name} />
           <DetailRow label="Slug" value={data.slug} mono />
           <DetailRow label="Description" value={data.description ?? "—"} />
