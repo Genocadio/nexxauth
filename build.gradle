@@ -74,6 +74,12 @@ tasks.named('test') {
 	}
 }
 
+// Fixed jar name (no version in the filename) so the Dockerfile can COPY it
+// without globbing and the layered extraction can reference it directly.
+tasks.named('bootJar') {
+	archiveFileName = 'nexxauth.jar'
+}
+
 // Boot 4 removed the bootBuildInfo task; generate the build-info.properties
 // that the actuator info endpoint reads (management.info.build.enabled=true).
 def buildInfoDir = layout.buildDirectory.dir('resources/main/META-INF')

@@ -1,0 +1,53 @@
+name: Build and Push x86 Docker Image
+
+on:
+  workflow_run:
+    # Only ship images for commits the CI workflow already validated.
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  build-and-push:
+    name: Build and push backend + web images
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' }}
+    steps:
+      - name: Checkout CI-validated commit
+        uses: actions/checkout@v4
+        with:
+          # workflow_run runs against the workflow file, not the commit that
+          # triggered CI; check out the exact SHA CI validated instead.
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: genoyves/nexxauth-backend:latest
+          cache-from: type=gha,scope=nexxauth-backend
+          cache-to: type=gha,mode=max,scope=nexxauth-backend
+
+      - name: Build and push web
+        uses: docker/build-push-action@v5
+        with:
+          context: ./web
+          platforms: linux/amd64
+          push: true
+          tags: genoyves/nexxauth-web:latest
+          # next.config.ts bakes the /api/v1 proxy target at build time; must
+          # match the backend service name used in compose.prod.yaml.
+          build-args: BACKEND_URL=http://backend:8080
+          cache-from: type=gha,scope=nexxauth-web
+          cache-to: type=gha,mode=max,scope=nexxauth-web

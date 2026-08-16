@@ -1,35 +1,75 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1.7
 
-# --- Build stage: compile the Spring Boot app with Gradle -------------------
-FROM gradle:9.5.1-jdk21 AS build
+# ---- Base image args (must be declared before the first FROM) ----------------
+# Overridable via build args so CI can pin to digest-pinned tags for fully
+# reproducible builds without editing this file:
+#   docker build --build-arg BUILD_JAVA_IMAGE=eclipse-temurin:21-jdk@sha256:...
+ARG BUILD_JAVA_IMAGE=eclipse-temurin:21-jdk
+ARG RUNTIME_JAVA_IMAGE=eclipse-temurin:21-jre
+
+# ---- Build stage ------------------------------------------------------------
+FROM ${BUILD_JAVA_IMAGE} AS build
+
 WORKDIR /workspace
 
-# Copy the whole repo; the build context is the repo root.
-COPY . .
+# Use the project's Gradle wrapper for reproducible builds. --chmod keeps the
+# exec bit without a separate RUN layer.
+COPY --chmod=+x gradlew .
+COPY gradle gradle
+COPY settings.gradle build.gradle ./
 
-# Compile and package the boot jar (skips tests — CI runs them).
-RUN gradle --no-daemon bootJar -x test
+# Resolve dependencies in a cacheable layer. The BuildKit cache mount keeps the
+# Gradle caches out of the image layers and warm across local rebuilds.
+RUN --mount=type=cache,target=/root/.gradle \
+    ./gradlew dependencies --no-daemon
 
-# --- Runtime stage: minimal JRE image ----------------------------------------
-FROM eclipse-temurin:21-jre
+# Copy application source only after dependency resolution.
+COPY src src
+
+# CI runs tests separately. Produce the Boot jar and split it into its layers
+# so the runtime stage can copy each as a separate image layer (Boot 4 jarmode
+# emits application/nexxauth.jar + dependencies/lib/ + empty loader layers).
+RUN --mount=type=cache,target=/root/.gradle \
+    ./gradlew bootJar --no-daemon -x test \
+    && java -Djarmode=tools -jar build/libs/nexxauth.jar extract --layers --destination extracted
+
+# ---- Runtime stage ----------------------------------------------------------
+FROM ${RUNTIME_JAVA_IMAGE}
+
 WORKDIR /app
 
-# Non-root user for the container.
-RUN groupadd --system nexxauth && useradd --system --gid nexxauth --no-create-home nexxauth \
-    && mkdir -p /var/log/nexxauth && chown nexxauth:nexxauth /var/log/nexxauth
+# curl for the healthcheck; non-root user; log directory owned by that user so
+# the prod profile can write /var/log/nexxauth/nexxauth.log (also the compose
+# app-logs volume mount point).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system nexxauth \
+    && useradd --system --gid nexxauth --no-create-home nexxauth \
+    && mkdir -p /var/log/nexxauth \
+    && chown -R nexxauth:nexxauth /var/log/nexxauth
 
-COPY --from=build /workspace/build/libs/*.jar /app/nexxauth.jar
+# Boot layers, least to most frequently changing, so deploy pushes only
+# re-transfer the application layer. Boot 4 extracts to a thin
+# application/nexxauth.jar whose manifest Class-Path resolves the dependency
+# jars from lib/ next to it.
+COPY --from=build /workspace/extracted/dependencies/ ./
+COPY --from=build /workspace/extracted/application/ ./
 
-# Actuator runs on 8081 (management port); the API on 8080. Bind the management
-# port to 0.0.0.0 so container health checks can reach it.
 EXPOSE 8080 8081
 
 USER nexxauth
 
-# Runtime env is supplied by the orchestrator (compose/k8s): datasource, JWT
-# secret, rate-limit store, etc. The prod profile switches to ECS JSON logging.
 ENV SPRING_PROFILES_ACTIVE=prod \
     SPRING_DOCKER_COMPOSE_ENABLED=false \
     MANAGEMENT_SERVER_ADDRESS=0.0.0.0
 
-ENTRYPOINT ["java", "-jar", "/app/nexxauth.jar"]
+# Health probe for any orchestrator; compose's depends_on: service_healthy
+# uses this image healthcheck too (compose overrides with its own if defined).
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=12 \
+    CMD curl -fsS http://localhost:8081/actuator/health/readiness || exit 1
+
+# Container-aware heap (75% of the cgroup limit) and exit on OOM so an
+# orchestrator restarts a wedged JVM instead of serving degraded. The thin
+# application jar resolves its dependencies from lib/ next to it.
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-XX:+ExitOnOutOfMemoryError", "-jar", "nexxauth.jar"]

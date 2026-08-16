@@ -45,6 +45,11 @@ COPY --from=build /app/public ./public
 EXPOSE 3000
 USER nexxauth
 
+# Health probe for orchestrators; compose's depends_on: service_healthy uses
+# this image healthcheck too.
+HEALTHCHECK --interval=10s --timeout=5s --start-period=20s --retries=12 \
+    CMD curl -fsS http://localhost:3000/ || exit 1
+
 # PORT/HOSTNAME are honored by the standalone server. API_SERVER_URL (org
 # portal server-side calls) is injected at runtime by compose.
 CMD ["node", "server.js"]
