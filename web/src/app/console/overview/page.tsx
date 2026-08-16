@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { CopyButton } from "@/components/shared/copy-button";
 import { useOrganisations, usePlatform, usePlatformUsers } from "@/hooks/queries";
+import { resolvePlatformApiUrl } from "@/lib/api-url";
 import { formatDate } from "@/lib/constants";
 import { ROLE_META } from "@/types/enums";
 
@@ -25,7 +26,7 @@ export default function OverviewPage() {
   const platformData = platform.data;
   const userCount = platformData?.userCount ?? users.data?.length ?? 0;
   const orgCount = organisations.data?.length ?? 0;
-  const apiUrl = platformData?.apiBaseUrl ?? null;
+  const apiUrl = platformData ? resolvePlatformApiUrl(platformData.apiBaseUrl, platformData.slug) : null;
 
   return (
     <div className="space-y-8">

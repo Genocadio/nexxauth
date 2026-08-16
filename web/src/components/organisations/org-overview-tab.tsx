@@ -21,7 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useUpdateOrganisation } from "@/hooks/mutations";
 import { useOrganisation, usePlatform } from "@/hooks/queries";
 import { useForm } from "@/hooks/use-form";
-import { organisationApiUrl } from "@/lib/api-url";
+import { organisationApiUrl, resolvePlatformApiUrl } from "@/lib/api-url";
 import { formatDate } from "@/lib/constants";
 import { updateOrganisationSchema } from "@/lib/validation";
 
@@ -37,7 +37,13 @@ export function OrgOverviewTab({ platformSlug, organisationSlug }: OrgOverviewTa
   const [editOpen, setEditOpen] = useState(false);
   const update = useUpdateOrganisation(platformSlug, organisationSlug);
 
-  const apiUrl = organisationApiUrl(platform.data?.apiBaseUrl, organisationSlug);
+  // Resolved from platform data only, so the rows never render during SSR (the
+  // client then fills in the absolute URL once the query resolves) — avoiding a
+  // hydration mismatch from the window.location fallback.
+  const platformBase = platform.data
+    ? resolvePlatformApiUrl(platform.data.apiBaseUrl, platformSlug)
+    : null;
+  const apiUrl = platformBase ? organisationApiUrl(platformBase, organisationSlug) : null;
 
   const form = useForm(updateOrganisationSchema, {
     name: org.data?.name ?? "",
@@ -64,7 +70,8 @@ export function OrgOverviewTab({ platformSlug, organisationSlug }: OrgOverviewTa
           <CardDescription>Identity and sign-in behaviour of this organisation.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
-          {apiUrl ? <UrlRow label="API URL" value={apiUrl} /> : null}
+          {platformBase ? <UrlRow label="Platform API URL" value={platformBase} /> : null}
+          {apiUrl ? <UrlRow label="Organisation API URL" value={apiUrl} /> : null}
           <DetailRow label="Name" value={data.name} />
           <DetailRow label="Slug" value={data.slug} mono />
           <DetailRow label="Description" value={data.description ?? "—"} />
