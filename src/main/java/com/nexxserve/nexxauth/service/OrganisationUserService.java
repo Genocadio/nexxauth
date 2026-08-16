@@ -280,7 +280,10 @@ public class OrganisationUserService {
     }
 
     private String identifierOf(OrganisationUser user) {
-        return user.getUsername() != null ? user.getUsername() : user.getEmail();
+        // First non-null identifier, so phone-only users stay attributable.
+        return user.getUsername() != null ? user.getUsername()
+                : user.getEmail() != null ? user.getEmail()
+                : user.getPhone() != null ? user.getPhone() : "unknown";
     }
 
     private void assertIdentifiersFree(Organisation organisation, String email, String username,

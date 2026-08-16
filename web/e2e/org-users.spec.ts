@@ -14,7 +14,9 @@ test.describe("organisation user management", () => {
     await authedPage.getByLabel("Email", { exact: true }).fill(`${username}@acme.test`);
     await authedPage.getByLabel("Password (optional)").fill("pw-secret-1");
     await authedPage.locator("#org-user-form").getByLabel("manager").check();
-    await authedPage.getByLabel("Employee ID").fill("EMP-1");
+    // User-field inputs are labelled by their attribute key (the label concept
+    // was removed from the field model).
+    await authedPage.getByLabel("employee-id").fill("EMP-1");
     await authedPage.getByRole("button", { name: "Create user" }).click();
 
     const row = authedPage.locator("tr", { hasText: username });

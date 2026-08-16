@@ -678,6 +678,53 @@ class OrganisationAuthIntegrationTest {
     }
 
     @Test
+    void disabledUserCannotLoginAndSessionsAreRevoked() throws Exception {
+        String platform = "/" + SLUGS[15];
+        String org = platform + "/organisations/" + ORG_SLUG;
+        String orgAuth = platform + "/auth";
+        String boss = registerPlatform("orgauth-disable-boss@nexx.io", SLUGS[15]);
+        createOrganisation(boss, platform);
+        long orgId = getOrgId(boss, org);
+        long disabled = registerOrgUser(orgAuth, orgId, "toby", "orgpass1");
+
+        // a working session first
+        MvcResult login = mockMvc.perform(post(orgAuth + "/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("organisationId", orgId, "identifier", "toby", "password", "orgpass1"))))
+                .andExpect(status().isOk())
+                .andReturn();
+        String refreshToken = objectMapper.readTree(login.getResponse().getContentAsString())
+                .get("refreshToken").asText();
+
+        // disable the account: login is rejected and the session is revoked
+        mockMvc.perform(patch(org + "/users/" + disabled)
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("enabled", false))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(false));
+        mockMvc.perform(post(orgAuth + "/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("organisationId", orgId, "identifier", "toby", "password", "orgpass1"))))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post(orgAuth + "/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("refreshToken", refreshToken))))
+                .andExpect(status().isUnauthorized());
+
+        // re-enabling restores login
+        mockMvc.perform(patch(org + "/users/" + disabled)
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("enabled", true))))
+                .andExpect(status().isOk());
+        mockMvc.perform(post(orgAuth + "/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("organisationId", orgId, "identifier", "toby", "password", "orgpass1"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void adminPasswordResetRevokesExistingSessions() throws Exception {
         String platform = "/" + SLUGS[9];
         String org = platform + "/organisations/" + ORG_SLUG;

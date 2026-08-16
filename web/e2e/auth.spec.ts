@@ -2,7 +2,7 @@ import { expect, test } from "./fixtures";
 import { uniqueEmail, uniqueSlug } from "./api";
 
 test.describe("authentication", () => {
-  test("registers a platform and lands on the console", async ({ page }) => {
+  test("registers a platform and lands in the onboarding wizard", async ({ page }) => {
     const slug = uniqueSlug("reg");
     await page.goto("/register");
     await page.getByLabel("First name").fill("Ada");
@@ -12,8 +12,9 @@ test.describe("authentication", () => {
     await page.getByLabel("Password", { exact: true }).fill("sup3r-secret");
     await page.getByRole("button", { name: "Create platform" }).click();
 
-    await expect(page).toHaveURL(/\/console\/organisations/);
-    await expect(page.getByRole("heading", { name: "Organisations", exact: true })).toBeVisible();
+    // A fresh platform lands in the onboarding wizard (first organisation).
+    await expect(page).toHaveURL(/\/console\/onboarding\//);
+    await expect(page.getByRole("heading", { name: "Set up your organisation" })).toBeVisible();
   });
 
   test("rejects invalid credentials with a clear message", async ({ page }) => {

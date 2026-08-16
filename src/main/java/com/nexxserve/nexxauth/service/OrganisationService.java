@@ -149,14 +149,14 @@ public class OrganisationService {
 
     /** Legacy {@code useEmailAsUsername} switch mapped onto the per-identifier
      * flags: email required + login identifier, username not login-capable and
-     * not required; phone untouched (never enabled by the old setting). */
+     * not required. Phone flags are left untouched — the old switch predates
+     * phone and must not silently disable a phone identifier configured via
+     * the onboarding wizard. */
     private void applyLegacyIdentifierSwitch(Organisation organisation, boolean emailAsUsername) {
         organisation.setEmailRequired(emailAsUsername);
         organisation.setEmailCanLogin(emailAsUsername);
         organisation.setUsernameRequired(!emailAsUsername);
         organisation.setUsernameCanLogin(!emailAsUsername);
-        organisation.setPhoneRequired(false);
-        organisation.setPhoneCanLogin(false);
     }
 
     @Transactional

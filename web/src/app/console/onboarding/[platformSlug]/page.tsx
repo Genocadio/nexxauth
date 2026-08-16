@@ -946,7 +946,12 @@ function StepKeys({
     queryFn: () => platformApi.get(platformSlug),
   });
 
-  const base = platformQuery.data?.apiBaseUrl ?? `${window.location.origin}`;
+  // Guarded: this page is server-rendered (force-dynamic layout), where
+  // `window` does not exist — the loading gate keeps StepKeys client-only, but
+  // the fallback must not crash SSR if that changes.
+  const base =
+    platformQuery.data?.apiBaseUrl ??
+    (typeof window !== "undefined" ? window.location.origin : "https://auth.example.com");
   const keysUrl = `${base}/organisations/${org.slug}/keys`;
   const client = clientsQuery.data?.[0];
   const activeKey = keysQuery.data?.find((k) => k.active);

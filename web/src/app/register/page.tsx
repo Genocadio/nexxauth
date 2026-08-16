@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
@@ -31,8 +31,16 @@ export default function RegisterPage() {
     platformSlug: "",
   });
 
+  // True from the moment the user submits the form: after a successful
+  // register the session appears in the store, and the bounce-below must not
+  // fight the onboarding redirect fired by the register mutation.
+  const submitted = useRef(false);
+
   useEffect(() => {
-    if (mounted && session) router.replace("/console");
+    // Already signed in (e.g. a returning user visiting /register): go to the
+    // console. Skipped right after a fresh register — that navigation is
+    // handled by usePlatformRegister (onboarding wizard).
+    if (mounted && session && !submitted.current) router.replace("/console");
   }, [mounted, session, router]);
 
   if (!mounted || session) return null;
@@ -51,8 +59,9 @@ export default function RegisterPage() {
       }
     >
       <form
-        onSubmit={form.handleSubmit((data) =>
-          register.mutateAsync({
+        onSubmit={form.handleSubmit((data) => {
+          submitted.current = true;
+          return register.mutateAsync({
             firstName: data.firstName,
             lastName: data.lastName,
             email: data.email,
@@ -60,8 +69,8 @@ export default function RegisterPage() {
             phone: data.phone?.trim() || undefined,
             platformName: data.platformName,
             platformSlug: data.platformSlug?.trim() || undefined,
-          }),
-        )}
+          });
+        })}
         className="space-y-4"
       >
         <div className="grid gap-4 sm:grid-cols-2">
