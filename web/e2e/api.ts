@@ -83,7 +83,7 @@ export async function registerPlatform(api: APIRequestContext): Promise<Platform
   const platformName = `E2E ${platformSlug}`;
 
   for (let attempt = 0; attempt < 5; attempt++) {
-    const res = await postJson(api, "/api/v1/auth/register", {
+    const res = await postJson(api, "/auth/register", {
       firstName: "Ada",
       lastName: "Lovelace",
       email,

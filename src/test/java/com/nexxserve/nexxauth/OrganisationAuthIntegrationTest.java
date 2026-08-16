@@ -278,7 +278,7 @@ class OrganisationAuthIntegrationTest {
                 .andExpect(status().isForbidden());
 
         // org tokens never grant platform access
-        mockMvc.perform(get("/api/v1/auth/me").header("Authorization", bearer(aliceToken)))
+        mockMvc.perform(get("/auth/me").header("Authorization", bearer(aliceToken)))
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(get(platform).header("Authorization", bearer(aliceToken)))
                 .andExpect(status().isUnauthorized());
@@ -497,7 +497,7 @@ class OrganisationAuthIntegrationTest {
     // --- helpers ---
 
     private String registerPlatform(String email, String slug) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/register")
+        MvcResult result = mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "firstName", "F", "lastName", "L",
@@ -574,11 +574,11 @@ class OrganisationAuthIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn();
         long memberId = objectMapper.readTree(add.getResponse().getContentAsString()).get("id").asLong();
-        mockMvc.perform(post("/api/v1/auth/login")
+        mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("email", "orgauth-ro@nexx.io", "password", "readonly-pw"))))
                 .andExpect(status().isOk());
-        MvcResult login = mockMvc.perform(post("/api/v1/auth/login")
+        MvcResult login = mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("email", "orgauth-ro@nexx.io", "password", "readonly-pw"))))
                 .andExpect(status().isOk())

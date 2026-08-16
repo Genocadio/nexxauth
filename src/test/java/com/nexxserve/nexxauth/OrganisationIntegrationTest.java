@@ -117,7 +117,7 @@ class OrganisationIntegrationTest {
                 .andReturn();
         long memberId = objectMapper.readTree(add.getResponse().getContentAsString()).get("id").asLong();
 
-        MvcResult login = mockMvc.perform(post("/api/v1/auth/login")
+        MvcResult login = mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("email", "ro@nexx.io", "password", "password1"))))
                 .andExpect(status().isOk())
@@ -209,7 +209,7 @@ class OrganisationIntegrationTest {
     // --- helpers ---
 
     private String register(String email, String platformName) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/register")
+        MvcResult result = mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "firstName", "F",

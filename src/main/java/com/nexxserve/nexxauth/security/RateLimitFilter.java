@@ -28,13 +28,12 @@ import java.util.Optional;
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class RateLimitFilter extends OncePerRequestFilter {
 
-    private static final String LOGIN_PATH = "/api/v1/auth/login";
-    private static final String REGISTER_PATH = "/api/v1/auth/register";
-    private static final String REFRESH_PATH = "/api/v1/auth/refresh";
-    private static final String SUGGESTIONS_PATH = "/api/v1/slug-suggestions";
-    // Platform auth stays under /api/v1; anything else ending in /auth/... is
-    // org auth at a platform's clean root origin /{slug}/auth/...
-    private static final String API_PREFIX = "/api/v1/";
+    private static final String LOGIN_PATH = "/auth/login";
+    private static final String REGISTER_PATH = "/auth/register";
+    private static final String REFRESH_PATH = "/auth/refresh";
+    private static final String SUGGESTIONS_PATH = "/slug-suggestions";
+    // Platform auth is /auth/...; org auth is /{slug}/auth/... — one extra path
+    // segment, which is how the two are told apart below.
 
     private final RateLimitService rateLimitService;
     private final RateLimitProperties properties;
@@ -89,7 +88,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private boolean isOrgAuth(String path, String endpoint) {
-        return !path.startsWith(API_PREFIX) && path.endsWith("/auth/" + endpoint);
+        // Org auth is /{slug}/auth/{endpoint} (a slug prefix); platform auth is
+        // /auth/{endpoint}. The org form has exactly three path separators.
+        return path.endsWith("/auth/" + endpoint)
+                && path.chars().filter(c -> c == '/').count() == 3;
     }
 
     private String endpointFor(String path) {
@@ -97,7 +99,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         // Org auth is a separate auth system: give it its own bucket so
         // brute-forcing org logins cannot exhaust the platform budget (and
         // vice versa).
-        if (!path.startsWith(API_PREFIX)) {
+        if (isOrgAuth(path, endpoint)) {
             return "org-" + endpoint;
         }
         return endpoint;

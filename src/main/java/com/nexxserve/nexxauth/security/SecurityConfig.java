@@ -43,8 +43,9 @@ public class SecurityConfig {
                         // Actuator health/info: served on the separate management
                         // port (8081), open so monitoring probes need no token.
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
-                        .requestMatchers("/api/v1/auth/login", "/api/v1/auth/register",
-                                "/api/v1/auth/refresh", "/api/v1/auth/logout").permitAll()
+                        // Platform (console) auth at the clean root origin.
+                        .requestMatchers("/auth/login", "/auth/register",
+                                "/auth/refresh", "/auth/logout").permitAll()
                         // Organisation auth (org-level, separate from platform auth).
                         // Platforms live at their own clean root origin: /{slug}/auth/*
                         .requestMatchers("/*/auth/login", "/*/auth/register",
@@ -52,19 +53,19 @@ public class SecurityConfig {
                         // Public slug suggestions for the register form (rate
                         // limited per IP); organisation suggestions enforce
                         // authentication in the service.
-                        .requestMatchers(HttpMethod.GET, "/api/v1/slug-suggestions").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/slug-suggestions").permitAll()
                         // Public verification keys for an organisation's tokens
                         .requestMatchers(HttpMethod.GET, "/*/organisations/*/keys").permitAll()
                         // Organisation endpoints: any authenticated token (platform
                         // or org user); the fine-grained platform-role and
                         // org-permission gating happens at method level.
                         .requestMatchers("/*/organisations/**").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/users/**").hasAnyRole("SUPER_USER", "READ_ONLY")
-                        .requestMatchers("/api/v1/users/**").hasRole("SUPER_USER")
+                        .requestMatchers(HttpMethod.GET, "/users/**").hasAnyRole("SUPER_USER", "READ_ONLY")
+                        .requestMatchers("/users/**").hasRole("SUPER_USER")
                         // Own-profile endpoints are open to any authenticated
                         // platform user (both roles), so they must be matched
                         // before the platform management rules below.
-                        .requestMatchers("/api/v1/auth/me", "/api/v1/auth/me/password").authenticated()
+                        .requestMatchers("/auth/me", "/auth/me/password").authenticated()
                         // Platform management endpoints at the platform's root origin
                         // /{slug} (platform details, platform users, ...).
                         .requestMatchers(HttpMethod.GET, "/*").hasAnyRole("SUPER_USER", "READ_ONLY")

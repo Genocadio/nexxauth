@@ -31,7 +31,7 @@ class GlobalCorsIntegrationTest {
 
     @Test
     void allowsFrontendOriginPreflight() throws Exception {
-        mockMvc.perform(options("/api/v1/auth/login")
+        mockMvc.perform(options("/auth/login")
                         .header("Origin", "https://app.example.com")
                         .header("Access-Control-Request-Method", "POST"))
                 .andExpect(status().isOk())
@@ -41,7 +41,7 @@ class GlobalCorsIntegrationTest {
 
     @Test
     void allowsBackendOriginPreflight() throws Exception {
-        mockMvc.perform(options("/api/v1/auth/login")
+        mockMvc.perform(options("/auth/login")
                         .header("Origin", "https://api.example.com")
                         .header("Access-Control-Request-Method", "POST"))
                 .andExpect(status().isOk())
@@ -51,7 +51,7 @@ class GlobalCorsIntegrationTest {
     @Test
     void allowsExtraOriginPreflight() throws Exception {
         // Extra origins behave exactly like the frontend origin.
-        mockMvc.perform(options("/api/v1/auth/login")
+        mockMvc.perform(options("/auth/login")
                         .header("Origin", "https://third.example.com")
                         .header("Access-Control-Request-Method", "POST"))
                 .andExpect(status().isOk())
@@ -60,7 +60,7 @@ class GlobalCorsIntegrationTest {
 
     @Test
     void rejectsUnknownOriginPreflight() throws Exception {
-        mockMvc.perform(options("/api/v1/auth/login")
+        mockMvc.perform(options("/auth/login")
                         .header("Origin", "https://evil.example.com")
                         .header("Access-Control-Request-Method", "POST"))
                 .andExpect(status().isForbidden())
@@ -71,7 +71,7 @@ class GlobalCorsIntegrationTest {
     void clientRequestsDeferToPerClientCors() throws Exception {
         // X-Client-Id requests are owned by ClientCorsFilter; the global source
         // must not add headers even for a globally-allowed origin.
-        mockMvc.perform(options("/api/v1/auth/login")
+        mockMvc.perform(options("/auth/login")
                         .header("X-Client-Id", "1")
                         .header("Origin", "https://app.example.com")
                         .header("Access-Control-Request-Method", "POST"))

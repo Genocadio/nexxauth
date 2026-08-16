@@ -402,7 +402,7 @@ class OrganisationUserFieldIntegrationTest {
     // --- helpers ---
 
     private String registerPlatform(String email, String slug) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/register")
+        MvcResult result = mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "firstName", "F", "lastName", "L",

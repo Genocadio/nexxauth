@@ -32,7 +32,7 @@ class AuthFlowIntegrationTest {
     @Test
     void fullAuthLifecycle() throws Exception {
         // --- register creates a platform + super user, returns tokens ---
-        MvcResult register = mockMvc.perform(post("/api/v1/auth/register")
+        MvcResult register = mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "firstName", "Ada",
@@ -55,13 +55,13 @@ class AuthFlowIntegrationTest {
         String refreshToken = registerBody.get("refreshToken").asText();
 
         // --- me with access token ---
-        mockMvc.perform(get("/api/v1/auth/me").header("Authorization", bearer(accessToken)))
+        mockMvc.perform(get("/auth/me").header("Authorization", bearer(accessToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.firstName").value("Ada"))
                 .andExpect(jsonPath("$.role").value("SUPER_USER"));
 
         // --- login with credentials ---
-        MvcResult login = mockMvc.perform(post("/api/v1/auth/login")
+        MvcResult login = mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("email", "ada@example.com", "password", "sup3r-secret"))))
                 .andExpect(status().isOk())
@@ -79,7 +79,7 @@ class AuthFlowIntegrationTest {
                 .andExpect(jsonPath("$.apiBaseUrl").value(org.hamcrest.Matchers.nullValue()));
 
         // --- self profile update ---
-        mockMvc.perform(patch("/api/v1/auth/me")
+        mockMvc.perform(patch("/auth/me")
                         .header("Authorization", bearer(loginAccess))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("phone", "+000000000"))))
@@ -101,7 +101,7 @@ class AuthFlowIntegrationTest {
         long graceId = objectMapper.readTree(addUser.getResponse().getContentAsString()).get("id").asLong();
 
         // --- read-only user logs in and can read but not write ---
-        MvcResult graceLogin = mockMvc.perform(post("/api/v1/auth/login")
+        MvcResult graceLogin = mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("email", "grace@example.com", "password", "readonly-pw"))))
                 .andExpect(status().isOk())
@@ -125,7 +125,7 @@ class AuthFlowIntegrationTest {
                 .andExpect(status().isForbidden());
 
         // --- super user updates the member's role ---
-        mockMvc.perform(patch("/api/v1/users/" + graceId)
+        mockMvc.perform(patch("/users/" + graceId)
                         .header("Authorization", bearer(loginAccess))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("role", "SUPER_USER", "firstName", "Gracey"))))
@@ -134,7 +134,7 @@ class AuthFlowIntegrationTest {
                 .andExpect(jsonPath("$.firstName").value("Gracey"));
 
         // --- refresh rotates the token (old one becomes unusable) ---
-        MvcResult refresh = mockMvc.perform(post("/api/v1/auth/refresh")
+        MvcResult refresh = mockMvc.perform(post("/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("refreshToken", refreshToken))))
                 .andExpect(status().isOk())
@@ -144,18 +144,18 @@ class AuthFlowIntegrationTest {
         String newRefreshToken = refreshBody.get("refreshToken").asText();
         assertThat(newRefreshToken).isNotEqualTo(refreshToken);
 
-        mockMvc.perform(post("/api/v1/auth/refresh")
+        mockMvc.perform(post("/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("refreshToken", refreshToken))))
                 .andExpect(status().isUnauthorized());
 
         // --- logout revokes the refresh token ---
-        mockMvc.perform(post("/api/v1/auth/logout")
+        mockMvc.perform(post("/auth/logout")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("refreshToken", newRefreshToken))))
                 .andExpect(status().isNoContent());
 
-        mockMvc.perform(post("/api/v1/auth/refresh")
+        mockMvc.perform(post("/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("refreshToken", newRefreshToken))))
                 .andExpect(status().isUnauthorized());
@@ -170,13 +170,13 @@ class AuthFlowIntegrationTest {
                 "password", "password1",
                 "platformName", "Dup Corp"));
 
-        mockMvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON).content(body))
+        mockMvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated());
 
-        mockMvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON).content(body))
+        mockMvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isConflict());
 
-        mockMvc.perform(post("/api/v1/auth/login")
+        mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("email", "dup@example.com", "password", "wrong-password"))))
                 .andExpect(status().isUnauthorized());
@@ -184,10 +184,10 @@ class AuthFlowIntegrationTest {
 
     @Test
     void invalidAccessTokenIsRejected() throws Exception {
-        mockMvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer not-a-jwt"))
+        mockMvc.perform(get("/auth/me").header("Authorization", "Bearer not-a-jwt"))
                 .andExpect(status().isUnauthorized());
 
-        mockMvc.perform(get("/api/v1/auth/me"))
+        mockMvc.perform(get("/auth/me"))
                 .andExpect(status().isUnauthorized());
     }
 

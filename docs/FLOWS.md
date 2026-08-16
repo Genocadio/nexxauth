@@ -83,7 +83,7 @@ Notes:
 ## 2. Platform register
 
 ```
-POST /api/v1/auth/register
+POST /auth/register
 { firstName, lastName, email, password, phone?, platformName, platformSlug? }
 ```
 
@@ -105,7 +105,7 @@ POST /api/v1/auth/register
 ## 3. Platform login
 
 ```
-POST /api/v1/auth/login
+POST /auth/login
 { email, password }
 ```
 
@@ -123,7 +123,7 @@ POST /api/v1/auth/login
 ## 4. Platform refresh (rotation + theft detection)
 
 ```
-POST /api/v1/auth/refresh
+POST /auth/refresh
 { refreshToken }
 ```
 
@@ -155,12 +155,12 @@ TTLs come from the same `session-settings` row and are applied at issue time.
 
 ## 5. Platform logout & password change
 
-**Logout** — `POST /api/v1/auth/logout { refreshToken }` → 204, idempotent:
+**Logout** — `POST /auth/logout { refreshToken }` → 204, idempotent:
 - audit attribution first (`findSubjectForAudit` — side-effect-free lookup, so a
   plain logout never trips the theft detector), then revoke the token.
 - unknown/already-revoked token still returns 204.
 
-**Change password** — `POST /api/v1/auth/me/password` (authenticated):
+**Change password** — `POST /auth/me/password` (authenticated):
 - verify `currentPassword` against the stored BCrypt hash → else 401.
 - `revokeAllForUser` — **every outstanding refresh token is revoked**, forcing
   re-authentication on all devices.

@@ -50,18 +50,18 @@ class RateLimitIntegrationTest {
         String body = json(Map.of("email", "nobody@example.com", "password", "wrong-password"));
 
         // First two attempts are processed (rejected for bad credentials, not throttled)...
-        mockMvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON).content(body))
+        mockMvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isUnauthorized());
-        mockMvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON).content(body))
+        mockMvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isUnauthorized());
 
         // ...the third is throttled with the unified error shape.
-        MvcResult blocked = mockMvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON).content(body))
+        MvcResult blocked = mockMvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists("Retry-After"))
                 .andExpect(header().exists("X-Request-Id"))
                 .andExpect(jsonPath("$.status").value(429))
-                .andExpect(jsonPath("$.path").value("/api/v1/auth/login"))
+                .andExpect(jsonPath("$.path").value("/auth/login"))
                 .andExpect(jsonPath("$.requestId").isNotEmpty())
                 .andReturn();
 
@@ -80,7 +80,7 @@ class RateLimitIntegrationTest {
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists("Retry-After"))
                 .andExpect(jsonPath("$.status").value(429))
-                .andExpect(jsonPath("$.path").value("/api/v1/auth/register"));
+                .andExpect(jsonPath("$.path").value("/auth/register"));
     }
 
     @Test
@@ -89,17 +89,17 @@ class RateLimitIntegrationTest {
 
         // First two refresh attempts are processed (rejected for an unknown
         // token, not throttled)...
-        mockMvc.perform(post("/api/v1/auth/refresh").contentType(MediaType.APPLICATION_JSON).content(body))
+        mockMvc.perform(post("/auth/refresh").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isUnauthorized());
-        mockMvc.perform(post("/api/v1/auth/refresh").contentType(MediaType.APPLICATION_JSON).content(body))
+        mockMvc.perform(post("/auth/refresh").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isUnauthorized());
 
         // ...the third is throttled with the unified error shape.
-        mockMvc.perform(post("/api/v1/auth/refresh").contentType(MediaType.APPLICATION_JSON).content(body))
+        mockMvc.perform(post("/auth/refresh").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists("Retry-After"))
                 .andExpect(jsonPath("$.status").value(429))
-                .andExpect(jsonPath("$.path").value("/api/v1/auth/refresh"));
+                .andExpect(jsonPath("$.path").value("/auth/refresh"));
     }
 
     @Test
@@ -123,7 +123,7 @@ class RateLimitIntegrationTest {
 
     @Test
     void slugSuggestionsAreLimitedPerIp() throws Exception {
-        String url = "/api/v1/slug-suggestions?type=PLATFORM&name=Acme";
+        String url = "/slug-suggestions?type=PLATFORM&name=Acme";
 
         // First two lookups are processed...
         mockMvc.perform(get(url)).andExpect(status().isOk());
@@ -134,11 +134,11 @@ class RateLimitIntegrationTest {
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists("Retry-After"))
                 .andExpect(jsonPath("$.status").value(429))
-                .andExpect(jsonPath("$.path").value("/api/v1/slug-suggestions"));
+                .andExpect(jsonPath("$.path").value("/slug-suggestions"));
     }
 
     private org.springframework.test.web.servlet.ResultActions register(String email) throws Exception {
-        return mockMvc.perform(post("/api/v1/auth/register")
+        return mockMvc.perform(post("/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json(Map.of(
                         "firstName", "A",

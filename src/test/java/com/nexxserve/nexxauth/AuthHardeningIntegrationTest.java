@@ -47,17 +47,17 @@ class AuthHardeningIntegrationTest {
         String workerAccess = login("worker@hardening.com", "password1");
 
         // Token works while the account is enabled...
-        mockMvc.perform(get("/api/v1/auth/me").header("Authorization", bearer(workerAccess)))
+        mockMvc.perform(get("/auth/me").header("Authorization", bearer(workerAccess)))
                 .andExpect(status().isOk());
 
         // ...and is rejected immediately once the account is disabled.
-        mockMvc.perform(patch("/api/v1/users/" + workerId)
+        mockMvc.perform(patch("/users/" + workerId)
                         .header("Authorization", bearer(superAccess))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("enabled", false))))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(get("/api/v1/auth/me").header("Authorization", bearer(workerAccess)))
+        mockMvc.perform(get("/auth/me").header("Authorization", bearer(workerAccess)))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -67,7 +67,7 @@ class AuthHardeningIntegrationTest {
         String access = tokenOf(register);
         String refresh = refreshOf(register);
 
-        mockMvc.perform(post("/api/v1/auth/me/password")
+        mockMvc.perform(post("/auth/me/password")
                         .header("Authorization", bearer(access))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
@@ -76,18 +76,18 @@ class AuthHardeningIntegrationTest {
                 .andExpect(status().isNoContent());
 
         // The old refresh token must not work anymore.
-        mockMvc.perform(post("/api/v1/auth/refresh")
+        mockMvc.perform(post("/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("refreshToken", refresh))))
                 .andExpect(status().isUnauthorized());
 
         // And the new password must actually be in effect (regression: a bulk
         // revoke used to clear the persistence context and lose the update).
-        mockMvc.perform(post("/api/v1/auth/login")
+        mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("email", "pw@hardening.com", "password", "new-password1"))))
                 .andExpect(status().isOk());
-        mockMvc.perform(post("/api/v1/auth/login")
+        mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("email", "pw@hardening.com", "password", "password1"))))
                 .andExpect(status().isUnauthorized());
@@ -101,7 +101,7 @@ class AuthHardeningIntegrationTest {
         assert email.equals("mixedcase@test.com") : "email was not normalized: " + email;
 
         // Different casing must still authenticate against the same account.
-        mockMvc.perform(post("/api/v1/auth/login")
+        mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("email", "MIXEDCASE@test.COM", "password", "password1"))))
                 .andExpect(status().isOk());
@@ -112,7 +112,7 @@ class AuthHardeningIntegrationTest {
         MvcResult register = register("reuse@hardening.com", "Reuse Co", "password1");
         String refresh1 = refreshOf(register);
 
-        MvcResult refresh = mockMvc.perform(post("/api/v1/auth/refresh")
+        MvcResult refresh = mockMvc.perform(post("/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("refreshToken", refresh1))))
                 .andExpect(status().isOk())
@@ -121,13 +121,13 @@ class AuthHardeningIntegrationTest {
                 .get("refreshToken").asText();
 
         // Replaying the already-rotated token is treated as theft...
-        mockMvc.perform(post("/api/v1/auth/refresh")
+        mockMvc.perform(post("/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("refreshToken", refresh1))))
                 .andExpect(status().isUnauthorized());
 
         // ...and the whole token family is revoked, including the fresh one.
-        mockMvc.perform(post("/api/v1/auth/refresh")
+        mockMvc.perform(post("/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("refreshToken", refresh2))))
                 .andExpect(status().isUnauthorized());
@@ -137,7 +137,7 @@ class AuthHardeningIntegrationTest {
     void blankOptionalFieldsAreRejected() throws Exception {
         String access = tokenOf(register("blank@hardening.com", "Blank Co", "password1"));
 
-        mockMvc.perform(patch("/api/v1/auth/me")
+        mockMvc.perform(patch("/auth/me")
                         .header("Authorization", bearer(access))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"firstName\":\"\"}"))
@@ -148,7 +148,7 @@ class AuthHardeningIntegrationTest {
     // --- helpers ---
 
     private MvcResult register(String email, String platformName, String password) throws Exception {
-        return mockMvc.perform(post("/api/v1/auth/register")
+        return mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "firstName", "F",
@@ -161,7 +161,7 @@ class AuthHardeningIntegrationTest {
     }
 
     private String login(String email, String password) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
+        MvcResult result = mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("email", email, "password", password))))
                 .andExpect(status().isOk())

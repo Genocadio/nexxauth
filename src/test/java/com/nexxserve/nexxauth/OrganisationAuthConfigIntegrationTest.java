@@ -237,7 +237,7 @@ class OrganisationAuthConfigIntegrationTest {
         // platform register/login are unaffected by org rules: a 9-char
         // password passes the platform's own 8-72 rule even though scope-org
         // demands 12 (platform rules never read the org config)
-        mockMvc.perform(post("/api/v1/auth/register")
+        mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "firstName", "P", "lastName", "T",
@@ -249,7 +249,7 @@ class OrganisationAuthConfigIntegrationTest {
     // --- helpers ---
 
     private String registerPlatform(String email, String slug) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/register")
+        MvcResult result = mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "firstName", "F", "lastName", "L",

@@ -446,7 +446,7 @@ class OrganisationClientIntegrationTest {
     // --- helpers ---
 
     private String register(String email, String platformName) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/register")
+        MvcResult result = mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "firstName", "F",
@@ -462,7 +462,7 @@ class OrganisationClientIntegrationTest {
     /** Creates the org and returns the boss's platform slug. */
     private String createOrg(String boss, String slug) throws Exception {
         String platformSlug = objectMapper.readTree(
-                        mockMvc.perform(get("/api/v1/auth/me")
+                        mockMvc.perform(get("/auth/me")
                                         .header("Authorization", bearer(boss)))
                                 .andExpect(status().isOk())
                                 .andReturn()

@@ -44,7 +44,7 @@ https://auth.example.com/acme
 
 All organisation-facing endpoints (auth, org API, keys) are served directly
 under that origin — no `/api/v1` prefix. The platform-wide admin/console
-endpoints (platform auth) remain under `https://auth.example.com/api/v1/auth/*`.
+endpoints (platform auth) are at `https://auth.example.com/auth/*`.
 
 Every request uses JSON (`Content-Type: application/json`).
 
@@ -466,7 +466,7 @@ token of that user (all their sessions) and rejects the request. So:
 
 ## 8. Platform (admin) tokens — brief
 
-Console/admin tokens come from `POST /api/v1/auth/login` (or `/register`):
+Console/admin tokens come from `POST /auth/login` (or `/register`):
 
 ```json
 {
@@ -486,7 +486,7 @@ These are **HS256** tokens signed with the shared `JWT_SECRET` — **not
 verifiable with any public key**; only Nexxauth itself (or a party holding the
 secret) can verify them. They carry a single `role` claim
 (`SUPER_USER`/`READ_ONLY`) and are meant for the console. Endpoints:
-`POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout`.
+`POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`.
 
 ---
 

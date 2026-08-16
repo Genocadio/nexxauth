@@ -34,7 +34,7 @@ class SlugSuggestionIntegrationTest {
 
     @Test
     void platformSuggestionsArePublicAndDerivedFromName() throws Exception {
-        mockMvc.perform(get("/api/v1/slug-suggestions")
+        mockMvc.perform(get("/slug-suggestions")
                         .param("type", "PLATFORM")
                         .param("name", "Acme Labs!"))
                 .andExpect(status().isOk())
@@ -50,7 +50,7 @@ class SlugSuggestionIntegrationTest {
     void platformCandidateReflectsExistingSlugAndOffersVariants() throws Exception {
         register("slug-platform@nexx.io", "Slug Platform");
 
-        mockMvc.perform(get("/api/v1/slug-suggestions")
+        mockMvc.perform(get("/slug-suggestions")
                         .param("type", "PLATFORM")
                         .param("name", "Slug Platform"))
                 .andExpect(status().isOk())
@@ -63,7 +63,7 @@ class SlugSuggestionIntegrationTest {
 
     @Test
     void platformTypedSlugIsValidatedAndChecked() throws Exception {
-        mockMvc.perform(get("/api/v1/slug-suggestions")
+        mockMvc.perform(get("/slug-suggestions")
                         .param("type", "PLATFORM")
                         .param("slug", "my-custom"))
                 .andExpect(status().isOk())
@@ -71,11 +71,11 @@ class SlugSuggestionIntegrationTest {
                 .andExpect(jsonPath("$.candidate.available").value(true));
 
         // invalid pattern / overlong -> 400, never a 200
-        mockMvc.perform(get("/api/v1/slug-suggestions")
+        mockMvc.perform(get("/slug-suggestions")
                         .param("type", "PLATFORM")
                         .param("slug", "UPPER_CASE"))
                 .andExpect(status().isBadRequest());
-        mockMvc.perform(get("/api/v1/slug-suggestions")
+        mockMvc.perform(get("/slug-suggestions")
                         .param("type", "PLATFORM")
                         .param("slug", "a".repeat(101)))
                 .andExpect(status().isBadRequest());
@@ -83,7 +83,7 @@ class SlugSuggestionIntegrationTest {
 
     @Test
     void organisationSuggestionsRequireAuthentication() throws Exception {
-        mockMvc.perform(get("/api/v1/slug-suggestions")
+        mockMvc.perform(get("/slug-suggestions")
                         .param("type", "ORGANISATION")
                         .param("platformSlug", "some-platform")
                         .param("name", "Acme"))
@@ -94,7 +94,7 @@ class SlugSuggestionIntegrationTest {
     void organisationSuggestionsAreScopedToThePlatform() throws Exception {
         String boss = register("slug-org-boss@nexx.io", "Org Slug Platform");
 
-        mockMvc.perform(get("/api/v1/slug-suggestions")
+        mockMvc.perform(get("/slug-suggestions")
                         .param("type", "ORGANISATION")
                         .param("platformSlug", "org-slug-platform")
                         .param("name", "Nexx Labs")
@@ -111,7 +111,7 @@ class SlugSuggestionIntegrationTest {
                         .content(json(Map.of("name", "Nexx Labs"))))
                 .andExpect(status().isCreated());
 
-        mockMvc.perform(get("/api/v1/slug-suggestions")
+        mockMvc.perform(get("/slug-suggestions")
                         .param("type", "ORGANISATION")
                         .param("platformSlug", "org-slug-platform")
                         .param("name", "Nexx Labs")
@@ -123,7 +123,7 @@ class SlugSuggestionIntegrationTest {
 
         // a member of another platform cannot probe this platform's slugs
         String stranger = register("slug-stranger@nexx.io", "Stranger Platform");
-        mockMvc.perform(get("/api/v1/slug-suggestions")
+        mockMvc.perform(get("/slug-suggestions")
                         .param("type", "ORGANISATION")
                         .param("platformSlug", "org-slug-platform")
                         .param("name", "Nexx Labs")
@@ -131,12 +131,12 @@ class SlugSuggestionIntegrationTest {
                 .andExpect(status().isForbidden());
 
         // missing / unknown platform
-        mockMvc.perform(get("/api/v1/slug-suggestions")
+        mockMvc.perform(get("/slug-suggestions")
                         .param("type", "ORGANISATION")
                         .param("name", "Nexx Labs")
                         .header("Authorization", bearer(boss)))
                 .andExpect(status().isBadRequest());
-        mockMvc.perform(get("/api/v1/slug-suggestions")
+        mockMvc.perform(get("/slug-suggestions")
                         .param("type", "ORGANISATION")
                         .param("platformSlug", "nope")
                         .param("name", "Nexx Labs")
@@ -146,14 +146,14 @@ class SlugSuggestionIntegrationTest {
 
     @Test
     void requiresNameOrSlug() throws Exception {
-        mockMvc.perform(get("/api/v1/slug-suggestions").param("type", "PLATFORM"))
+        mockMvc.perform(get("/slug-suggestions").param("type", "PLATFORM"))
                 .andExpect(status().isBadRequest());
     }
 
     // --- helpers ---
 
     private String register(String email, String platformName) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/register")
+        MvcResult result = mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "firstName", "F",

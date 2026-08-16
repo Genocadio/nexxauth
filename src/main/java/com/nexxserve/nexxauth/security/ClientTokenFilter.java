@@ -52,9 +52,9 @@ public class ClientTokenFilter extends OncePerRequestFilter {
     static final String CLIENT_ID_HEADER = "X-Client-Id";
 
     private static final String BEARER_PREFIX = "Bearer ";
-    // Platform auth lives under /api/v1/auth; the org auth paths are at a
-    // platform's clean root origin /{slug}/auth/(login|register). The negative
-    // lookahead keeps a slug literally named "api" from hijacking /api/...
+    // Platform auth is /auth/...; the org auth paths are at a platform's clean
+    // root origin /{slug}/auth/(login|register) — the pattern requires the
+    // slug segment, so platform /auth/login can never match.
     private static final Pattern ORG_AUTH_PATH =
             Pattern.compile("^/(?!api/)[^/]+/auth/(login|register)$");
     private static final List<SimpleGrantedAuthority> CLIENT_AUTHORITIES = clientAuthorities();

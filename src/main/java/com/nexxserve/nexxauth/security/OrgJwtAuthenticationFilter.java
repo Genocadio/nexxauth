@@ -36,7 +36,7 @@ public class OrgJwtAuthenticationFilter extends OncePerRequestFilter {
     /** While a gating action (CHANGE_PASSWORD) is pending the user may only
      * reach the action endpoints; every other org endpoint stays closed. The
      * negative lookahead keeps a slug literally named "api" from matching
-     * /api/v1/* paths (org endpoints live at /{slug}/organisations/...). */
+     * /api/... paths (org endpoints live at /{slug}/organisations/...). */
     private static final String ACTION_ENDPOINTS =
             "^/(?!api/)[^/]+/organisations/[^/]+/users/me/change-password$";
 

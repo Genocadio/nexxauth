@@ -42,7 +42,7 @@ check() { # label expected actual
 }
 
 echo "== register (creates platform + super user) =="
-req POST /api/v1/auth/register -H 'Content-Type: application/json' \
+req POST /auth/register -H 'Content-Type: application/json' \
   -d '{"firstName":"Ada","lastName":"Lovelace","email":"ada@nexx.io","password":"sup3r-secret","phone":"+123","platformName":"Analytical Engines"}'
 check "register" 201 "$(status)"
 BA=$(field '["accessToken"]'); BR=$(field '["refreshToken"]')
@@ -51,10 +51,10 @@ check "role" SUPER_USER "$(field '["user"]["role"]')"
 check "slug derived" analytical-engines "$(field '["user"]["platform"]["slug"]')"
 
 echo "== me / profile / platform =="
-req GET /api/v1/auth/me -H "Authorization: Bearer $BA"
+req GET /auth/me -H "Authorization: Bearer $BA"
 check "me" 200 "$(status)"
 check "me email" ada@nexx.io "$(field '["email"]')"
-req PATCH /api/v1/auth/me -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' -d '{"phone":"+999"}'
+req PATCH /auth/me -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' -d '{"phone":"+999"}'
 check "patch me" 200 "$(status)"
 check "patch me phone" +999 "$(field '["phone"]')"
 req GET /analytical-engines -H "Authorization: Bearer $BA"
@@ -68,7 +68,7 @@ check "add member" 201 "$(status)"
 check "member role default" READ_ONLY "$(field '["role"]')"
 MID=$(field '["id"]')
 
-req POST /api/v1/auth/login -H 'Content-Type: application/json' -d '{"email":"grace@nexx.io","password":"readonly-pw"}'
+req POST /auth/login -H 'Content-Type: application/json' -d '{"email":"grace@nexx.io","password":"readonly-pw"}'
 check "member login" 200 "$(status)"
 MA=$(field '["accessToken"]')
 
@@ -206,7 +206,7 @@ check "org users/me" 200 "$(status)"
 check "org me identifier" bob "$(field '["username"]')"
 
 # org token has no platform power
-req GET /api/v1/auth/me -H "Authorization: Bearer $OBA2"
+req GET /auth/me -H "Authorization: Bearer $OBA2"
 check "org token not a platform token" 401 "$(status)"
 req GET /analytical-engines -H "Authorization: Bearer $OBA2"
 check "org token cannot read platform" 401 "$(status)"
@@ -420,7 +420,7 @@ check "delete org with children" 204 "$(status)"
 req GET /analytical-engines/organisations/auth-corp -H "Authorization: Bearer $BA"
 check "deleted auth org 404" 404 "$(status)"
 
-req PATCH /api/v1/users/$MID -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' -d '{"role":"SUPER_USER"}'
+req PATCH /users/$MID -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' -d '{"role":"SUPER_USER"}'
 check "promote member" 200 "$(status)"
 check "promoted role" SUPER_USER "$(field '["role"]')"
 
@@ -428,43 +428,43 @@ req POST /analytical-engines/users -H "Authorization: Bearer $MA" -H 'Content-Ty
   -d '{"firstName":"New","lastName":"Member","email":"newbie@nexx.io","password":"password1"}'
 check "promoted member can add (no re-login)" 201 "$(status)"
 
-req PATCH /api/v1/users/$MID -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' -d '{"enabled":false}'
+req PATCH /users/$MID -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' -d '{"enabled":false}'
 check "disable member" 200 "$(status)"
-req GET /api/v1/auth/me -H "Authorization: Bearer $MA"
+req GET /auth/me -H "Authorization: Bearer $MA"
 check "disabled token rejected immediately" 401 "$(status)"
 
-req GET /api/v1/users/$MID -H "Authorization: Bearer $BA"
+req GET /users/$MID -H "Authorization: Bearer $BA"
 check "get user by id" 200 "$(status)"
 
 echo "== refresh rotation + reuse detection =="
-req POST /api/v1/auth/refresh -H 'Content-Type: application/json' -d "{\"refreshToken\":\"$BR\"}"
+req POST /auth/refresh -H 'Content-Type: application/json' -d "{\"refreshToken\":\"$BR\"}"
 check "refresh rotates" 200 "$(status)"
 BR2=$(field '["refreshToken"]')
-req POST /api/v1/auth/refresh -H 'Content-Type: application/json' -d "{\"refreshToken\":\"$BR\"}"
+req POST /auth/refresh -H 'Content-Type: application/json' -d "{\"refreshToken\":\"$BR\"}"
 check "reused token rejected" 401 "$(status)"
-req POST /api/v1/auth/refresh -H 'Content-Type: application/json' -d "{\"refreshToken\":\"$BR2\"}"
+req POST /auth/refresh -H 'Content-Type: application/json' -d "{\"refreshToken\":\"$BR2\"}"
 check "family revoked after reuse" 401 "$(status)"
-req POST /api/v1/auth/logout -H 'Content-Type: application/json' -d "{\"refreshToken\":\"$BR2\"}"
+req POST /auth/logout -H 'Content-Type: application/json' -d "{\"refreshToken\":\"$BR2\"}"
 check "logout (idempotent)" 204 "$(status)"
 
 echo "== password change revokes sessions =="
-req POST /api/v1/auth/login -H 'Content-Type: application/json' -d '{"email":"ada@nexx.io","password":"sup3r-secret"}'
+req POST /auth/login -H 'Content-Type: application/json' -d '{"email":"ada@nexx.io","password":"sup3r-secret"}'
 check "login" 200 "$(status)"
 BA2=$(field '["accessToken"]'); BR3=$(field '["refreshToken"]')
-req POST /api/v1/auth/me/password -H "Authorization: Bearer $BA2" -H 'Content-Type: application/json' \
+req POST /auth/me/password -H "Authorization: Bearer $BA2" -H 'Content-Type: application/json' \
   -d '{"currentPassword":"sup3r-secret","newPassword":"sup3r-secret2"}'
 check "change password" 204 "$(status)"
-req POST /api/v1/auth/refresh -H 'Content-Type: application/json' -d "{\"refreshToken\":\"$BR3\"}"
+req POST /auth/refresh -H 'Content-Type: application/json' -d "{\"refreshToken\":\"$BR3\"}"
 check "refresh after password change" 401 "$(status)"
-req POST /api/v1/auth/login -H 'Content-Type: application/json' -d '{"email":"ada@nexx.io","password":"sup3r-secret2"}'
+req POST /auth/login -H 'Content-Type: application/json' -d '{"email":"ada@nexx.io","password":"sup3r-secret2"}'
 check "login new password" 200 "$(status)"
-req POST /api/v1/auth/login -H 'Content-Type: application/json' -d '{"email":"ada@nexx.io","password":"sup3r-secret"}'
+req POST /auth/login -H 'Content-Type: application/json' -d '{"email":"ada@nexx.io","password":"sup3r-secret"}'
 check "login old password" 401 "$(status)"
-req POST /api/v1/auth/login -H 'Content-Type: application/json' -d '{"email":"ada@nexx.io","password":"wrong-password"}'
+req POST /auth/login -H 'Content-Type: application/json' -d '{"email":"ada@nexx.io","password":"wrong-password"}'
 check "login wrong password" 401 "$(status)"
 
 echo "== rate limiting (login bucket: 5/min) =="
-req POST /api/v1/auth/login -H 'Content-Type: application/json' -d '{"email":"ada@nexx.io","password":"wrong-password"}'
+req POST /auth/login -H 'Content-Type: application/json' -d '{"email":"ada@nexx.io","password":"wrong-password"}'
 check "6th login throttled" 429 "$(status)"
 RA=$(header 'Retry-After')
 check "retry-after header present" 1 "$([ -n "$RA" ] && echo 1 || echo 0)"
@@ -472,31 +472,31 @@ check "429 error shape" 429 "$(field '["status"]')"
 check "429 request id matches header" "$(header 'X-Request-Id')" "$(field '["requestId"]')"
 
 echo "== validation + conflicts =="
-req POST /api/v1/auth/register -H 'Content-Type: application/json' \
+req POST /auth/register -H 'Content-Type: application/json' \
   -d '{"firstName":"Ada","lastName":"Lovelace","email":"ada@nexx.io","password":"sup3r-secret2","platformName":"Analytical Engines"}'
 check "duplicate email" 409 "$(status)"
-req POST /api/v1/auth/register -H 'Content-Type: application/json' -d '{}'
+req POST /auth/register -H 'Content-Type: application/json' -d '{}'
 check "missing fields" 400 "$(status)"
 check "fieldErrors present" True "$(field '["fieldErrors"] != None')"
-req POST /api/v1/auth/register -H 'Content-Type: application/json' \
+req POST /auth/register -H 'Content-Type: application/json' \
   -d '{"firstName":"A","lastName":"B","email":"short@nexx.io","password":"short","platformName":"Short Pw"}'
 check "short password" 400 "$(status)"
-req POST /api/v1/auth/register -H 'Content-Type: application/json' \
+req POST /auth/register -H 'Content-Type: application/json' \
   -d '{"firstName":"","lastName":"","email":"","password":"","platformName":""}'
 check "blank fields" 400 "$(status)"
-req POST /api/v1/auth/register -H 'Content-Type: application/json' \
+req POST /auth/register -H 'Content-Type: application/json' \
   -d '{"firstName":"Burst","lastName":"Burst","email":"burst@nexx.io","password":"password1","platformName":"Burst Co"}'
 check "register throttled (6th)" 429 "$(status)"
 
 echo "== security paths =="
-req GET /api/v1/auth/me
+req GET /auth/me
 check "no token" 401 "$(status)"
 check "401 request id matches header" "$(header 'X-Request-Id')" "$(field '["requestId"]')"
-req GET /api/v1/auth/me -H 'Authorization: Bearer garbage.token.here'
+req GET /auth/me -H 'Authorization: Bearer garbage.token.here'
 check "garbage token" 401 "$(status)"
-req GET /api/v1/does-not-exist -H "Authorization: Bearer $BA2"
+req GET /nope/does-not-exist -H "Authorization: Bearer $BA2"
 check "unknown route (authenticated)" 404 "$(status)"
-req GET /api/v1/does-not-exist
+req GET /nope/does-not-exist
 check "unknown route (anonymous)" 401 "$(status)"
 req GET /actuator/env
 check "actuator env hidden" 401 "$(status)"

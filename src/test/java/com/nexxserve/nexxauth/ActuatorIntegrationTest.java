@@ -96,7 +96,7 @@ class ActuatorIntegrationTest {
         // The security rules are unchanged on the main port: actuator health is
         // permitted, but API endpoints still demand a token.
         ResponseEntity<String> api = restTemplate.getForEntity(
-                url(serverPort, "/api/v1/auth/me"), String.class);
+                url(serverPort, "/auth/me"), String.class);
         assertThat(api.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 

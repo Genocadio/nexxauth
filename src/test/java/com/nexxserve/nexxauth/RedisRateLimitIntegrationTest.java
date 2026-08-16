@@ -60,20 +60,20 @@ class RedisRateLimitIntegrationTest {
         String body = json(Map.of("email", "nobody@example.com", "password", "wrong-password"));
 
         // First two attempts are processed (rejected for bad credentials, not throttled)...
-        mockMvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON).content(body))
+        mockMvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isUnauthorized());
-        mockMvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON).content(body))
+        mockMvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isUnauthorized());
 
         // ...the third is throttled with the unified error shape, backed by Redis.
-        MvcResult blocked = mockMvc.perform(post("/api/v1/auth/login")
+        MvcResult blocked = mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists("Retry-After"))
                 .andExpect(header().exists("X-Request-Id"))
                 .andExpect(jsonPath("$.status").value(429))
-                .andExpect(jsonPath("$.path").value("/api/v1/auth/login"))
+                .andExpect(jsonPath("$.path").value("/auth/login"))
                 .andReturn();
 
         assertThat(blocked.getResponse().getHeader("Retry-After")).matches("\\d+");

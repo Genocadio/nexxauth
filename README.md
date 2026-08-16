@@ -54,7 +54,7 @@ row per org) but never to none; org users are never platform users.
 
 | | Platform | Organisation |
 |---|---|---|
-| Endpoints | `/api/v1/auth/*` | `/{slug}/auth/*` |
+| Endpoints | `/auth/*` | `/{slug}/auth/*` |
 | Identifier | email (unique globally) | username or email (unique per org) |
 | Access token | HS256 (shared secret) | RS256 (per-org keypair, `kid` in header) |
 | Refresh token | rotating + reuse detection | rotating + reuse detection |
@@ -90,7 +90,7 @@ if you manage Postgres yourself.
 **First request — create a platform (becomes its super user):**
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/auth/register \
+curl -X POST http://localhost:8080/auth/register \
   -H 'Content-Type: application/json' \
   -d '{"firstName":"Ada","lastName":"Lovelace","email":"ada@nexx.io",
        "password":"sup3r-secret","platformName":"Analytical Engines"}'
@@ -102,7 +102,7 @@ made unique if needed. It can never be changed afterwards.
 **Then log in and use the access token:**
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/auth/login \
+curl -X POST http://localhost:8080/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"email":"ada@nexx.io","password":"sup3r-secret"}'
 # → { accessToken, refreshToken, tokenType, expiresInSeconds, user }
@@ -151,14 +151,16 @@ down noisy frameworks. Every log line carries the `requestId` MDC value.
 
 ## API reference
 
-All endpoints are under `/api/v1`. Errors always use the unified shape:
+All endpoints are at the clean root origin — platform-wide ones under
+`/auth/*`, `/users/*`, `/slug-suggestions`, and each platform under `/{slug}/...`
+(no `/api/v1`). Errors always use the unified shape:
 
 ```json
 { "timestamp": "...", "status": 401, "error": "Unauthorized",
   "message": "Authentication required", "path": "/...", "requestId": "..." }
 ```
 
-### Platform auth — `/api/v1/auth`
+### Platform auth — `/auth`
 
 | Method & path | Auth | Description |
 |---|---|---|
@@ -170,7 +172,7 @@ All endpoints are under `/api/v1`. Errors always use the unified shape:
 | `PATCH /auth/me` | any platform user | update own first/last name, phone |
 | `POST /auth/me/password` | any platform user | change own password; revokes all sessions |
 
-### Platform & users — `/{slug}`, `/api/v1/users`
+### Platform & users — `/{slug}`, `/users`
 
 | Method & path | Auth | Description |
 |---|---|---|

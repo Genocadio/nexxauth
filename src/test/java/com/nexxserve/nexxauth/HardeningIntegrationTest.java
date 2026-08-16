@@ -43,8 +43,8 @@ class HardeningIntegrationTest {
     @Test
     void malformedBodiesAre400Never500() throws Exception {
         for (String path : List.of(
-                "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh",
-                "/api/v1/auth/logout", "/" + SLUGS[0] + "/auth/register",
+                "/auth/register", "/auth/login", "/auth/refresh",
+                "/auth/logout", "/" + SLUGS[0] + "/auth/register",
                 "/" + SLUGS[0] + "/auth/login")) {
             mockMvc.perform(post(path)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -52,14 +52,14 @@ class HardeningIntegrationTest {
                     .andExpect(status().isBadRequest());
         }
         // missing body entirely
-        mockMvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON))
+        mockMvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
         // empty JSON object -> validation errors, not 500
-        mockMvc.perform(post("/api/v1/auth/register")
+        mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest());
         // JSON null body -> unreadable, not 500
-        mockMvc.perform(post("/api/v1/auth/login")
+        mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON).content("null"))
                 .andExpect(status().isBadRequest());
     }
@@ -73,13 +73,13 @@ class HardeningIntegrationTest {
                                 "password", "password1", "firstName", "F", "lastName", "L"))))
                 .andExpect(status().isBadRequest());
         // object where string expected (objects can never coerce to String)
-        mockMvc.perform(post("/api/v1/auth/register")
+        mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"firstName\":{\"x\":1},\"lastName\":\"L\",\"email\":\"a@b.io\","
                                 + "\"password\":\"password1\",\"platformName\":\"P\"}"))
                 .andExpect(status().isBadRequest());
         // object where boolean expected
-        mockMvc.perform(post("/api/v1/auth/register")
+        mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"firstName\":\"F\",\"lastName\":\"L\",\"email\":\"a@b.io\","
                                 + "\"password\":\"password1\",\"platformName\":\"P\",\"phone\":{\"x\":1}}"))
@@ -124,7 +124,7 @@ class HardeningIntegrationTest {
                         .content("{\"authType\":\"OTP\"}"))
                 .andExpect(status().isBadRequest());
         // invalid role enum on platform user update
-        mockMvc.perform(patch("/api/v1/users/1")
+        mockMvc.perform(patch("/users/1")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"role\":\"GOD\"}"))
@@ -214,21 +214,21 @@ class HardeningIntegrationTest {
         mockMvc.perform(get(org + "/users/abc").header("Authorization", bearer(boss)))
                 .andExpect(status().isBadRequest());
         // unknown route
-        mockMvc.perform(get("/api/v1/does-not-exist").header("Authorization", bearer(boss)))
+        mockMvc.perform(get("/nope/does-not-exist").header("Authorization", bearer(boss)))
                 .andExpect(status().isNotFound());
         mockMvc.perform(get(org + "/users/999999").header("Authorization", bearer(boss)))
                 .andExpect(status().isNotFound());
         // method not allowed
-        mockMvc.perform(get("/api/v1/auth/login"))
+        mockMvc.perform(get("/auth/login"))
                 .andExpect(status().isMethodNotAllowed());
         // unsupported media type
-        mockMvc.perform(post("/api/v1/auth/login").contentType(MediaType.TEXT_PLAIN).content("x"))
+        mockMvc.perform(post("/auth/login").contentType(MediaType.TEXT_PLAIN).content("x"))
                 .andExpect(status().isUnsupportedMediaType());
         // unknown platform slug -> 404
         mockMvc.perform(get("/no-such-platform").header("Authorization", bearer(boss)))
                 .andExpect(status().isNotFound());
         // oversized request body -> 413 before it is ever buffered
-        mockMvc.perform(post("/api/v1/auth/login")
+        mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}")
                         .header(HttpHeaders.CONTENT_LENGTH, "200000"))
@@ -304,11 +304,11 @@ class HardeningIntegrationTest {
         for (String token : List.of(
                 "garbage.token.here", "abc", "Bearer", "a.b", "a.b.c.d",
                 "eyJ.eyJ.eyJ", "  ")) {
-            mockMvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + token))
+            mockMvc.perform(get("/auth/me").header("Authorization", "Bearer " + token))
                     .andExpect(status().isUnauthorized());
         }
         // garbage refresh tokens
-        mockMvc.perform(post("/api/v1/auth/refresh")
+        mockMvc.perform(post("/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("refreshToken", "not-a-token"))))
                 .andExpect(status().isUnauthorized());
@@ -318,7 +318,7 @@ class HardeningIntegrationTest {
                 .andExpect(status().isUnauthorized());
         // platform token must not work on org routes, org token must not work
         // on platform routes (both just 401, never 500)
-        MvcResult reg = mockMvc.perform(post("/api/v1/auth/register")
+        MvcResult reg = mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("firstName", "T", "lastName", "K",
                                 "email", "hd-token@nexx.io", "password", "password1",
@@ -335,7 +335,7 @@ class HardeningIntegrationTest {
     // --- helpers ---
 
     private String registerPlatform(String email, String slug) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/register")
+        MvcResult result = mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "firstName", "F", "lastName", "L",

@@ -62,7 +62,7 @@ class AuthAuditIntegrationTest {
 
     @Test
     void platformAuthEmitsAuditEvents() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/register")
+        mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "firstName", "A", "lastName", "B",
@@ -71,11 +71,11 @@ class AuthAuditIntegrationTest {
                 .andExpect(status().isCreated());
 
         // failed then successful login
-        mockMvc.perform(post("/api/v1/auth/login")
+        mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("email", "audit-boss@nexx.io", "password", "wrong"))))
                 .andExpect(status().isUnauthorized());
-        MvcResult login = mockMvc.perform(post("/api/v1/auth/login")
+        MvcResult login = mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("email", "audit-boss@nexx.io", "password", "password1"))))
                 .andExpect(status().isOk())
@@ -84,13 +84,13 @@ class AuthAuditIntegrationTest {
 
         // rotate (the original token is revoked by the rotation), then log out
         // with the fresh token so the actor resolves for the audit event
-        MvcResult rotated = mockMvc.perform(post("/api/v1/auth/refresh")
+        MvcResult rotated = mockMvc.perform(post("/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("refreshToken", refresh))))
                 .andExpect(status().isOk())
                 .andReturn();
         String refresh2 = objectMapper.readTree(rotated.getResponse().getContentAsString()).get("refreshToken").asText();
-        mockMvc.perform(post("/api/v1/auth/logout")
+        mockMvc.perform(post("/auth/logout")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("refreshToken", refresh2))))
                 .andExpect(status().isNoContent());
@@ -212,7 +212,7 @@ class AuthAuditIntegrationTest {
     }
 
     private String registerPlatform(String email, String slug) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/register")
+        MvcResult result = mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "firstName", "F", "lastName", "L",

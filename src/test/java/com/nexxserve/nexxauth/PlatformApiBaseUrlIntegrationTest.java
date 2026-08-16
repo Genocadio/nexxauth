@@ -34,7 +34,7 @@ class PlatformApiBaseUrlIntegrationTest {
 
     @Test
     void platformApiBaseUrlCombinesPublicOriginWithSlug() throws Exception {
-        MvcResult register = mockMvc.perform(post("/api/v1/auth/register")
+        MvcResult register = mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "firstName", "Anna",

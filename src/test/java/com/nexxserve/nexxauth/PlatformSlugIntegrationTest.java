@@ -28,7 +28,7 @@ class PlatformSlugIntegrationTest {
 
     @Test
     void omittedSlugIsDerivedFromName() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/register")
+        mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "firstName", "A",
@@ -42,7 +42,7 @@ class PlatformSlugIntegrationTest {
 
     @Test
     void explicitSlugIsUsedAsIs() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/register")
+        mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "firstName", "A",
@@ -65,11 +65,11 @@ class PlatformSlugIntegrationTest {
                 "platformName", "Taken Name",
                 "platformSlug", "shared-slug"));
 
-        mockMvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON).content(register))
+        mockMvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content(register))
                 .andExpect(status().isCreated());
 
         // Second platform asking for the same explicit slug is rejected, never renamed.
-        mockMvc.perform(post("/api/v1/auth/register")
+        mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "firstName", "C",
@@ -90,12 +90,12 @@ class PlatformSlugIntegrationTest {
                 "password", "password1",
                 "platformName", "Same Name"));
 
-        mockMvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON).content(register))
+        mockMvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content(register))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.user.platform.slug").value("same-name"));
 
         // Same name again: the auto-derived slug is deduped, not rejected.
-        mockMvc.perform(post("/api/v1/auth/register")
+        mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "firstName", "C",

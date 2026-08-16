@@ -33,14 +33,14 @@ class ErrorHandlingIntegrationTest {
     void unknownRouteReturns404ForAuthenticatedAnd401ForAnonymous() throws Exception {
         // Anonymous probes are rejected before routing: everything requires auth,
         // so unknown routes don't leak endpoint existence.
-        MvcResult anonymous = mockMvc.perform(get("/api/v1/does-not-exist"))
+        MvcResult anonymous = mockMvc.perform(get("/nope/does-not-exist"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().exists("X-Request-Id"))
                 .andReturn();
         assertErrorShape(objectMapper.readTree(anonymous.getResponse().getContentAsString()), 401);
 
         // An authenticated caller hitting a nonexistent path gets a proper 404.
-        MvcResult registered = mockMvc.perform(post("/api/v1/auth/register")
+        MvcResult registered = mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "firstName", "A",
@@ -53,7 +53,7 @@ class ErrorHandlingIntegrationTest {
         String accessToken = objectMapper.readTree(registered.getResponse().getContentAsString())
                 .get("accessToken").asText();
 
-        MvcResult result = mockMvc.perform(get("/api/v1/does-not-exist")
+        MvcResult result = mockMvc.perform(get("/nope/does-not-exist")
                         .header("Authorization", bearer(accessToken)))
                 .andExpect(status().isNotFound())
                 .andExpect(header().exists("X-Request-Id"))
@@ -61,13 +61,13 @@ class ErrorHandlingIntegrationTest {
 
         JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
         assertErrorShape(body, 404);
-        assertThat(body.get("path").asText()).isEqualTo("/api/v1/does-not-exist");
+        assertThat(body.get("path").asText()).isEqualTo("/nope/does-not-exist");
         assertThat(body.get("requestId").asText()).isEqualTo(result.getResponse().getHeader("X-Request-Id"));
     }
 
     @Test
     void missingRequiredFieldsReturn400WithFieldErrors() throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/register")
+        MvcResult result = mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"firstName\":\"Only\"}"))
                 .andExpect(status().isBadRequest())
@@ -82,7 +82,7 @@ class ErrorHandlingIntegrationTest {
 
     @Test
     void malformedJsonReturns400() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/register")
+        mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{not valid json"))
                 .andExpect(status().isBadRequest())
@@ -91,7 +91,7 @@ class ErrorHandlingIntegrationTest {
 
     @Test
     void badCredentialsReturn401WithStructuredBody() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/register")
+        mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "firstName", "A",
@@ -101,7 +101,7 @@ class ErrorHandlingIntegrationTest {
                                 "platformName", "Errors Inc"))))
                 .andExpect(status().isCreated());
 
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
+        MvcResult result = mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("email", "errors@example.com", "password", "wrong"))))
                 .andExpect(status().isUnauthorized())
@@ -112,12 +112,12 @@ class ErrorHandlingIntegrationTest {
 
     @Test
     void missingOrInvalidTokenReturns401WithStructuredBody() throws Exception {
-        MvcResult missing = mockMvc.perform(get("/api/v1/auth/me"))
+        MvcResult missing = mockMvc.perform(get("/auth/me"))
                 .andExpect(status().isUnauthorized())
                 .andReturn();
         assertErrorShape(objectMapper.readTree(missing.getResponse().getContentAsString()), 401);
 
-        MvcResult invalid = mockMvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer garbage"))
+        MvcResult invalid = mockMvc.perform(get("/auth/me").header("Authorization", "Bearer garbage"))
                 .andExpect(status().isUnauthorized())
                 .andReturn();
         assertErrorShape(objectMapper.readTree(invalid.getResponse().getContentAsString()), 401);
@@ -132,10 +132,10 @@ class ErrorHandlingIntegrationTest {
                 "password", "password1",
                 "platformName", "Dup Errors"));
 
-        mockMvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON).content(body))
+        mockMvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated());
 
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON).content(body))
+        MvcResult result = mockMvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isConflict())
                 .andReturn();
 
@@ -144,7 +144,7 @@ class ErrorHandlingIntegrationTest {
 
     @Test
     void unsupportedMediaTypeReturns415() throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/register")
+        MvcResult result = mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.TEXT_PLAIN)
                         .content("hello"))
                 .andExpect(status().isUnsupportedMediaType())
@@ -155,7 +155,7 @@ class ErrorHandlingIntegrationTest {
 
     @Test
     void wrongMethodReturns405() throws Exception {
-        MvcResult result = mockMvc.perform(get("/api/v1/auth/login"))
+        MvcResult result = mockMvc.perform(get("/auth/login"))
                 .andExpect(status().isMethodNotAllowed())
                 .andReturn();
 

@@ -233,7 +233,7 @@ class OrganisationSessionSettingsIntegrationTest {
     }
 
     private String registerPlatform(String email, String slug) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/register")
+        MvcResult result = mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "firstName", "F", "lastName", "L",
@@ -308,7 +308,7 @@ class OrganisationSessionSettingsIntegrationTest {
                                 "firstName", "R", "lastName", "O",
                                 "email", "ss-readonly@nexx.io", "password", "readonly-pw"))))
                 .andExpect(status().isCreated());
-        MvcResult login = mockMvc.perform(post("/api/v1/auth/login")
+        MvcResult login = mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("email", "ss-readonly@nexx.io", "password", "readonly-pw"))))
                 .andExpect(status().isOk())
