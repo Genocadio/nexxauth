@@ -21,6 +21,7 @@ import com.nexxserve.nexxauth.repository.OrganisationUserRepository;
 import com.nexxserve.nexxauth.security.OrgActor;
 import com.nexxserve.nexxauth.security.OrgUserPrincipal;
 import com.nexxserve.nexxauth.util.Emails;
+import com.nexxserve.nexxauth.util.Phones;
 import com.nexxserve.nexxauth.util.Usernames;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -110,16 +111,22 @@ public class OrganisationUserService {
         Organisation organisation = resolve(platformSlug, organisationSlug, requester, true, Permission.ORGANISATION_USER_CREATE);
         String email = normalizedEmail(request.email());
         String username = cleanedUsername(request.username());
+        String phone = cleanedPhone(request.phone());
 
-        if (organisation.isUseEmailAsUsername() && email == null) {
-            throw new BadRequestException("Email is required as the username for this organisation");
+        // Admin-created users may be placeholders without a username or phone
+        // (they simply cannot log in until one is added); email is still
+        // enforced when it is the required login identifier, mirroring the
+        // legacy email-as-username rule.
+        if (organisation.isEmailRequired() && email == null) {
+            throw new BadRequestException("Email is required for this organisation");
         }
-        assertIdentifiersFree(organisation, email, username, null);
+        assertIdentifiersFree(organisation, email, username, phone, null);
 
         OrganisationUser user = userMapper.toEntity(request);
         user.setOrganisation(organisation);
         user.setEmail(email);
         user.setUsername(username);
+        user.setPhone(phone);
         if (request.roleIds() != null) {
             user.setRoles(resolveRoles(organisation, request.roleIds()));
         }
@@ -152,17 +159,29 @@ public class OrganisationUserService {
         }
         if (request.email() != null) {
             String email = normalizedEmail(request.email());
-            if (organisation.isUseEmailAsUsername() && email == null) {
-                throw new BadRequestException("Email is required as the username for this organisation");
+            if (organisation.isEmailRequired() && email == null) {
+                throw new BadRequestException("Email is required for this organisation");
             }
-            assertIdentifiersFree(organisation, email, user.getUsername(), user);
+            assertIdentifiersFree(organisation, email, user.getUsername(), user.getPhone(), user);
             user.setEmail(email);
         }
         if (request.username() != null) {
             String username = cleanedUsername(request.username());
-            assertIdentifiersFree(organisation, user.getEmail(), username, user);
+            if (organisation.isUsernameRequired() && username == null) {
+                throw new BadRequestException("Username is required for this organisation");
+            }
+            assertIdentifiersFree(organisation, user.getEmail(), username, user.getPhone(), user);
             user.setUsername(username);
         }
+        if (request.phone() != null) {
+            String phone = cleanedPhone(request.phone());
+            if (organisation.isPhoneRequired() && phone == null) {
+                throw new BadRequestException("Phone is required for this organisation");
+            }
+            assertIdentifiersFree(organisation, user.getEmail(), user.getUsername(), phone, user);
+            user.setPhone(phone);
+        }
+
         if (request.enabled() != null) {
             user.setEnabled(request.enabled());
             if (!request.enabled()) {
@@ -265,7 +284,7 @@ public class OrganisationUserService {
     }
 
     private void assertIdentifiersFree(Organisation organisation, String email, String username,
-                                       OrganisationUser exclude) {
+                                       String phone, OrganisationUser exclude) {
         if (email != null && (exclude == null || !email.equals(exclude.getEmail()))
                 && userRepository.existsByOrganisationIdAndEmail(organisation.getId(), email)) {
             throw new ConflictException("An organisation user with email " + email
@@ -274,6 +293,11 @@ public class OrganisationUserService {
         if (username != null && (exclude == null || !username.equals(exclude.getUsername()))
                 && userRepository.existsByOrganisationIdAndUsername(organisation.getId(), username)) {
             throw new ConflictException("An organisation user with username " + username
+                    + " already exists in this organisation");
+        }
+        if (phone != null && (exclude == null || !phone.equals(exclude.getPhone()))
+                && userRepository.existsByOrganisationIdAndPhone(organisation.getId(), phone)) {
+            throw new ConflictException("An organisation user with phone " + phone
                     + " already exists in this organisation");
         }
     }
@@ -334,6 +358,16 @@ public class OrganisationUserService {
             return null;
         }
         String normalized = Usernames.normalize(value);
+        return normalized.isEmpty() ? null : normalized;
+    }
+
+    /** null/blank -> null (clears the identifier); otherwise trimmed with
+     * separators stripped so +1 (555) 123-4567 == +15551234567. */
+    private String cleanedPhone(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = Phones.normalize(value);
         return normalized.isEmpty() ? null : normalized;
     }
 }

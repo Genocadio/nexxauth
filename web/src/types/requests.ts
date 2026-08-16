@@ -81,7 +81,16 @@ export interface UpdateOrganisationRequest {
   name?: string;
   slug?: string;
   description?: string;
+  /** Legacy switch: true = email required + login identifier, username not. */
   useEmailAsUsername?: boolean;
+  emailRequired?: boolean;
+  usernameRequired?: boolean;
+  phoneRequired?: boolean;
+  emailCanLogin?: boolean;
+  usernameCanLogin?: boolean;
+  phoneCanLogin?: boolean;
+  /** Onboarding wizard progress: 1..7 = step, 8 = complete. */
+  onboardingStep?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -89,18 +98,29 @@ export interface UpdateOrganisationRequest {
 // ---------------------------------------------------------------------------
 
 export interface OrgRegisterRequest {
-  organisationId: number;
-  identifier: string;
-  password: string;
+  /** Only required when the request carries no X-Client-Id header. */
+  organisationId?: number;
+  username?: string;
+  email?: string;
+  phone?: string;
+  password?: string;
   firstName: string;
   lastName: string;
   metadata?: Record<string, string>;
 }
 
+export type OrgIdentifierType = "USERNAME" | "EMAIL" | "PHONE";
+
 export interface OrgLoginRequest {
-  organisationId: number;
+  /** Only required when the request carries no X-Client-Id header. */
+  organisationId?: number;
   identifier: string;
-  password: string;
+  /** What kind of identifier is being sent; omit for auto-detection. */
+  identifierType?: OrgIdentifierType;
+  /** Defaults to PASSWORD; future methods (passkey, OTP, ...) extend this. */
+  authType?: "PASSWORD";
+  /** Required when authType is PASSWORD (the only method today). */
+  password?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -112,6 +132,7 @@ export interface CreateOrganisationUserRequest {
   lastName: string;
   username?: string;
   email?: string;
+  phone?: string;
   roleIds?: number[];
   /** Omit to create the user without auth (cannot log in until set). */
   password?: string;
@@ -125,6 +146,8 @@ export interface UpdateOrganisationUserRequest {
   username?: string;
   /** Pass "" to clear; omitted to keep. */
   email?: string;
+  /** Pass "" to clear; omitted to keep. */
+  phone?: string;
   enabled?: boolean;
   /** Replaces the whole role set; [] clears all roles. */
   roleIds?: number[];
@@ -153,6 +176,8 @@ export interface UpdateOrganisationRoleRequest {
 
 export interface UpdateOrganisationAuthConfigRequest {
   authType?: AuthType;
+  /** When false, password authentication is disabled for the org. */
+  passwordEnabled?: boolean;
   passwordMinLength?: number;
   passwordMaxLength?: number;
   passwordExpirationDays?: number;
@@ -171,15 +196,16 @@ export interface UpdateOrganisationSessionSettingsRequest {
 
 export interface CreateOrganisationUserFieldRequest {
   key: string;
-  label: string;
   fieldType: UserFieldType;
   loginEnabled?: boolean;
+  /** When true, every user must have a value for this field. */
+  required?: boolean;
 }
 
 export interface UpdateOrganisationUserFieldRequest {
-  label?: string;
   fieldType?: UserFieldType;
   loginEnabled?: boolean;
+  required?: boolean;
 }
 
 // ---------------------------------------------------------------------------

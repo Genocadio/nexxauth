@@ -38,7 +38,9 @@ export function usePlatformRegister() {
       const session: PlatformSession = { ...data, loginAt: Date.now() };
       dispatch(setPlatformSession(session));
       toast.success(`Platform "${data.user.platform.name}" created`);
-      router.replace("/console");
+      // A fresh platform starts with the onboarding wizard, which sets up the
+      // first organisation (identifiers, fields, auth, sessions, client).
+      router.replace(`/console/onboarding/${data.user.platform.slug}`);
     },
     // Errors are shown inline by the register form — no duplicate toast.
   });

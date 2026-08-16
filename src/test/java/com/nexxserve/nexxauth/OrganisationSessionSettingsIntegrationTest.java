@@ -275,7 +275,7 @@ class OrganisationSessionSettingsIntegrationTest {
         MvcResult result = mockMvc.perform(post(platform + "/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
-                                "organisationId", orgId, "identifier", identifier,
+                                "organisationId", orgId, "username", identifier,
                                 "password", password, "firstName", "F", "lastName", "L"))))
                 .andExpect(status().isCreated())
                 .andReturn();

@@ -46,10 +46,10 @@ class OrganisationUserFieldIntegrationTest {
         createOrganisation(boss, platform);
         long orgId = getOrgId(boss, org);
 
-        createField(boss, org, "employee-id", "Employee ID", "STRING", true);
-        createField(boss, org, "active", "Active", "BOOLEAN", false);
-        createField(boss, org, "joined", "Joined on", "DATE", false);
-        createField(boss, org, "score", "Score", "NUMBER", false);
+        createField(boss, org, "employee-id", "STRING", true);
+        createField(boss, org, "active", "BOOLEAN", false);
+        createField(boss, org, "joined", "DATE", false);
+        createField(boss, org, "score", "NUMBER", false);
 
         mockMvc.perform(get(org + "/user-fields").header("Authorization", bearer(boss)))
                 .andExpect(status().isOk())
@@ -128,10 +128,10 @@ class OrganisationUserFieldIntegrationTest {
         createOrganisation(boss, platform);
         long orgId = getOrgId(boss, org);
 
-        createField(boss, org, "employee-id", "Employee ID", "STRING", true);
-        createField(boss, org, "score", "Score", "NUMBER", true);
-        createField(boss, org, "joined", "Joined on", "DATE", true);
-        createField(boss, org, "active", "Active", "BOOLEAN", false);
+        createField(boss, org, "employee-id", "STRING", true);
+        createField(boss, org, "score", "NUMBER", true);
+        createField(boss, org, "joined", "DATE", true);
+        createField(boss, org, "active", "BOOLEAN", false);
 
         createUserWithPassword(boss, org, "alice", Map.of(
                 "employee-id", "EMP123",
@@ -242,21 +242,21 @@ class OrganisationUserFieldIntegrationTest {
         mockMvc.perform(post(org + "/user-fields")
                         .header("Authorization", bearer(vickToken))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("key", "nickname", "label", "Nick", "fieldType", "STRING"))))
+                        .content(json(Map.of("key", "nickname", "fieldType", "STRING"))))
                 .andExpect(status().isForbidden());
 
         // admin: full CRUD
         mockMvc.perform(post(org + "/user-fields")
                         .header("Authorization", bearer(adaToken))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("key", "nickname", "label", "Nick", "fieldType", "STRING", "loginEnabled", true))))
+                        .content(json(Map.of("key", "nickname", "fieldType", "STRING", "loginEnabled", true))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.key").value("nickname"))
                 .andExpect(jsonPath("$.loginEnabled").value(true));
         mockMvc.perform(patch(org + "/user-fields/1")
                         .header("Authorization", bearer(vickToken))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("label", "Nickname"))))
+                        .content(json(Map.of("loginEnabled", false))))
                 .andExpect(status().isForbidden());
 
         long fieldId = getId(mockMvc.perform(get(org + "/user-fields")
@@ -268,9 +268,9 @@ class OrganisationUserFieldIntegrationTest {
         mockMvc.perform(patch(org + "/user-fields/" + fieldId)
                         .header("Authorization", bearer(adaToken))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("label", "Nickname"))))
+                        .content(json(Map.of("loginEnabled", false))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.label").value("Nickname"));
+                .andExpect(jsonPath("$.loginEnabled").value(false));
         mockMvc.perform(delete(org + "/user-fields/" + fieldId)
                         .header("Authorization", bearer(vickToken)))
                 .andExpect(status().isForbidden());
@@ -288,13 +288,13 @@ class OrganisationUserFieldIntegrationTest {
         createOrganisation(boss, platform);
         long orgId = getOrgId(boss, org);
 
-        createField(boss, org, "badge", "Badge", "STRING", false);
+        createField(boss, org, "badge", "STRING", false);
 
         mockMvc.perform(post(orgAuth + "/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId,
-                                "identifier", "newbie",
+                                "username", "newbie",
                                 "password", "orgpass1",
                                 "firstName", "N", "lastName", "B",
                                 "metadata", Map.of("badge", "B123")))))
@@ -306,7 +306,7 @@ class OrganisationUserFieldIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId,
-                                "identifier", "other",
+                                "username", "other",
                                 "password", "orgpass1",
                                 "firstName", "O", "lastName", "T",
                                 "metadata", Map.of("mystery", "x")))))
@@ -325,7 +325,7 @@ class OrganisationUserFieldIntegrationTest {
         long tag = getId(mockMvc.perform(post(org + "/user-fields")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("key", "tag", "label", "Tag", "fieldType", "STRING"))))
+                        .content(json(Map.of("key", "tag", "fieldType", "STRING"))))
                 .andExpect(status().isCreated())
                 .andReturn(), "/id");
 
@@ -352,7 +352,7 @@ class OrganisationUserFieldIntegrationTest {
         long empty = getId(mockMvc.perform(post(org + "/user-fields")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("key", "count", "label", "Count", "fieldType", "STRING"))))
+                        .content(json(Map.of("key", "count", "fieldType", "STRING"))))
                 .andExpect(status().isCreated())
                 .andReturn(), "/id");
         mockMvc.perform(patch(org + "/user-fields/" + empty)
@@ -372,7 +372,7 @@ class OrganisationUserFieldIntegrationTest {
         createOrganisation(boss, platform);
         long orgId = getOrgId(boss, org);
 
-        long fieldId = createField(boss, org, "emp", "Employee", "STRING", true);
+        long fieldId = createField(boss, org, "emp", "STRING", true);
         long carol = createUserWithPassword(boss, org, "carol", Map.of("emp", "E1"));
 
         // login works through the field
@@ -427,12 +427,12 @@ class OrganisationUserFieldIntegrationTest {
                 .andReturn(), "/id");
     }
 
-    private long createField(String boss, String org, String key, String label, String type, boolean loginEnabled)
+    private long createField(String boss, String org, String key, String type, boolean loginEnabled)
             throws Exception {
         return getId(mockMvc.perform(post(org + "/user-fields")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("key", key, "label", label, "fieldType", type,
+                        .content(json(Map.of("key", key, "fieldType", type,
                                 "loginEnabled", loginEnabled))))
                 .andExpect(status().isCreated())
                 .andReturn(), "/id");
@@ -452,7 +452,7 @@ class OrganisationUserFieldIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId,
-                                "identifier", identifier,
+                                "username", identifier,
                                 "password", password,
                                 "firstName", "F", "lastName", "L"))))
                 .andExpect(status().isCreated())

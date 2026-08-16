@@ -22,7 +22,7 @@ import { userFieldSchema } from "@/lib/validation";
 import { USER_FIELD_TYPE_META, type UserFieldType } from "@/types/enums";
 import type { OrganisationUserFieldResponse } from "@/types/api";
 
-const FIELD_TYPE_OPTIONS: UserFieldType[] = ["STRING", "NUMBER", "BOOLEAN", "DATE"];
+const FIELD_TYPE_OPTIONS: UserFieldType[] = ["STRING", "NUMBER", "BOOLEAN", "DATE", "EMAIL", "LINK"];
 
 interface OrgFieldDialogProps {
   platformSlug: string;
@@ -40,9 +40,9 @@ export function OrgFieldDialog({ platformSlug, organisationSlug, open, onOpenCha
 
   const form = useForm(userFieldSchema, {
     key: field?.key ?? "",
-    label: field?.label ?? "",
     fieldType: "STRING",
     loginEnabled: false,
+    required: false,
   });
 
   useEffect(() => {
@@ -50,9 +50,9 @@ export function OrgFieldDialog({ platformSlug, organisationSlug, open, onOpenCha
     if (field) {
       form.setValues({
         key: field.key,
-        label: field.label,
         fieldType: field.fieldType,
         loginEnabled: field.loginEnabled,
+        required: field.required,
       });
     } else {
       form.reset();
@@ -65,14 +65,14 @@ export function OrgFieldDialog({ platformSlug, organisationSlug, open, onOpenCha
     if (isEdit && field) {
       await update.mutateAsync({
         fieldId: field.id,
-        body: { label: data.label, fieldType: data.fieldType, loginEnabled: data.loginEnabled },
+        body: { fieldType: data.fieldType, loginEnabled: data.loginEnabled, required: data.required },
       });
     } else {
       await create.mutateAsync({
         key: data.key,
-        label: data.label,
         fieldType: data.fieldType,
         loginEnabled: data.loginEnabled,
+        required: data.required,
       });
     }
     onOpenChange(false);
@@ -84,34 +84,24 @@ export function OrgFieldDialog({ platformSlug, organisationSlug, open, onOpenCha
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit user field" : "New user field"}</DialogTitle>
           <DialogDescription>
-            The key is the machine name used in user metadata and can never change.
+            The attribute name is used in user metadata and can never change.
           </DialogDescription>
         </DialogHeader>
         <form id="org-field-form" onSubmit={form.handleSubmit(() => submit())} className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <FormField
-              label="Key"
-              htmlFor="uf-key"
-              error={form.errors.key}
-              hint="Lowercase letters, digits and hyphens"
-            >
-              <Input
-                id="uf-key"
-                disabled={isEdit}
-                placeholder="employee-id"
-                value={form.values.key}
-                onChange={(e) => form.setValue("key", e.target.value)}
-              />
-            </FormField>
-            <FormField label="Label" htmlFor="uf-label" error={form.errors.label}>
-              <Input
-                id="uf-label"
-                placeholder="Employee ID"
-                value={form.values.label}
-                onChange={(e) => form.setValue("label", e.target.value)}
-              />
-            </FormField>
-          </div>
+          <FormField
+            label="Attribute name"
+            htmlFor="uf-key"
+            error={form.errors.key}
+            hint="Lowercase letters, digits and hyphens"
+          >
+            <Input
+              id="uf-key"
+              disabled={isEdit}
+              placeholder="employee-id"
+              value={form.values.key}
+              onChange={(e) => form.setValue("key", e.target.value)}
+            />
+          </FormField>
           <FormField label="Value type" error={form.errors.fieldType}>
             <Select
               value={form.values.fieldType}
@@ -148,6 +138,22 @@ export function OrgFieldDialog({ platformSlug, organisationSlug, open, onOpenCha
               id="uf-login"
               checked={form.values.loginEnabled ?? false}
               onCheckedChange={(checked) => form.setValue("loginEnabled", checked)}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+            <div>
+              <Label htmlFor="uf-required" className="text-sm font-medium">
+                Required
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Every user must have a value for this field; users missing it get an update-profile
+                prompt at login.
+              </p>
+            </div>
+            <Switch
+              id="uf-required"
+              checked={form.values.required ?? false}
+              onCheckedChange={(checked) => form.setValue("required", checked)}
             />
           </div>
           {form.submitError ? (

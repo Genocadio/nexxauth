@@ -69,7 +69,7 @@ class HardeningIntegrationTest {
         // string where number expected
         mockMvc.perform(post("/" + SLUGS[0] + "/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", "abc", "identifier", "u",
+                        .content(json(Map.of("organisationId", "abc", "username", "u",
                                 "password", "password1", "firstName", "F", "lastName", "L"))))
                 .andExpect(status().isBadRequest());
         // object where string expected (objects can never coerce to String)
@@ -289,7 +289,7 @@ class HardeningIntegrationTest {
         // oversize password (1000 chars) -> DTO bound, never 500
         mockMvc.perform(post(orgAuth + "/register")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", 1L, "identifier", "u",
+                        .content(json(Map.of("organisationId", 1L, "username", "u",
                                 "password", "p".repeat(1000), "firstName", "F", "lastName", "L"))))
                 .andExpect(status().isBadRequest());
     }

@@ -158,7 +158,7 @@ export async function createUserField(
   token: string,
   platformSlug: string,
   organisationSlug: string,
-  body: { key: string; label: string; fieldType: string; loginEnabled?: boolean },
+  body: { key: string; fieldType: string; loginEnabled?: boolean },
 ): Promise<{ id: number; key: string }> {
   const res = await postJson(
     api,

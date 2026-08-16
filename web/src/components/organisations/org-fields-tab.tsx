@@ -63,6 +63,7 @@ export function OrgFieldsTab({ platformSlug, organisationSlug }: OrgFieldsTabPro
                   <TableHead>Field</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Login identifier</TableHead>
+                  <TableHead>Required</TableHead>
                   <TableHead className="w-20" />
                 </TableRow>
               </TableHeader>
@@ -70,8 +71,7 @@ export function OrgFieldsTab({ platformSlug, organisationSlug }: OrgFieldsTabPro
                 {fields.data.map((field) => (
                   <TableRow key={field.id}>
                     <TableCell>
-                      <p className="text-sm font-medium">{field.label}</p>
-                      <p className="font-mono text-xs text-muted-foreground">{field.key}</p>
+                      <p className="text-sm font-medium">{field.key}</p>
                     </TableCell>
                     <TableCell>
                       <UserFieldTypeBadge fieldType={field.fieldType} />
@@ -87,11 +87,18 @@ export function OrgFieldsTab({ platformSlug, organisationSlug }: OrgFieldsTabPro
                       )}
                     </TableCell>
                     <TableCell>
+                      {field.required ? (
+                        <span className="text-sm">Required</span>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">Optional</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       <div className="flex items-center justify-end gap-1">
                         <Button
                           variant="ghost"
                           size="icon"
-                          aria-label={`Edit ${field.label}`}
+                          aria-label={`Edit ${field.key}`}
                           onClick={() => setEditing(field)}
                         >
                           <Pencil />
@@ -99,7 +106,7 @@ export function OrgFieldsTab({ platformSlug, organisationSlug }: OrgFieldsTabPro
                         <Button
                           variant="ghost"
                           size="icon"
-                          aria-label={`Delete ${field.label}`}
+                          aria-label={`Delete ${field.key}`}
                           className="text-destructive hover:text-destructive"
                           onClick={() => setDeleting(field)}
                         >
@@ -148,7 +155,7 @@ export function OrgFieldsTab({ platformSlug, organisationSlug }: OrgFieldsTabPro
         title="Delete user field"
         description={
           deleting
-            ? `"${deleting.label}" and every value stored under it will be removed. Users lose that metadata.`
+            ? `"${deleting.key}" and every value stored under it will be removed. Users lose that metadata.`
             : ""
         }
         confirmLabel="Delete field"

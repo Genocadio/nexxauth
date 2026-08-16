@@ -8,8 +8,7 @@ test.describe("organisation user fields", () => {
 
     await authedPage.goto(`/console/organisations/${org.slug}?tab=fields`);
     await authedPage.getByRole("button", { name: "New field" }).first().click();
-    await authedPage.getByLabel("Key", { exact: true }).fill("employee-code");
-    await authedPage.getByLabel("Label", { exact: true }).fill("Employee Code");
+    await authedPage.getByLabel("Attribute name", { exact: true }).fill("employee-code");
     await authedPage.getByRole("combobox").click();
     await authedPage.getByRole("option", { name: /Number/ }).click();
     await authedPage.getByLabel("Login identifier").click();
@@ -17,14 +16,13 @@ test.describe("organisation user fields", () => {
 
     const row = authedPage.locator("tr", { hasText: "employee-code" });
     await expect(row).toHaveCount(1);
-    await expect(row.getByText("Employee Code")).toBeVisible();
     await expect(row.getByText("Can be used to log in")).toBeVisible();
 
-    // editing the label keeps the key
+    // the attribute name (key) is immutable on edit
     await row.getByRole("button", { name: /Edit/i }).click();
-    await authedPage.getByLabel("Label", { exact: true }).fill("Staff Code");
+    await expect(authedPage.getByLabel("Attribute name", { exact: true })).toBeDisabled();
     await authedPage.getByRole("button", { name: "Save changes" }).click();
-    await expect(authedPage.locator("tr", { hasText: "employee-code" }).getByText("Staff Code")).toBeVisible();
+    await expect(authedPage.locator("tr", { hasText: "employee-code" })).toHaveCount(1);
   });
 
   test("deletes a field", async ({ authedPage, platform }) => {
@@ -36,7 +34,7 @@ test.describe("organisation user fields", () => {
         platform.session.accessToken,
         platform.platformSlug,
         org.slug,
-        { key: "badge", label: "Badge", fieldType: "STRING" },
+        { key: "badge", fieldType: "STRING" },
       );
     } finally {
       await api.dispose();

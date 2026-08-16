@@ -19,9 +19,9 @@ import java.util.Set;
 /**
  * A user within an organisation. Purely managed data - no authentication. The
  * same person may exist in several organisations (one row per organisation),
- * and never outside one. Username/email are optional identifiers, unique per
- * organisation; when the organisation has {@code useEmailAsUsername} enabled,
- * email is the required identifier.
+ * and never outside one. Username/email/phone are optional identifiers,
+ * unique per organisation, each required or login-enabled per the
+ * organisation's sign-in identifier configuration.
  */
 @Getter
 @Setter
@@ -44,6 +44,9 @@ public class OrganisationUser extends BaseEntity {
 
     @Column(name = "email", length = 255)
     private String email;
+
+    @Column(name = "phone", length = 30)
+    private String phone;
 
     /** BCrypt hash; null for users created as managed data without auth. */
     @Column(name = "password_hash", length = 255)

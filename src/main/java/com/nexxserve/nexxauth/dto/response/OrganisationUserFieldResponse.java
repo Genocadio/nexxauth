@@ -12,7 +12,6 @@ import java.time.Instant;
 public record OrganisationUserFieldResponse(
         Long id,
         String key,
-        String label,
         UserFieldType fieldType,
         boolean loginEnabled,
         boolean required,

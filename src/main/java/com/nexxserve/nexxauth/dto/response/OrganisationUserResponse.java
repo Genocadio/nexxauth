@@ -12,6 +12,7 @@ public record OrganisationUserResponse(
         String lastName,
         String username,
         String email,
+        String phone,
         boolean enabled,
         boolean temporaryPassword,
         AuthType authType,

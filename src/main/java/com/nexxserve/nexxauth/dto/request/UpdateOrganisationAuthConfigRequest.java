@@ -13,6 +13,10 @@ public record UpdateOrganisationAuthConfigRequest(
 
         AuthType authType,
 
+        /** When false, password authentication is disabled for the org; users
+         * cannot sign in until another method is enabled. */
+        Boolean passwordEnabled,
+
         @Min(value = 1, message = "Password minimum length must be at least 1")
         @Max(value = 72, message = "Password minimum length must be at most 72")
         Integer passwordMinLength,

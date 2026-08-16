@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, Plus } from "lucide-react";
+import { Building2, Plus, Rocket } from "lucide-react";
 import Link from "next/link";
 import { OrganisationDialog } from "@/components/organisations/organisation-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -29,6 +29,24 @@ export default function OrganisationsPage() {
           </Button>
         }
       />
+
+      {platformSlug && (organisations.data ?? []).some((o) => (o.onboardingStep ?? 0) < 8) ? (
+        <Link
+          href={`/console/onboarding/${platformSlug}`}
+          className="mb-6 flex items-center justify-between gap-4 rounded-lg border bg-primary/5 p-4 transition-colors hover:bg-primary/10"
+        >
+          <div className="flex items-center gap-3">
+            <Rocket className="h-5 w-5 text-primary" />
+            <div>
+              <p className="text-sm font-medium">Finish setting up your organisation</p>
+              <p className="text-xs text-muted-foreground">
+                Continue the setup wizard — identifiers, fields, auth, sessions, client and keys.
+              </p>
+            </div>
+          </div>
+          <span className="text-sm font-medium text-primary">Continue →</span>
+        </Link>
+      ) : null}
 
       {organisations.isLoading ? (
         <CardsSkeleton count={3} />

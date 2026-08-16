@@ -113,15 +113,24 @@ Base path: `POST /{platformSlug}/auth/...`
 These endpoints are public — a browser app calls them **with** `X-Client-Id` +
 `Origin`; a server or script can call them without any headers.
 
+> **Which organisation?** When the request carries an `X-Client-Id` header the
+> organisation is identified through the client — the client's organisation is
+> authoritative and **no `organisationId` is needed in the body** (any body id
+> is ignored). Without a client header (server-side scripts, the admin console)
+> the body's `organisationId` is **required**. The `organisationId` is a
+> platform-internal id and never appears in the client-facing payloads below.
+
 ### 4.1 Register an organisation user
 
 ```http
 POST /{platformSlug}/auth/register
+X-Client-Id: cli_AbCdEfGhIjKlMnOpQrStUvWxYz1234567890_ab
 Content-Type: application/json
 
 {
-  "organisationId": 7,
-  "identifier": "alice",
+  "username": "alice",
+  "email": "alice@example.com",
+  "phone": "+15551234567",
   "password": "correct horse battery staple",
   "firstName": "Alice",
   "lastName": "Example",
@@ -129,22 +138,42 @@ Content-Type: application/json
 }
 ```
 
-`identifier` is the login identifier (username, email, or a configured
-login-enabled user field value). `password` must satisfy the organisation's
-password policy (see `auth-config`).
+Without `X-Client-Id` (server-side/platform-user flow) add
+`"organisationId": 7` to the body.
+
+`username`, `email` and `phone` are optional identifiers, unique per
+organisation. Which ones are **required** on users and which can be used for
+**login** is the organisation's sign-in identifier configuration (see the
+console or `PATCH /{platformSlug}/organisations/{organisationSlug}`) — at
+least one identifier must be usable for login, and a user registering must
+provide one. `password` must satisfy the organisation's password policy (see
+`auth-config`); when password authentication is disabled for the organisation
+a password is not required.
 
 ### 4.2 Login
 
 ```http
 POST /{platformSlug}/auth/login
+X-Client-Id: cli_AbCdEfGhIjKlMnOpQrStUvWxYz1234567890_ab
 Content-Type: application/json
 
 {
-  "organisationId": 7,
   "identifier": "alice",
+  "identifierType": "USERNAME",
+  "authType": "PASSWORD",
   "password": "correct horse battery staple"
 }
 ```
+
+- `identifier` is the username, email or phone — whichever the organisation has
+  enabled for login (plus any login-enabled user-field value).
+- `identifierType` (`USERNAME` | `EMAIL` | `PHONE`) says what kind of
+  identifier is being sent; when omitted the backend tries each enabled
+  identifier in order.
+- `authType` selects the authentication method and **defaults to `PASSWORD`**
+  when omitted; today only `PASSWORD` exists, so `password` is always sent.
+  Future methods (passkey, OTP, ...) will extend this field.
+- Without `X-Client-Id` add `"organisationId": 7` to the body.
 
 ### 4.3 Response shape (register, login, refresh)
 

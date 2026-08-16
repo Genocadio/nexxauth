@@ -28,6 +28,9 @@ public record UpdateOrganisationUserRequest(
         @Size(max = 255, message = "Email must be at most 255 characters")
         String email,
 
+        @Size(max = 30, message = "Phone must be at most 30 characters")
+        String phone,
+
         Boolean enabled,
 
         Set<Long> roleIds,

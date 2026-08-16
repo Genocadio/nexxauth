@@ -50,6 +50,15 @@ export interface OrganisationResponse {
   name: string;
   slug: string;
   description: string | null;
+  emailRequired: boolean;
+  usernameRequired: boolean;
+  phoneRequired: boolean;
+  emailCanLogin: boolean;
+  usernameCanLogin: boolean;
+  phoneCanLogin: boolean;
+  /** Onboarding wizard progress: 1..7 = step, 8 = complete, null = not started. */
+  onboardingStep: number | null;
+  /** Backwards-compatible: true when email is the primary login identifier. */
   useEmailAsUsername: boolean;
   createdAt: IsoDate;
 }
@@ -78,6 +87,7 @@ export interface OrganisationUserResponse {
   lastName: string;
   username: string | null;
   email: string | null;
+  phone: string | null;
   enabled: boolean;
   authType: AuthType | null;
   roles: OrganisationRoleResponse[];
@@ -96,6 +106,7 @@ export interface OrgAuthResponse {
 
 export interface OrganisationAuthConfigResponse {
   authType: AuthType;
+  passwordEnabled: boolean;
   passwordMinLength: number;
   passwordMaxLength: number;
   passwordExpirationDays: number;
@@ -111,9 +122,9 @@ export interface OrganisationSessionSettingsResponse {
 export interface OrganisationUserFieldResponse {
   id: number;
   key: string;
-  label: string;
   fieldType: UserFieldType;
   loginEnabled: boolean;
+  required: boolean;
   createdAt: IsoDate;
 }
 

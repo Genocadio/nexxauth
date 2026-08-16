@@ -90,6 +90,9 @@ public class OrganisationAuthConfigService {
         if (request.authType() != null) {
             config.setAuthType(request.authType());
         }
+        if (request.passwordEnabled() != null) {
+            config.setPasswordEnabled(request.passwordEnabled());
+        }
         if (request.passwordMinLength() != null) {
             config.setPasswordMinLength(request.passwordMinLength());
         }
@@ -199,6 +202,7 @@ public class OrganisationAuthConfigService {
     private OrganisationAuthConfigResponse toResponse(OrganisationAuthConfig config) {
         return new OrganisationAuthConfigResponse(
                 config.getAuthType(),
+                config.isPasswordEnabled(),
                 config.getPasswordMinLength(),
                 config.getPasswordMaxLength(),
                 config.getPasswordExpirationDays(),

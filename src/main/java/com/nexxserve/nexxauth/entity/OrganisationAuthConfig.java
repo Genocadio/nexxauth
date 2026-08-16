@@ -26,10 +26,15 @@ public class OrganisationAuthConfig extends BaseEntity {
     @JoinColumn(name = "organisation_id", nullable = false, unique = true)
     private Organisation organisation;
 
-    /** The auth method users of this organisation use; {@code 0} = never expires. */
+    /** The auth method users of this organisation use. */
     @Enumerated(EnumType.STRING)
     @Column(name = "auth_type", nullable = false, length = 30)
     private AuthType authType = AuthType.PASSWORD;
+
+    /** When false, password authentication is disabled for the whole
+     * organisation (users cannot sign in until another method is enabled). */
+    @Column(name = "password_enabled", nullable = false)
+    private boolean passwordEnabled = true;
 
     @Column(name = "password_min_length", nullable = false)
     private int passwordMinLength = 8;

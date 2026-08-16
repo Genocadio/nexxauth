@@ -30,6 +30,9 @@ public record CreateOrganisationUserRequest(
         @Size(max = 255, message = "Email must be at most 255 characters")
         String email,
 
+        @Size(max = 30, message = "Phone must be at most 30 characters")
+        String phone,
+
         Set<Long> roleIds,
 
         /** Optional initial password. When set, the user gets the org's default

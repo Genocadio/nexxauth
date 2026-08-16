@@ -170,45 +170,81 @@ TTLs come from the same `session-settings` row and are applied at issue time.
 
 ```
 POST /{slug}/auth/register
-{ organisationId, identifier, password, firstName, lastName, metadata? }
+X-Client-Id: cli_...            # when present, its organisation is authoritative
+
+{ username?, email?, phone?, password?, firstName, lastName, metadata? }
+# without X-Client-Id the body must carry: { organisationId, ... } (server-side)
 ```
 
 1. **Rate limit** — `org-register` bucket (separate from the platform bucket).
-2. **Bean validation** — all fields required, identifier ≤ 100, password ≤ 72
-   (the detailed rules come from the org's auth-config, not the annotation).
-3. **OrganisationAuthService.register**:
-   - org must exist **under this platform** (id + platform match) → else 404.
-   - `useEmailAsUsername` org → identifier must be a valid email, normalized, and
-      unique per org → else 409; the user row stores `email`.
-   - otherwise identifier is the `username`, normalized to **lowercase** (trim +
-      `toLowerCase`, mirror of the email normalization) and unique per org → else 409 —
-      so `Bob` and `bob` are the same account.
-   - `authConfigService.setPassword` — the org's password rules are validated here
+2. **Bean validation** — username ≤ 100, email ≤ 255 (must be valid), phone ≤ 30,
+   password ≤ 72 (the detailed rules come from the org's auth-config).
+3. **Organisation identified** — from the `X-Client-Id` client when present (the
+   client's organisation is authoritative; a body `organisationId` is ignored,
+   even a mismatched one); without a client header the body's `organisationId`
+   is **required** (server-side/platform-user flows) — else 400.
+4. **OrganisationAuthService.register**:
+   - org must exist **under this platform** → else 404.
+   - **sign-in identifier configuration** — email, username and phone each have
+     a `required` and a `canLogin` flag on the org (§6a). Required ones must be
+     present (else 400/409); at least **one login-enabled identifier must be
+     provided** so the user can actually sign in (else 400).
+   - identifiers are normalized before storage + lookup: username trimmed +
+     lowercased (`Bob` == `bob`), email trimmed + lowercased, phone stripped of
+     separators (`+1 (555) 123-4567` == `+15551234567`). Each is unique per org
+     → else 409.
+   - **password** — required while password auth is enabled for the org
+     (`auth-config.passwordEnabled`), validated by `authConfigService.setPassword`
      (min/max length, 72-byte bound, reuse history) → violation is a 400; the hash
-     is encoded, `passwordChangedAt` stamped, `authType` set to the org's configured
-     type (`PASSWORD`).
+     is encoded, `passwordChangedAt` stamped, `authType` set to `PASSWORD`. When
+     password auth is disabled a password is optional (the user gets no auth
+     until a method is enabled).
    - user saved with **no roles**, audit `ORG_REGISTER`. An optional `metadata`
      map is validated and stored (see §15) — keys must be fields the org has
      defined.
-4. **Org tokens issued** — access token signed with the org's **active RSA key**
+5. **Org tokens issued** — access token signed with the org's **active RSA key**
    (created lazily if missing) + rotating refresh token. 201.
+
+## 6a. Sign-in identifier configuration
+
+The org row carries six flags (settable via `PATCH .../organisations/{orgSlug}`
+and in the onboarding wizard): `emailRequired`, `usernameRequired`,
+`phoneRequired`, `emailCanLogin`, `usernameCanLogin`, `phoneCanLogin`. At least
+one `*CanLogin` must be true (else 400). The legacy `useEmailAsUsername` switch
+still works and maps to these flags. New users must provide every required
+identifier; login tries the enabled identifiers in order (username → email →
+phone) then login-enabled user fields.
 
 ## 7. Organisation login
 
 ```
 POST /{slug}/auth/login
-{ organisationId, identifier, password }
+X-Client-Id: cli_...            # when present, its organisation is authoritative
+
+{ identifier, identifierType?, authType?, password }   # authType defaults to PASSWORD
+# without X-Client-Id the body must carry: { organisationId, identifier, ... }
 ```
 
 1. **Rate limit** — `org-login` bucket.
-2. **OrganisationAuthService.login** (write tx):
-   - org under this platform → else 404.
-   - identifier lookup (username or email depending on the org setting,
-      **case-insensitive** for both) → if that misses, each **login-enabled user
-      field** is tried in key order (see §15) → still unknown → audit
-      `ORG_LOGIN_FAILURE` + 401.
+2. **Organisation identified** — same rule as register: from the `X-Client-Id`
+   client when present (body `organisationId` ignored), else the body's
+   `organisationId` (required — else 400).
+3. **Authentication method** — `authType` selects it; `PASSWORD` is the default
+   and today the only implemented method (the enum is the extension point for
+   passkey, OTP, ... — adding one forces a new case in the service switch). For
+   `PASSWORD` the `password` field is required (else 400).
+4. **OrganisationAuthService.passwordLogin** (write tx):
+   - **password auth enabled?** — if `auth-config.passwordEnabled` is false,
+     every login fails exactly like bad credentials (audit + timing burn + 401).
+   - **identifier lookup** — with an explicit `identifierType`
+     (`USERNAME`/`EMAIL`/`PHONE`) only that identifier is tried (and only if the
+     org has it login-enabled); without one, each enabled identifier is tried in
+     order (username → email → phone, all case-insensitive / normalized), then
+     each **login-enabled user field** in key order (see §15) → still unknown →
+     audit `ORG_LOGIN_FAILURE` + 401.
    - **gate order** (all must pass, any failure = 401 + audit):
-     1. `authType == PASSWORD` (a user with no auth configured can never log in),
+     1. the user's `authType == PASSWORD` (a user with no auth configured can
+        never log in),
      2. account enabled,
      3. a password hash exists,
      4. password matches,
@@ -216,11 +252,11 @@ POST /{slug}/auth/login
         `passwordChangedAt` → 401 `Password has expired` (forces a password reset;
         existing sessions drain naturally since expiry is only checked at login).
     - success → audit `ORG_LOGIN_SUCCESS`.
-3. **Actions computed** — the pending [`OrgUserAction`](#16-org-user-actions-temporary-password--required-fields)
+5. **Actions computed** — the pending [`OrgUserAction`](#16-org-user-actions-temporary-password--required-fields)
    list is appended to the response. When a **gating** action (CHANGE_PASSWORD) is
    pending the login returns **no refresh token** and a **fixed 5-minute access
    token** (see §16).
-4. **Org tokens issued** (§10).
+6. **Org tokens issued** (§10).
 
 ## 8. Organisation refresh & logout
 
@@ -328,6 +364,7 @@ write transaction on purpose — Postgres rejects inserts in read-only transacti
 | Setting | Default | Meaning |
 |---|---|---|
 | `authType` | `PASSWORD` | auth method new users get when a password is set (enum = extension point for OTP/SSO/…) |
+| `passwordEnabled` | `true` | when false, password auth is disabled for the whole org — login always fails and register no longer requires a password (reserved for the future; the UI keeps password on) |
 | `passwordMinLength` / `passwordMaxLength` | `8` / `72` | length bounds (72 is also the bcrypt byte bound) |
 | `passwordExpirationDays` | `0` | 0 = never; after N days login → 401 `Password has expired` |
 | `passwordHistoryCount` | `0` | 0 = off; N = the last N passwords can't be reused |
@@ -394,15 +431,15 @@ every user and returned under `metadata` on all user objects.
 
 | Field | Meaning |
 |---|---|
-| `key` | machine name, unique per org (`^[a-z0-9]+(-[a-z0-9]+)*$`), immutable |
-| `label` | human-readable name |
-| `fieldType` | `STRING` / `NUMBER` / `BOOLEAN` / `DATE` — how values are validated and canonicalized |
+| `key` | attribute name, unique per org (`^[a-z0-9]+(-[a-z0-9]+)*$`), immutable |
+| `fieldType` | `STRING` / `NUMBER` / `BOOLEAN` / `DATE` / `EMAIL` / `LINK` — how values are validated and canonicalized |
 | `loginEnabled` | when true, the field's value also works as a login identifier |
 | `required` | when true, every user must have a value for this field; users missing it get the UPDATE_PROFILE action at login (§16) |
 
 Values are stored as **canonical strings**: STRING trimmed, NUMBER
 `BigDecimal.toPlainString()` so `1.50 == 1.5`, BOOLEAN `true|false`, DATE ISO
-`yyyy-MM-dd`. On users the values appear as a `metadata` map `{key: value}`; the
+`yyyy-MM-dd`, EMAIL trimmed + lowercased, LINK kept as typed (must be an http(s)
+URL). On users the values appear as a `metadata` map `{key: value}`; the
 `loginEnabled` flag is **config-level only** and is never echoed on the user
 objects. Note that metadata is stored **in plaintext** in
 `organisation_user_field_values` — do not use fields for secrets; encrypt

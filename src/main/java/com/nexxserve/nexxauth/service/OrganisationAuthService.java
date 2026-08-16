@@ -4,22 +4,27 @@ import com.nexxserve.nexxauth.dto.request.OrgLoginRequest;
 import com.nexxserve.nexxauth.dto.request.OrgRegisterRequest;
 import com.nexxserve.nexxauth.dto.response.OrgAuthResponse;
 import com.nexxserve.nexxauth.entity.AuthType;
+import com.nexxserve.nexxauth.entity.OrgIdentifierType;
 import com.nexxserve.nexxauth.entity.Organisation;
+import com.nexxserve.nexxauth.entity.OrganisationClient;
 import com.nexxserve.nexxauth.entity.OrganisationSigningKey;
 import com.nexxserve.nexxauth.entity.OrganisationUser;
 import com.nexxserve.nexxauth.entity.OrgUserAction;
 import com.nexxserve.nexxauth.entity.Platform;
+import com.nexxserve.nexxauth.exception.BadRequestException;
 import com.nexxserve.nexxauth.exception.ConflictException;
 import com.nexxserve.nexxauth.exception.InvalidCredentialsException;
 import com.nexxserve.nexxauth.exception.PasswordExpiredException;
 import com.nexxserve.nexxauth.exception.RefreshTokenException;
 import com.nexxserve.nexxauth.exception.ResourceNotFoundException;
 import com.nexxserve.nexxauth.mapper.OrganisationUserMapper;
+import com.nexxserve.nexxauth.repository.OrganisationClientRepository;
 import com.nexxserve.nexxauth.repository.OrganisationRepository;
 import com.nexxserve.nexxauth.repository.OrganisationUserRepository;
 import com.nexxserve.nexxauth.security.AuthTiming;
 import com.nexxserve.nexxauth.security.OrgJwtService;
 import com.nexxserve.nexxauth.util.Emails;
+import com.nexxserve.nexxauth.util.Phones;
 import com.nexxserve.nexxauth.util.Usernames;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -40,6 +45,7 @@ public class OrganisationAuthService {
 
     private final PlatformAccess platformAccess;
     private final OrganisationRepository organisationRepository;
+    private final OrganisationClientRepository clientRepository;
     private final OrganisationUserRepository userRepository;
     private final OrganisationRefreshTokenService refreshTokenService;
     private final OrgJwtService orgJwtService;
@@ -54,6 +60,7 @@ public class OrganisationAuthService {
     private final OrgUserActions orgUserActions;
 
     public OrganisationAuthService(PlatformAccess platformAccess, OrganisationRepository organisationRepository,
+                                   OrganisationClientRepository clientRepository,
                                    OrganisationUserRepository userRepository,
                                    OrganisationRefreshTokenService refreshTokenService, OrgJwtService orgJwtService,
                                    OrgKeyService orgKeyService,
@@ -64,6 +71,7 @@ public class OrganisationAuthService {
                                    OrgUserActions orgUserActions) {
         this.platformAccess = platformAccess;
         this.organisationRepository = organisationRepository;
+        this.clientRepository = clientRepository;
         this.userRepository = userRepository;
         this.refreshTokenService = refreshTokenService;
         this.orgJwtService = orgJwtService;
@@ -78,55 +86,85 @@ public class OrganisationAuthService {
         this.orgUserActions = orgUserActions;
     }
 
-    /** Creates an org user (no roles by default) and returns its tokens. */
+    /** Creates an org user (no roles by default) and returns its tokens. The
+     * organisation comes from the {@code X-Client-Id} client when present,
+     * otherwise from {@code organisationId} in the body. */
     @Transactional
-    public OrgAuthResponse register(String platformSlug, OrgRegisterRequest request) {
-        Organisation organisation = findOrganisation(platformSlug, request.organisationId());
-        String identifier = request.identifier().trim();
-        if (organisation.isUseEmailAsUsername()) {
-            String email = Emails.normalize(identifier);
-            if (email.isBlank()) {
-                throw new ConflictException("A valid email is required as the username for this organisation");
-            }
-            if (userRepository.existsByOrganisationIdAndEmail(organisation.getId(), email)) {
-                throw new ConflictException("An organisation user with email " + email
-                        + " already exists in this organisation");
-            }
-            OrganisationUser user = new OrganisationUser();
-            user.setOrganisation(organisation);
-            user.setFirstName(request.firstName());
-            user.setLastName(request.lastName());
-            user.setEmail(email);
-            // Register always configures password auth; the org's rules are
-            // validated (length + history) before the user is persisted.
-            authConfigService.setPassword(user, request.password());
-            OrganisationUser saved = userRepository.save(user);
-            applyRegisterMetadata(request, saved);
-            audit.log(AuthAuditService.ORG_REGISTER, email, organisation.getSlug());
-            return issueTokens(saved);
+    public OrgAuthResponse register(String platformSlug, OrgRegisterRequest request,
+                                    String clientId) {
+        Organisation organisation = resolveOrganisation(platformSlug, request.organisationId(),
+                resolveClient(clientId));
+        String email = normalizedEmail(request.email());
+        String username = cleanedUsername(request.username());
+        String phone = cleanedPhone(request.phone());
+
+        // The organisation's configured sign-in identifiers: required ones must
+        // be present, and at least one login-enabled identifier is needed so
+        // the user can actually sign in.
+        if (organisation.isEmailRequired() && email == null) {
+            throw new ConflictException("A valid email is required for this organisation");
         }
-        String username = Usernames.normalize(identifier);
-        if (userRepository.existsByOrganisationIdAndUsername(organisation.getId(), username)) {
-            throw new ConflictException("An organisation user with username " + username
-                    + " already exists in this organisation");
+        if (organisation.isUsernameRequired() && username == null) {
+            throw new ConflictException("A username is required to register for this organisation");
         }
+        if (organisation.isPhoneRequired() && phone == null) {
+            throw new BadRequestException("A phone number is required for this organisation");
+        }
+        if (!hasLoginCapableIdentifier(organisation, email, username, phone)) {
+            throw new BadRequestException(
+                    "At least one login-enabled identifier (email, username or phone) is required");
+        }
+        assertIdentifiersFree(organisation, email, username, phone);
+
         OrganisationUser user = new OrganisationUser();
         user.setOrganisation(organisation);
         user.setFirstName(request.firstName());
         user.setLastName(request.lastName());
+        user.setEmail(email);
         user.setUsername(username);
-        authConfigService.setPassword(user, request.password());
+        user.setPhone(phone);
+        // Register configures password auth while it is enabled for the org;
+        // when password auth is disabled a password is optional (the user gets
+        // no auth until a method is enabled). The org's rules are validated
+        // (length + history) before the user is persisted.
+        if (request.password() != null && !request.password().isBlank()) {
+            authConfigService.setPassword(user, request.password());
+        } else if (authConfigService.configOf(organisation).isPasswordEnabled()) {
+            throw new BadRequestException("Password is required for the PASSWORD auth method");
+        }
         OrganisationUser saved = userRepository.save(user);
         applyRegisterMetadata(request, saved);
-        audit.log(AuthAuditService.ORG_REGISTER, identifier, organisation.getSlug());
+        audit.log(AuthAuditService.ORG_REGISTER, identifierOf(saved), organisation.getSlug());
         return issueTokens(saved);
     }
 
     @Transactional
-    public OrgAuthResponse login(String platformSlug, OrgLoginRequest request) {
-        Organisation organisation = findOrganisation(platformSlug, request.organisationId());
+    public OrgAuthResponse login(String platformSlug, OrgLoginRequest request,
+                                 String clientId) {
+        Organisation organisation = resolveOrganisation(platformSlug, request.organisationId(),
+                resolveClient(clientId));
+        // The requested authentication method. PASSWORD is the default; the
+        // enum is the extension point for future methods (passkey, OTP, ...)
+        // and the switch forces a case for each one.
+        AuthType method = request.authType() != null ? request.authType() : AuthType.PASSWORD;
+        return switch (method) {
+            case PASSWORD -> passwordLogin(organisation, request);
+        };
+    }
+
+    private OrgAuthResponse passwordLogin(Organisation organisation, OrgLoginRequest request) {
+        if (request.password() == null || request.password().isBlank()) {
+            throw new BadRequestException("Password is required for the PASSWORD auth method");
+        }
         String identifier = request.identifier().trim();
-        OrganisationUser user = findByIdentifier(organisation, identifier)
+        // Password auth disabled for the org: every login fails identically to
+        // bad credentials (no user enumeration, same timing burn).
+        if (!authConfigService.configOf(organisation).isPasswordEnabled()) {
+            audit.log(AuthAuditService.ORG_LOGIN_FAILURE, identifier, organisation.getSlug());
+            authTiming.equalsUnknown(request.password());
+            throw new InvalidCredentialsException();
+        }
+        OrganisationUser user = findByIdentifier(organisation, identifier, request.identifierType())
                 .or(() -> userFieldService.findUserByLoginField(organisation, identifier))
                 .orElseThrow(() -> {
                     audit.log(AuthAuditService.ORG_LOGIN_FAILURE, identifier, organisation.getSlug());
@@ -185,13 +223,143 @@ public class OrganisationAuthService {
         return user.getUsername() != null ? user.getUsername() : user.getEmail();
     }
 
-    private java.util.Optional<OrganisationUser> findByIdentifier(Organisation organisation, String identifier) {
-        if (organisation.isUseEmailAsUsername()) {
-            return userRepository.findWithRolesByOrganisationIdAndEmail(organisation.getId(),
-                    Emails.normalize(identifier));
+    private void assertIdentifiersFree(Organisation organisation, String email, String username, String phone) {
+        if (email != null && userRepository.existsByOrganisationIdAndEmail(organisation.getId(), email)) {
+            throw new ConflictException("An organisation user with email " + email
+                    + " already exists in this organisation");
         }
-        return userRepository.findWithRolesByOrganisationIdAndUsername(organisation.getId(),
-                Usernames.normalize(identifier));
+        if (username != null && userRepository.existsByOrganisationIdAndUsername(organisation.getId(), username)) {
+            throw new ConflictException("An organisation user with username " + username
+                    + " already exists in this organisation");
+        }
+        if (phone != null && userRepository.existsByOrganisationIdAndPhone(organisation.getId(), phone)) {
+            throw new ConflictException("An organisation user with phone " + phone
+                    + " already exists in this organisation");
+        }
+    }
+
+    /** null/blank -> null; otherwise trimmed + normalized email. */
+    private String normalizedEmail(String email) {
+        if (email == null) {
+            return null;
+        }
+        String normalized = Emails.normalize(email);
+        return normalized.isBlank() ? null : normalized;
+    }
+
+    /** null/blank -> null; otherwise trimmed + lowercased (Bob == bob). */
+    private String cleanedUsername(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = Usernames.normalize(value);
+        return normalized.isEmpty() ? null : normalized;
+    }
+
+    /** null/blank -> null; otherwise trimmed with separators stripped. */
+    private String cleanedPhone(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = Phones.normalize(value);
+        return normalized.isEmpty() ? null : normalized;
+    }
+
+    /** True when at least one provided identifier is enabled for login. */
+    private boolean hasLoginCapableIdentifier(Organisation organisation, String email,
+                                              String username, String phone) {
+        return (organisation.isEmailCanLogin() && email != null)
+                || (organisation.isUsernameCanLogin() && username != null)
+                || (organisation.isPhoneCanLogin() && phone != null);
+    }
+
+    /** Looks up the user by the requested identifier type, or by each enabled
+     * identifier in order when the type is omitted (then login-enabled fields). */
+    private java.util.Optional<OrganisationUser> findByIdentifier(Organisation organisation,
+                                                                  String identifier,
+                                                                  OrgIdentifierType identifierType) {
+        if (identifierType != null) {
+            return switch (identifierType) {
+                case EMAIL -> organisation.isEmailCanLogin()
+                        ? userRepository.findWithRolesByOrganisationIdAndEmail(organisation.getId(),
+                        Emails.normalize(identifier))
+                        : java.util.Optional.empty();
+                case USERNAME -> organisation.isUsernameCanLogin()
+                        ? userRepository.findWithRolesByOrganisationIdAndUsername(organisation.getId(),
+                        Usernames.normalize(identifier))
+                        : java.util.Optional.empty();
+                case PHONE -> organisation.isPhoneCanLogin()
+                        ? userRepository.findWithRolesByOrganisationIdAndPhone(organisation.getId(),
+                        Phones.normalize(identifier))
+                        : java.util.Optional.empty();
+            };
+        }
+        java.util.Optional<OrganisationUser> direct = enabledIdentifierLookup(organisation, identifier);
+        if (direct.isPresent()) {
+            return direct;
+        }
+        return userFieldService.findUserByLoginField(organisation, identifier);
+    }
+
+    /** Tries username, then email, then phone — only the enabled ones. */
+    private java.util.Optional<OrganisationUser> enabledIdentifierLookup(Organisation organisation,
+                                                                         String identifier) {
+        if (organisation.isUsernameCanLogin()) {
+            java.util.Optional<OrganisationUser> user =
+                    userRepository.findWithRolesByOrganisationIdAndUsername(organisation.getId(),
+                            Usernames.normalize(identifier));
+            if (user.isPresent()) {
+                return user;
+            }
+        }
+        if (organisation.isEmailCanLogin()) {
+            java.util.Optional<OrganisationUser> user =
+                    userRepository.findWithRolesByOrganisationIdAndEmail(organisation.getId(),
+                            Emails.normalize(identifier));
+            if (user.isPresent()) {
+                return user;
+            }
+        }
+        if (organisation.isPhoneCanLogin()) {
+            java.util.Optional<OrganisationUser> user =
+                    userRepository.findWithRolesByOrganisationIdAndPhone(organisation.getId(),
+                            Phones.normalize(identifier));
+            if (user.isPresent()) {
+                return user;
+            }
+        }
+        return java.util.Optional.empty();
+    }
+
+    /** Resolves the {@code X-Client-Id} header to a client within this
+     * transaction, or {@code null} when absent. Unknown or blank keys (already
+     * rejected by the client filter before this point) fall back to
+     * body-based identification. */
+    private OrganisationClient resolveClient(String clientId) {
+        if (clientId == null || clientId.isBlank()) {
+            return null;
+        }
+        return clientRepository.findByClientKey(clientId.trim()).orElse(null);
+    }
+
+    /** Resolves the organisation: the client's organisation when an
+     * {@code X-Client-Id} client is present (body {@code organisationId} is
+     * ignored — the client is authoritative), otherwise the body's
+     * {@code organisationId} (required for server-side/platform-user flows). */
+    private Organisation resolveOrganisation(String platformSlug, Long organisationId,
+                                             OrganisationClient client) {
+        if (client != null) {
+            Organisation organisation = client.getOrganisation();
+            if (!organisation.getPlatform().getSlug().equals(platformSlug)) {
+                throw ResourceNotFoundException.of("Organisation", organisation.getId());
+            }
+            return organisation;
+        }
+        if (organisationId == null) {
+            throw new BadRequestException(
+                    "Organisation id is required when no X-Client-Id header is present");
+        }
+        return findOrganisation(platformSlug, organisationId);
     }
 
     private Organisation findOrganisation(String platformSlug, Long organisationId) {

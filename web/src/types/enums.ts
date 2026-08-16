@@ -20,13 +20,15 @@ export const AUTH_TYPE_META: Record<AuthType, { label: string; description: stri
   PASSWORD: { label: "Password", description: "Users authenticate with an identifier and password" },
 };
 
-export type UserFieldType = "STRING" | "NUMBER" | "BOOLEAN" | "DATE";
+export type UserFieldType = "STRING" | "NUMBER" | "BOOLEAN" | "DATE" | "EMAIL" | "LINK";
 
 export const USER_FIELD_TYPE_META: Record<UserFieldType, { label: string; description: string }> = {
   STRING: { label: "Text", description: "Trimmed text (case-insensitive matching)" },
   NUMBER: { label: "Number", description: "Canonical decimal value (1.50 == 1.5)" },
   BOOLEAN: { label: "Boolean", description: "true / false" },
   DATE: { label: "Date", description: "ISO date (yyyy-MM-dd)" },
+  EMAIL: { label: "Email", description: "Normalized email address" },
+  LINK: { label: "Link", description: "http(s) URL" },
 };
 
 export type Permission =
@@ -70,6 +72,8 @@ export const USER_FIELD_TYPE_TONE: Record<UserFieldType, BadgeTone> = {
   NUMBER: "default",
   BOOLEAN: "warning",
   DATE: "outline",
+  EMAIL: "success",
+  LINK: "default",
 };
 
 // ---------------------------------------------------------------------------

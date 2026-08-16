@@ -185,7 +185,7 @@ check "key is active" True "$(field '[0]["active"]')"
 
 # org register returns org tokens (signed by the org's own RSA key)
 req POST /analytical-engines/auth/register -H 'Content-Type: application/json' \
-  -d "{\"organisationId\":$AORGID,\"identifier\":\"bob\",\"password\":\"orgpass1\",\"firstName\":\"Bob\",\"lastName\":\"Builder\"}"
+  -d "{\"organisationId\":$AORGID,\"username\":\"bob\",\"password\":\"orgpass1\",\"firstName\":\"Bob\",\"lastName\":\"Builder\"}"
 check "org register" 201 "$(status)"
 OBA=$(field '["accessToken"]')
 check "org token type" Bearer "$(field '["tokenType"]')"
@@ -199,6 +199,21 @@ OBA2=$(field '["accessToken"]'); OBR=$(field '["refreshToken"]')
 req POST /analytical-engines/auth/login -H 'Content-Type: application/json' \
   -d "{\"organisationId\":$AORGID,\"identifier\":\"bob\",\"password\":\"wrong\"}"
 check "org login wrong password" 401 "$(status)"
+
+# a client identifies the organisation: login/register need no organisationId
+req POST /analytical-engines/organisations/auth-corp/clients -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+  -d '{"name":"Smoke App","type":"WEB"}'
+check "create client" 201 "$(status)"
+CLIKEY=$(field '["clientKey"]')
+req POST /analytical-engines/auth/login -H "X-Client-Id: $CLIKEY" -H 'Content-Type: application/json' \
+  -d '{"identifier":"bob","authType":"PASSWORD","password":"orgpass1"}'
+check "org login via client (no org id)" 200 "$(status)"
+req POST /analytical-engines/auth/register -H "X-Client-Id: $CLIKEY" -H 'Content-Type: application/json' \
+  -d '{"username":"cliuser","password":"orgpass1","firstName":"Cli","lastName":"User"}'
+check "org register via client (no org id)" 201 "$(status)"
+req POST /analytical-engines/auth/login -H 'Content-Type: application/json' \
+  -d '{"identifier":"cliuser","password":"orgpass1"}'
+check "org login without client and without org id" 400 "$(status)"
 
 # org users can read themselves by default
 req GET /analytical-engines/organisations/auth-corp/users/me -H "Authorization: Bearer $OBA2"
@@ -279,7 +294,7 @@ req PATCH /analytical-engines/organisations/auth-corp/auth-config -H "Authorizat
 check "update auth config" 200 "$(status)"
 check "min length updated" 12 "$(field '["passwordMinLength"]')"
 req POST /analytical-engines/auth/register -H 'Content-Type: application/json' \
-  -d "{\"organisationId\":$AORGID,\"identifier\":\"shortpw\",\"password\":\"shortpass\",\"firstName\":\"S\",\"lastName\":\"P\"}"
+  -d "{\"organisationId\":$AORGID,\"username\":\"shortpw\",\"password\":\"shortpass\",\"firstName\":\"S\",\"lastName\":\"P\"}"
 check "org register rejects too-short password" 400 "$(status)"
 
 # create user without password: no auth, cannot login; then set one via PATCH
@@ -383,7 +398,7 @@ check "access ttl applied" 120 "$(field '["accessTokenTtlSeconds"]')"
 
 # the register/login response reports the org-specific access-token lifetime
 req POST /analytical-engines/auth/register -H 'Content-Type: application/json' \
-  -d "{\"organisationId\":$AORGID,\"identifier\":\"carol\",\"password\":\"orgpass1\",\"firstName\":\"Carol\",\"lastName\":\"C\"}"
+  -d "{\"organisationId\":$AORGID,\"username\":\"carol\",\"password\":\"orgpass1\",\"firstName\":\"Carol\",\"lastName\":\"C\"}"
 check "register carol" 201 "$(status)"
 check "carol access ttl reported" 120 "$(field '["expiresInSeconds"]')"
 CBR=$(field '["refreshToken"]')

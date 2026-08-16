@@ -28,7 +28,12 @@ public interface OrganisationUserRepository extends JpaRepository<OrganisationUs
     @EntityGraph(attributePaths = {"roles.permissions", "organisation"})
     Optional<OrganisationUser> findWithRolesByOrganisationIdAndEmail(Long organisationId, String email);
 
+    @EntityGraph(attributePaths = {"roles.permissions", "organisation"})
+    Optional<OrganisationUser> findWithRolesByOrganisationIdAndPhone(Long organisationId, String phone);
+
     boolean existsByOrganisationIdAndUsername(Long organisationId, String username);
 
     boolean existsByOrganisationIdAndEmail(Long organisationId, String email);
+
+    boolean existsByOrganisationIdAndPhone(Long organisationId, String phone);
 }

@@ -38,7 +38,7 @@ class OrganisationAuthIntegrationTest {
 
     // Each test registers its own platform (unique slug) because all tests
     // share one database; a shared slug would 409 on the second registration.
-    private static final String[] SLUGS = {"orgauth1", "orgauth2", "orgauth3", "orgauth4", "orgauth5", "orgauth6", "orgauth7", "orgauth8", "orgauth9", "orgauth10"};
+    private static final String[] SLUGS = {"orgauth1", "orgauth2", "orgauth3", "orgauth4", "orgauth5", "orgauth6", "orgauth7", "orgauth8", "orgauth9", "orgauth10", "orgauth11", "orgauth12", "orgauth13", "orgauth14", "orgauth15", "orgauth16"};
     private static final String ORG_SLUG = "oa-org";
 
     @Autowired
@@ -61,7 +61,7 @@ class OrganisationAuthIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId,
-                                "identifier", "jane",
+                                "username", "jane",
                                 "password", "orgpass1",
                                 "firstName", "Jane",
                                 "lastName", "Doe"))))
@@ -111,7 +111,7 @@ class OrganisationAuthIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId,
-                                "identifier", "jane",
+                                "username", "jane",
                                 "password", "orgpass1",
                                 "firstName", "J", "lastName", "D"))))
                 .andExpect(status().isConflict());
@@ -387,7 +387,7 @@ class OrganisationAuthIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId,
-                                "identifier", "MixedCase",
+                                "username", "MixedCase",
                                 "password", "orgpass1",
                                 "firstName", "F", "lastName", "L"))))
                 .andExpect(status().isCreated())
@@ -411,10 +411,270 @@ class OrganisationAuthIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId,
-                                "identifier", "MIXEDCASE",
+                                "username", "MIXEDCASE",
                                 "password", "orgpass1",
                                 "firstName", "G", "lastName", "R"))))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    void organisationIsResolvedFromClientHeaderForLoginAndRegister() throws Exception {
+        String platform = "/" + SLUGS[10];
+        String org = platform + "/organisations/" + ORG_SLUG;
+        String orgAuth = platform + "/auth";
+        String boss = registerPlatform("orgauth-client-boss@nexx.io", SLUGS[10]);
+        createOrganisation(boss, platform);
+        String clientKey = createClient(boss, org, "Mobile App");
+
+        // register via the client: no organisationId in the body
+        mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "username", "clientreg",
+                                "password", "orgpass1",
+                                "firstName", "C", "lastName", "R"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.user.username").value("clientreg"));
+
+        // a body organisationId is ignored when a client is present (the
+        // client's organisation is authoritative), even a bogus one
+        mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "organisationId", 999999L,
+                                "username", "clientreg2",
+                                "password", "orgpass1",
+                                "firstName", "C", "lastName", "R"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.user.username").value("clientreg2"));
+
+        // login via the client without an organisationId: explicit and default authType
+        mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("identifier", "clientreg", "authType", "PASSWORD", "password", "orgpass1"))))
+                .andExpect(status().isOk());
+        mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("identifier", "clientreg", "password", "orgpass1"))))
+                .andExpect(status().isOk());
+
+        // wrong credentials with a client are still rejected
+        mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("identifier", "clientreg", "password", "wrong"))))
+                .andExpect(status().isUnauthorized());
+
+        // the registered users exist under the org
+        mockMvc.perform(get(org + "/users").header("Authorization", bearer(boss)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
+    void organisationIdIsRequiredWhenNoClientHeaderIsPresent() throws Exception {
+        String platform = "/" + SLUGS[11];
+        String org = platform + "/organisations/" + ORG_SLUG;
+        String orgAuth = platform + "/auth";
+        String boss = registerPlatform("orgauth-noclient-boss@nexx.io", SLUGS[11]);
+        createOrganisation(boss, platform);
+        long orgId = getOrgId(boss, org);
+
+        // without a client header the body organisationId is required
+        mockMvc.perform(post(orgAuth + "/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("identifier", "jane", "password", "orgpass1"))))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post(orgAuth + "/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "username", "noclient",
+                                "password", "orgpass1",
+                                "firstName", "N", "lastName", "C"))))
+                .andExpect(status().isBadRequest());
+
+        // ... but it still works when provided (backwards compatible)
+        mockMvc.perform(post(orgAuth + "/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "organisationId", orgId,
+                                "username", "noclient",
+                                "password", "orgpass1",
+                                "firstName", "N", "lastName", "C"))))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void phoneIsALoginIdentifierAndIdentifierTypeIsRespected() throws Exception {
+        String platform = "/" + SLUGS[12];
+        String org = platform + "/organisations/" + ORG_SLUG;
+        String orgAuth = platform + "/auth";
+        String boss = registerPlatform("orgauth-phone-boss@nexx.io", SLUGS[12]);
+        createOrganisation(boss, platform);
+        long orgId = getOrgId(boss, org);
+
+        // email + phone are the login identifiers; username is stored but not login-capable
+        mockMvc.perform(patch(org)
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "emailRequired", true, "emailCanLogin", true,
+                                "usernameRequired", false, "usernameCanLogin", false,
+                                "phoneCanLogin", true))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.phoneCanLogin").value(true));
+
+        mockMvc.perform(post(orgAuth + "/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "organisationId", orgId,
+                                "username", "phuser",
+                                "email", "ph@nexx.io",
+                                "phone", "+1 (555) 123-4567",
+                                "password", "orgpass1",
+                                "firstName", "P", "lastName", "H"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.user.phone").value("+15551234567"));
+
+        // explicit identifier types: phone and email work, username is not enabled
+        mockMvc.perform(post(orgAuth + "/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("organisationId", orgId,
+                                "identifierType", "PHONE", "identifier", "+1 (555) 123-4567",
+                                "password", "orgpass1"))))
+                .andExpect(status().isOk());
+        mockMvc.perform(post(orgAuth + "/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("organisationId", orgId,
+                                "identifierType", "EMAIL", "identifier", "PH@nexx.io",
+                                "password", "orgpass1"))))
+                .andExpect(status().isOk());
+        mockMvc.perform(post(orgAuth + "/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("organisationId", orgId,
+                                "identifierType", "USERNAME", "identifier", "phuser",
+                                "password", "orgpass1"))))
+                .andExpect(status().isUnauthorized());
+
+        // phone uniqueness per org, even after normalization
+        mockMvc.perform(post(orgAuth + "/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "organisationId", orgId,
+                                "email", "ph2@nexx.io",
+                                "phone", "+15551234567",
+                                "password", "orgpass1",
+                                "firstName", "Q", "lastName", "H"))))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void requiredIdentifiersAndAtLeastOneLoginIdentifierAreEnforced() throws Exception {
+        String platform = "/" + SLUGS[13];
+        String org = platform + "/organisations/" + ORG_SLUG;
+        String orgAuth = platform + "/auth";
+        String boss = registerPlatform("orgauth-req-boss@nexx.io", SLUGS[13]);
+        createOrganisation(boss, platform);
+        long orgId = getOrgId(boss, org);
+
+        // phone is required + login-enabled
+        mockMvc.perform(patch(org)
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("phoneRequired", true, "phoneCanLogin", true))))
+                .andExpect(status().isOk());
+
+        // register without the required phone is rejected
+        mockMvc.perform(post(orgAuth + "/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "organisationId", orgId,
+                                "username", "nophone",
+                                "password", "orgpass1",
+                                "firstName", "N", "lastName", "P"))))
+                .andExpect(status().isBadRequest());
+
+        // all identifiers disabled for login is rejected on the org itself
+        mockMvc.perform(patch(org)
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "emailCanLogin", false, "usernameCanLogin", false, "phoneCanLogin", false))))
+                .andExpect(status().isBadRequest());
+
+        // identifiers not required, but none enabled for login: a user that
+        // provides no login-capable identifier is rejected at register
+        mockMvc.perform(patch(org)
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "usernameRequired", false, "phoneRequired", false,
+                                "usernameCanLogin", true))));
+        mockMvc.perform(post(orgAuth + "/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "organisationId", orgId,
+                                "email", "onlyemail@nexx.io",
+                                "password", "orgpass1",
+                                "firstName", "O", "lastName", "E"))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void passwordCanBeDisabledPerOrganisation() throws Exception {
+        String platform = "/" + SLUGS[14];
+        String org = platform + "/organisations/" + ORG_SLUG;
+        String orgAuth = platform + "/auth";
+        String boss = registerPlatform("orgauth-nopw-boss@nexx.io", SLUGS[14]);
+        createOrganisation(boss, platform);
+        long orgId = getOrgId(boss, org);
+
+        // disable password auth: register without a password is allowed
+        mockMvc.perform(patch(org + "/auth-config")
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("passwordEnabled", false))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.passwordEnabled").value(false));
+
+        MvcResult reg = mockMvc.perform(post(orgAuth + "/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "organisationId", orgId,
+                                "username", "nopw",
+                                "firstName", "N", "lastName", "W"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.user.authType").isEmpty())
+                .andReturn();
+        long userId = objectMapper.readTree(reg.getResponse().getContentAsString()).get("user").get("id").asLong();
+
+        // no password method enabled: login always fails
+        mockMvc.perform(post(orgAuth + "/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("organisationId", orgId,
+                                "identifier", "nopw", "password", "whatever1"))))
+                .andExpect(status().isUnauthorized());
+
+        // re-enable password auth and set a password: the user can now log in
+        mockMvc.perform(patch(org + "/auth-config")
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("passwordEnabled", true))))
+                .andExpect(status().isOk());
+        mockMvc.perform(patch(org + "/users/" + userId)
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("password", "newpass123"))))
+                .andExpect(status().isOk());
+        mockMvc.perform(post(orgAuth + "/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("organisationId", orgId,
+                                "identifier", "nopw", "password", "newpass123"))))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -480,7 +740,7 @@ class OrganisationAuthIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId,
-                                "identifier", "email-user@nexx.io",
+                                "email", "email-user@nexx.io",
                                 "password", "orgpass1",
                                 "firstName", "E", "lastName", "U"))))
                 .andExpect(status().isCreated())
@@ -524,6 +784,16 @@ class OrganisationAuthIntegrationTest {
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
     }
 
+    private String createClient(String boss, String org, String name) throws Exception {
+        MvcResult result = mockMvc.perform(post(org + "/clients")
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("name", name, "type", "WEB"))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("clientKey").asText();
+    }
+
     private long createRole(String boss, String org, String name, String... permissions) throws Exception {
         MvcResult result = mockMvc.perform(post(org + "/roles")
                         .header("Authorization", bearer(boss))
@@ -539,7 +809,7 @@ class OrganisationAuthIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId,
-                                "identifier", identifier,
+                                "username", identifier,
                                 "password", password,
                                 "firstName", "F", "lastName", "L"))))
                 .andExpect(status().isCreated())

@@ -44,7 +44,7 @@ export function OrgSettingsTab({ platformSlug, organisationSlug }: OrgSettingsTa
       </TabsList>
 
       <TabsContent value="auth" className="mt-6 space-y-6">
-        <EmailAsUsernameCard platformSlug={platformSlug} organisationSlug={organisationSlug} />
+        <IdentifiersCard platformSlug={platformSlug} organisationSlug={organisationSlug} />
         <AuthConfigCard platformSlug={platformSlug} organisationSlug={organisationSlug} />
       </TabsContent>
 
@@ -63,45 +63,74 @@ export function OrgSettingsTab({ platformSlug, organisationSlug }: OrgSettingsTa
 // Auth: email-as-username
 // ---------------------------------------------------------------------------
 
-function EmailAsUsernameCard({ platformSlug, organisationSlug }: OrgSettingsTabProps) {
+function IdentifiersCard({ platformSlug, organisationSlug }: OrgSettingsTabProps) {
   const org = useOrganisation(organisationSlug);
   const update = useUpdateOrganisation(platformSlug, organisationSlug);
 
-  if (org.isLoading) return <TableSkeleton rows={2} columns={2} />;
+  if (org.isLoading) return <TableSkeleton rows={3} columns={3} />;
   if (org.isError) return <ErrorState error={org.error} onRetry={() => org.refetch()} />;
 
-  const enabled = org.data?.useEmailAsUsername ?? false;
+  const data = org.data!;
+
+  /** Toggle one flag; the full set is sent so the at-least-one-login rule
+   * (enforced server-side too) never leaves the UI out of sync. */
+  const setFlag = (key: "emailRequired" | "usernameRequired" | "phoneRequired" | "emailCanLogin" | "usernameCanLogin" | "phoneCanLogin", value: boolean) => {
+    update
+      .mutateAsync({
+        emailRequired: key === "emailRequired" ? value : data.emailRequired,
+        usernameRequired: key === "usernameRequired" ? value : data.usernameRequired,
+        phoneRequired: key === "phoneRequired" ? value : data.phoneRequired,
+        emailCanLogin: key === "emailCanLogin" ? value : data.emailCanLogin,
+        usernameCanLogin: key === "usernameCanLogin" ? value : data.usernameCanLogin,
+        phoneCanLogin: key === "phoneCanLogin" ? value : data.phoneCanLogin,
+      })
+      .catch(() => undefined);
+  };
+
+  const identifiers: { key: "email" | "username" | "phone"; label: string; hint: string }[] = [
+    { key: "email", label: "Email", hint: "Normalized and unique per organisation" },
+    { key: "username", label: "Username", hint: "Lowercased and unique per organisation" },
+    { key: "phone", label: "Phone number", hint: "Normalized and unique per organisation" },
+  ];
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <Mail className="h-4 w-4 text-primary" /> Sign-in identifier
+          <Mail className="h-4 w-4 text-primary" /> Sign-in identifiers
         </CardTitle>
         <CardDescription>
-          Which field organisation users use to sign in.
+          Which identifiers your users sign in with. Each can be required on new users and/or
+          usable for login — at least one must be usable for login.
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
-          <div>
-            <Label htmlFor="oe-email" className="text-sm font-medium">
-              Use email as username
-            </Label>
-            <p className="text-xs text-muted-foreground">
-              When enabled, email is required on new users and becomes their login identifier.
-              A username stays optional and can still be stored.
-            </p>
+      <CardContent className="space-y-3">
+        {identifiers.map(({ key, label, hint }) => (
+          <div key={key} className="flex items-center justify-between gap-4 rounded-lg border p-3">
+            <div>
+              <Label className="text-sm font-medium">{label}</Label>
+              <p className="text-xs text-muted-foreground">{hint}</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2 text-sm">
+                <Switch
+                  checked={data[`${key}Required`]}
+                  disabled={update.isPending}
+                  onCheckedChange={(checked) => setFlag(`${key}Required` as const, checked)}
+                />
+                Required
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <Switch
+                  checked={data[`${key}CanLogin`]}
+                  disabled={update.isPending}
+                  onCheckedChange={(checked) => setFlag(`${key}CanLogin` as const, checked)}
+                />
+                Can log in
+              </label>
+            </div>
           </div>
-          <Switch
-            id="oe-email"
-            checked={enabled}
-            disabled={update.isPending}
-            onCheckedChange={(checked) =>
-              update.mutateAsync({ useEmailAsUsername: checked }).catch(() => undefined)
-            }
-          />
-        </div>
+        ))}
       </CardContent>
     </Card>
   );
@@ -117,6 +146,7 @@ function AuthConfigCard({ platformSlug, organisationSlug }: OrgSettingsTabProps)
 
   const form = useForm(authConfigSchema, {
     authType: "PASSWORD",
+    passwordEnabled: true,
     passwordMinLength: 8,
     passwordMaxLength: 72,
     passwordExpirationDays: 0,
@@ -127,6 +157,7 @@ function AuthConfigCard({ platformSlug, organisationSlug }: OrgSettingsTabProps)
     if (config.data) {
       form.setValues({
         authType: config.data.authType,
+        passwordEnabled: config.data.passwordEnabled,
         passwordMinLength: config.data.passwordMinLength,
         passwordMaxLength: config.data.passwordMaxLength,
         passwordExpirationDays: config.data.passwordExpirationDays,
@@ -143,6 +174,7 @@ function AuthConfigCard({ platformSlug, organisationSlug }: OrgSettingsTabProps)
     const data = form.values;
     await update.mutateAsync({
       authType: data.authType,
+      passwordEnabled: data.passwordEnabled,
       passwordMinLength: data.passwordMinLength,
       passwordMaxLength: data.passwordMaxLength,
       passwordExpirationDays: data.passwordExpirationDays,

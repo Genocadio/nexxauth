@@ -82,7 +82,7 @@ class OrganisationAuthConfigIntegrationTest {
         mockMvc.perform(post(orgAuth + "/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
-                                "organisationId", orgId, "identifier", "shorty",
+                                "organisationId", orgId, "username", "shorty",
                                 "password", "shortpass", "firstName", "S", "lastName", "Y"))))
                 .andExpect(status().isBadRequest());
 
@@ -90,7 +90,7 @@ class OrganisationAuthConfigIntegrationTest {
         MvcResult reg = mockMvc.perform(post(orgAuth + "/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
-                                "organisationId", orgId, "identifier", "longer",
+                                "organisationId", orgId, "username", "longer",
                                 "password", "alongerpass", "firstName", "L", "lastName", "G"))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.user.authType").value("PASSWORD"))
@@ -169,7 +169,7 @@ class OrganisationAuthConfigIntegrationTest {
         MvcResult reg = mockMvc.perform(post(orgAuth + "/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
-                                "organisationId", orgId, "identifier", "cycler",
+                                "organisationId", orgId, "username", "cycler",
                                 "password", "firstpass", "firstName", "C", "lastName", "R"))))
                 .andExpect(status().isCreated())
                 .andReturn();
@@ -201,7 +201,7 @@ class OrganisationAuthConfigIntegrationTest {
         mockMvc.perform(post(orgAuth + "/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
-                                "organisationId", orgId, "identifier", "aged",
+"organisationId", orgId, "username", "aged",
                                 "password", "oldpass12", "firstName", "A", "lastName", "G"))))
                 .andExpect(status().isCreated());
 

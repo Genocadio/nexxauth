@@ -41,6 +41,7 @@ const EMPTY_VALUES = {
   lastName: "",
   username: "",
   email: "",
+  phone: "",
   enabled: true,
   roleIds: [] as number[],
   password: "",
@@ -85,6 +86,7 @@ function OrgUserDialogInner({
           lastName: user.lastName,
           username: user.username ?? "",
           email: user.email ?? "",
+          phone: user.phone ?? "",
           enabled: user.enabled,
           roleIds: user.roles.map((r) => r.id),
           password: "",
@@ -104,6 +106,7 @@ function OrgUserDialogInner({
           lastName: data.lastName,
           username: data.username.trim() || undefined,
           email: data.email.trim() || undefined,
+          phone: data.phone.trim() || undefined,
           enabled: data.enabled,
           roleIds: data.roleIds,
           // Blank password = no change; clearPassword sends "" to remove auth.
@@ -117,6 +120,7 @@ function OrgUserDialogInner({
         lastName: data.lastName,
         username: data.username.trim() || undefined,
         email: data.email.trim() || undefined,
+        phone: data.phone.trim() || undefined,
         roleIds: data.roleIds,
         password: data.password.trim() || undefined,
         metadata,
@@ -175,6 +179,14 @@ function OrgUserDialogInner({
                 onChange={(e) => form.setValue("username", e.target.value)}
               />
             </FormField>
+            <FormField label="Phone" htmlFor="ou-phone" error={form.errors.phone}>
+              <Input
+                id="ou-phone"
+                type="tel"
+                value={form.values.phone}
+                onChange={(e) => form.setValue("phone", e.target.value)}
+              />
+            </FormField>
           </>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
@@ -191,6 +203,14 @@ function OrgUserDialogInner({
                 type="email"
                 value={form.values.email}
                 onChange={(e) => form.setValue("email", e.target.value)}
+              />
+            </FormField>
+            <FormField label="Phone" htmlFor="ou-phone" error={form.errors.phone}>
+              <Input
+                id="ou-phone"
+                type="tel"
+                value={form.values.phone}
+                onChange={(e) => form.setValue("phone", e.target.value)}
               />
             </FormField>
           </div>
@@ -302,7 +322,7 @@ function FieldValueInput({
   if (field.fieldType === "BOOLEAN") {
     const selected = value || "unset";
     return (
-      <FormField label={field.label} htmlFor={id}>
+      <FormField label={field.key} htmlFor={id}>
         <Select value={selected} onValueChange={(next) => onChange(next === "unset" ? "" : next)}>
           <SelectTrigger id={id} className="w-full">
             <SelectValue placeholder="Not set" />
@@ -319,7 +339,7 @@ function FieldValueInput({
 
   return (
     <FormField
-      label={field.label}
+      label={field.key}
       htmlFor={id}
       hint={field.fieldType === "NUMBER" ? "Decimal number (e.g. 1.5)" : field.fieldType === "DATE" ? "Date (yyyy-MM-dd)" : undefined}
     >

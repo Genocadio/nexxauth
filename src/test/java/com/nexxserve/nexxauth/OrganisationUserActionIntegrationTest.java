@@ -193,7 +193,7 @@ class OrganisationUserActionIntegrationTest {
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
-                                "key", "department", "label", "Department",
+                                "key", "department",
                                 "fieldType", "STRING", "loginEnabled", false,
                                 "required", true))))
                 .andExpect(status().isCreated())
@@ -278,7 +278,7 @@ class OrganisationUserActionIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId,
-                                "identifier", identifier,
+                                "username", identifier,
                                 "password", password,
                                 "firstName", "F", "lastName", "L"))))
                 .andExpect(status().isCreated())

@@ -97,7 +97,7 @@ export async function seedPreparedOrganisation(platform: PlatformSetup): Promise
       platform.session.accessToken,
       platform.platformSlug,
       org.slug,
-      { key: "employee-id", label: "Employee ID", fieldType: "STRING", loginEnabled: true },
+      { key: "employee-id", fieldType: "STRING", loginEnabled: true },
     );
     return { id: org.id, slug: org.slug, name: org.name, roleId: role.id, fieldKey: field.key };
   } finally {

@@ -5,6 +5,7 @@ import com.nexxserve.nexxauth.dto.request.UpdateOrganisationRequest;
 import com.nexxserve.nexxauth.dto.response.OrganisationResponse;
 import com.nexxserve.nexxauth.entity.Organisation;
 import com.nexxserve.nexxauth.entity.Platform;
+import com.nexxserve.nexxauth.exception.BadRequestException;
 import com.nexxserve.nexxauth.exception.ConflictException;
 import com.nexxserve.nexxauth.exception.ResourceNotFoundException;
 import com.nexxserve.nexxauth.mapper.OrganisationMapper;
@@ -107,8 +108,34 @@ public class OrganisationService {
         if (request.description() != null) {
             organisation.setDescription(request.description());
         }
+        // Legacy switch first, then explicit flags win over it.
         if (request.useEmailAsUsername() != null) {
-            organisation.setUseEmailAsUsername(request.useEmailAsUsername());
+            applyLegacyIdentifierSwitch(organisation, request.useEmailAsUsername());
+        }
+        if (request.emailRequired() != null) {
+            organisation.setEmailRequired(request.emailRequired());
+        }
+        if (request.usernameRequired() != null) {
+            organisation.setUsernameRequired(request.usernameRequired());
+        }
+        if (request.phoneRequired() != null) {
+            organisation.setPhoneRequired(request.phoneRequired());
+        }
+        if (request.emailCanLogin() != null) {
+            organisation.setEmailCanLogin(request.emailCanLogin());
+        }
+        if (request.usernameCanLogin() != null) {
+            organisation.setUsernameCanLogin(request.usernameCanLogin());
+        }
+        if (request.phoneCanLogin() != null) {
+            organisation.setPhoneCanLogin(request.phoneCanLogin());
+        }
+        if (request.onboardingStep() != null) {
+            organisation.setOnboardingStep(request.onboardingStep());
+        }
+        if (!organisation.hasLoginIdentifier()) {
+            throw new BadRequestException(
+                    "At least one sign-in identifier (email, username or phone) must be enabled for login");
         }
         if (request.slug() != null && !request.slug().equals(organisation.getSlug())) {
             if (organisationRepository.existsByPlatformIdAndSlug(platform.getId(), request.slug())) {
@@ -118,6 +145,18 @@ public class OrganisationService {
             organisation.setSlug(request.slug());
         }
         return organisationMapper.toResponse(organisationRepository.save(organisation));
+    }
+
+    /** Legacy {@code useEmailAsUsername} switch mapped onto the per-identifier
+     * flags: email required + login identifier, username not login-capable and
+     * not required; phone untouched (never enabled by the old setting). */
+    private void applyLegacyIdentifierSwitch(Organisation organisation, boolean emailAsUsername) {
+        organisation.setEmailRequired(emailAsUsername);
+        organisation.setEmailCanLogin(emailAsUsername);
+        organisation.setUsernameRequired(!emailAsUsername);
+        organisation.setUsernameCanLogin(!emailAsUsername);
+        organisation.setPhoneRequired(false);
+        organisation.setPhoneCanLogin(false);
     }
 
     @Transactional

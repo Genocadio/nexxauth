@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,10 +21,17 @@ import org.springframework.web.bind.annotation.RestController;
  * Organisation-level authentication, independent of the platform auth flow.
  * Public endpoints (like platform auth): register and login create an org
  * session signed by the organisation's own RSA key.
+ * <p>
+ * When the request carries an {@code X-Client-Id} header the organisation is
+ * identified through the client (the client's organisation is authoritative
+ * and no {@code organisationId} is needed in the body); without the header the
+ * body's {@code organisationId} is required (server-side/platform-user flows).
  */
 @RestController
 @RequestMapping("/{slug}/auth")
 public class OrganisationAuthController {
+
+    static final String CLIENT_ID_HEADER = "X-Client-Id";
 
     private final OrganisationAuthService authService;
 
@@ -34,14 +42,16 @@ public class OrganisationAuthController {
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
     public OrgAuthResponse register(@PathVariable String slug,
+                                    @RequestHeader(value = CLIENT_ID_HEADER, required = false) String clientId,
                                     @Valid @RequestBody OrgRegisterRequest request) {
-        return authService.register(slug, request);
+        return authService.register(slug, request, clientId);
     }
 
     @PostMapping("/login")
     public OrgAuthResponse login(@PathVariable String slug,
+                                 @RequestHeader(value = CLIENT_ID_HEADER, required = false) String clientId,
                                  @Valid @RequestBody OrgLoginRequest request) {
-        return authService.login(slug, request);
+        return authService.login(slug, request, clientId);
     }
 
     @PostMapping("/refresh")

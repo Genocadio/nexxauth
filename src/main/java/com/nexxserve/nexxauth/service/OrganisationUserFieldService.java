@@ -17,12 +17,14 @@ import com.nexxserve.nexxauth.repository.OrganisationUserFieldRepository;
 import com.nexxserve.nexxauth.repository.OrganisationUserFieldValueRepository;
 import com.nexxserve.nexxauth.repository.OrganisationUserRepository;
 import com.nexxserve.nexxauth.security.OrgActor;
+import com.nexxserve.nexxauth.util.Emails;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.net.URI;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -33,6 +35,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -44,6 +47,9 @@ import java.util.stream.Collectors;
  */
 @Service
 public class OrganisationUserFieldService {
+
+    private static final Pattern EMAIL_PATTERN =
+            Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
 
     private final OrganisationUserFieldRepository fieldRepository;
     private final OrganisationUserFieldValueRepository valueRepository;
@@ -96,7 +102,6 @@ public class OrganisationUserFieldService {
         OrganisationUserField field = new OrganisationUserField();
         field.setOrganisation(organisation);
         field.setKey(key);
-        field.setLabel(request.label().trim());
         field.setFieldType(request.fieldType());
         field.setLoginEnabled(Boolean.TRUE.equals(request.loginEnabled()));
         field.setRequired(Boolean.TRUE.equals(request.required()));
@@ -113,9 +118,6 @@ public class OrganisationUserFieldService {
         lockOrganisation(organisation);
         OrganisationUserField field = fieldRepository.findByIdAndOrganisationId(fieldId, organisation.getId())
                 .orElseThrow(() -> ResourceNotFoundException.of("Organisation user field", fieldId));
-        if (request.label() != null) {
-            field.setLabel(request.label().trim());
-        }
         if (request.fieldType() != null && request.fieldType() != field.getFieldType()) {
             if (valueRepository.existsByOrganisationIdAndFieldKey(organisation.getId(), field.getKey())) {
                 throw new BadRequestException("Cannot change the type of field \"" + field.getKey()
@@ -325,6 +327,26 @@ public class OrganisationUserFieldService {
                     throw new BadRequestException("Value must be a date (yyyy-MM-dd) for a DATE field");
                 }
             }
+            case EMAIL -> {
+                String emailValue = Emails.normalize(trimmed);
+                if (emailValue == null || !EMAIL_PATTERN.matcher(emailValue).matches()) {
+                    throw new BadRequestException("Value must be a valid email for an EMAIL field");
+                }
+                yield emailValue;
+            }
+            case LINK -> {
+                try {
+                    URI uri = URI.create(trimmed);
+                    String scheme = uri.getScheme();
+                    if (scheme == null || uri.getHost() == null
+                            || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))) {
+                        throw new BadRequestException("Value must be an http(s) link for a LINK field");
+                    }
+                    yield trimmed;
+                } catch (IllegalArgumentException e) {
+                    throw new BadRequestException("Value must be an http(s) link for a LINK field");
+                }
+            }
         };
         if (normalized.length() > 255) {
             throw new BadRequestException("Metadata value is too long (max 255 characters)");
@@ -343,7 +365,7 @@ public class OrganisationUserFieldService {
     }
 
     private OrganisationUserFieldResponse toResponse(OrganisationUserField field) {
-        return new OrganisationUserFieldResponse(field.getId(), field.getKey(), field.getLabel(),
+        return new OrganisationUserFieldResponse(field.getId(), field.getKey(),
                 field.getFieldType(), field.isLoginEnabled(), field.isRequired(), field.getCreatedAt());
     }
 

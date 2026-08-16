@@ -7,21 +7,17 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 /**
- * Define an organisation user field. The key is the machine name used in user
- * {@code metadata} (lowercase letters, digits and hyphens) and must be unique
- * per organisation; the label is human-readable.
+ * Define an organisation user field. The key is the attribute name used in
+ * user {@code metadata} (lowercase letters, digits and hyphens) and must be
+ * unique per organisation.
  */
 public record CreateOrganisationUserFieldRequest(
 
-        @NotBlank(message = "Key is required")
+        @NotBlank(message = "Attribute name is required")
         @Pattern(regexp = "^[a-z0-9]+(?:-[a-z0-9]+)*$",
-                message = "Key must be lowercase letters, digits and hyphens (e.g. employee-id)")
-        @Size(max = 100, message = "Key must be at most 100 characters")
+                message = "Attribute name must be lowercase letters, digits and hyphens (e.g. employee-id)")
+        @Size(max = 100, message = "Attribute name must be at most 100 characters")
         String key,
-
-        @NotBlank(message = "Label is required")
-        @Size(max = 100, message = "Label must be at most 100 characters")
-        String label,
 
         @NotNull(message = "Field type is required")
         UserFieldType fieldType,

@@ -1,26 +1,38 @@
 package com.nexxserve.nexxauth.dto.request;
 
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.util.Map;
 
 /**
  * Org-level signup: creates an org user (no roles by default) and returns
- * organisation access tokens. The identifier is the username, or the email
- * when the organisation uses email as username.
+ * organisation access tokens. The organisation is identified by the
+ * {@code X-Client-Id} header when the request comes from a registered client
+ * (the client's organisation is authoritative); otherwise {@code organisationId}
+ * is required (server-side/platform-user flows). Username, email and phone are
+ * optional identifiers, unique per organisation; each is required or
+ * login-enabled per the organisation's sign-in identifier configuration.
  */
 public record OrgRegisterRequest(
 
-        @NotNull(message = "Organisation id is required")
+        /** Required only when no {@code X-Client-Id} header is present. */
         Long organisationId,
 
-        @NotBlank(message = "Identifier is required")
-        @Size(max = 100, message = "Identifier must be at most 100 characters")
-        String identifier,
+        @Size(max = 100, message = "Username must be at most 100 characters")
+        String username,
 
-        @NotBlank(message = "Password is required")
+        @Email(message = "Email must be valid")
+        @Size(max = 255, message = "Email must be at most 255 characters")
+        String email,
+
+        @Size(max = 30, message = "Phone must be at most 30 characters")
+        String phone,
+
+        /** Required while password auth is enabled for the organisation; when
+         * password auth is disabled a user may register without one (they get
+         * no auth configured until a method is enabled). */
         @Size(max = 72, message = "Password must be at most 72 characters")
         String password,
 

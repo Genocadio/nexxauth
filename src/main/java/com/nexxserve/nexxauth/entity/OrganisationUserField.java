@@ -28,12 +28,9 @@ public class OrganisationUserField extends BaseEntity {
     @JoinColumn(name = "organisation_id", nullable = false)
     private Organisation organisation;
 
-    /** Machine key, unique per organisation (e.g. {@code employee-id}). */
+    /** Attribute name, unique per organisation (e.g. {@code employee-id}). */
     @Column(name = "field_key", nullable = false, length = 100)
     private String key;
-
-    @Column(name = "label", nullable = false, length = 100)
-    private String label;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "field_type", nullable = false, length = 20)

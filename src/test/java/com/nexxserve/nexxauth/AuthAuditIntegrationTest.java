@@ -122,13 +122,13 @@ class AuthAuditIntegrationTest {
         mockMvc.perform(post(platform + "/organisations/audit-org/user-fields")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("key", "badge", "label", "Badge", "fieldType", "STRING"))))
+                        .content(json(Map.of("key", "badge", "fieldType", "STRING"))))
                 .andExpect(status().isCreated());
 
         mockMvc.perform(post(platform + "/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
-                                "organisationId", orgId, "identifier", "gary",
+                                "organisationId", orgId, "username", "gary",
                                 "password", "orgpass1", "firstName", "G", "lastName", "R"))))
                 .andExpect(status().isCreated());
         mockMvc.perform(post(platform + "/auth/login")
@@ -181,7 +181,7 @@ class AuthAuditIntegrationTest {
         mockMvc.perform(post(platform + "/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
-                                "organisationId", orgId, "identifier", "heidi",
+                                "organisationId", orgId, "username", "heidi",
                                 "password", "orgpass1", "firstName", "H", "lastName", "I"))))
                 .andExpect(status().isCreated());
         MvcResult login = mockMvc.perform(post(platform + "/auth/login")

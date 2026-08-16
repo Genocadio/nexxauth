@@ -298,7 +298,7 @@ class OrganisationClientIntegrationTest {
                 .andReturn().getResponse().getContentAsString()).get("id").asLong();
         long readerId = objectMapper.readTree(mockMvc.perform(post(orgAuth + "/register")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "alice",
+                        .content(json(Map.of("organisationId", orgId, "username", "alice",
                                 "password", "password1", "firstName", "A", "lastName", "L"))))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString()).get("user").get("id").asLong();
@@ -354,7 +354,7 @@ class OrganisationClientIntegrationTest {
                 .andReturn().getResponse().getContentAsString()).get("id").asLong();
         long userId = objectMapper.readTree(mockMvc.perform(post(orgAuth + "/register")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "bob",
+                        .content(json(Map.of("organisationId", orgId, "username", "bob",
                                 "password", "password1", "firstName", "B", "lastName", "L"))))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString()).get("user").get("id").asLong();

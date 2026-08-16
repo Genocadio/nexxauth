@@ -9,6 +9,7 @@ import com.nexxserve.nexxauth.entity.AuthType;
  */
 public record OrganisationAuthConfigResponse(
         AuthType authType,
+        boolean passwordEnabled,
         int passwordMinLength,
         int passwordMaxLength,
         int passwordExpirationDays,

@@ -92,6 +92,13 @@ export const updateOrganisationSchema = z.object({
   name: z.union([z.string().trim().min(1).max(200), z.literal("")]),
   description: optionalLongText,
   useEmailAsUsername: z.boolean().optional(),
+  emailRequired: z.boolean().optional(),
+  usernameRequired: z.boolean().optional(),
+  phoneRequired: z.boolean().optional(),
+  emailCanLogin: z.boolean().optional(),
+  usernameCanLogin: z.boolean().optional(),
+  phoneCanLogin: z.boolean().optional(),
+  onboardingStep: z.number().int().min(1).max(8).optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -116,6 +123,7 @@ export const orgUserFormSchema = z.object({
   lastName: requiredName(100, "Last name"),
   username: z.union([z.string().trim().max(100), z.literal("")]),
   email: optionalEmail,
+  phone: z.union([z.string().trim().max(30, "At most 30 characters"), z.literal("")]),
   enabled: z.boolean(),
   roleIds: z.array(z.number().int()),
   password: z.union([z.string().max(72, "At most 72 characters"), z.literal("")]),
@@ -148,6 +156,7 @@ export const roleSchema = z.object({
 export const authConfigSchema = z
   .object({
     authType: z.enum(["PASSWORD"]),
+    passwordEnabled: z.boolean(),
     passwordMinLength: z.number().int().min(1).max(72),
     passwordMaxLength: z.number().int().min(1).max(72),
     passwordExpirationDays: z.number().int().min(0).max(3650),
@@ -179,15 +188,15 @@ export const userFieldSchema = z.object({
     .trim()
     .regex(SLUG_PATTERN, slugMessage)
     .max(100, "At most 100 characters"),
-  label: requiredName(100, "Label"),
-  fieldType: z.enum(["STRING", "NUMBER", "BOOLEAN", "DATE"] as const satisfies readonly UserFieldType[]),
+  fieldType: z.enum(["STRING", "NUMBER", "BOOLEAN", "DATE", "EMAIL", "LINK"] as const satisfies readonly UserFieldType[]),
   loginEnabled: z.boolean().optional(),
+  required: z.boolean().optional(),
 });
 
 export const updateUserFieldSchema = z.object({
-  label: requiredName(100, "Label"),
-  fieldType: z.enum(["STRING", "NUMBER", "BOOLEAN", "DATE"] as const),
+  fieldType: z.enum(["STRING", "NUMBER", "BOOLEAN", "DATE", "EMAIL", "LINK"] as const),
   loginEnabled: z.boolean().optional(),
+  required: z.boolean().optional(),
 });
 
 // ---------------------------------------------------------------------------
