@@ -1,0 +1,31 @@
+# Build contexts
+build/
+.gradle/
+**/build/
+.idea/
+*.iml
+
+# Backend ignores anything not needed by the Gradle build.
+src/test/
+docs/
+scripts/
+
+# Web (separate build context; keep it out of the backend image)
+web/node_modules/
+web/.next/
+web/test-results/
+web/playwright-report/
+
+# VCS
+.git/
+.gitignore
+.gitattributes
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+*.log

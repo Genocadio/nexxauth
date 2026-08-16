@@ -5,6 +5,15 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
+# Secrets / env
+.env
+.env.*
+!.env.example
+!.env.prod.example
+
+# Docker
+docker-compose.override.yml
+
 ### STS ###
 .apt_generated
 .classpath

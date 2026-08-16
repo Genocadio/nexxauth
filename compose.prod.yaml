@@ -1,0 +1,117 @@
+# Distinct project name so this stack does NOT collide with the dev
+# compose.yaml (which owns `nexxauth-postgres` / `nexxauth-redis` and their
+# volumes). Everything here is scoped under nexxauth-prod-*.
+name: nexxauth-prod
+
+# Production compose: builds and runs the Nexxauth backend + web console with
+# PostgreSQL and Redis. Bring everything up with:
+#
+#   cp .env.prod.example .env      # then set a real JWT_SECRET + DB password
+#   docker compose -f compose.prod.yaml up -d --build
+#
+#   web     -> http://localhost:3000   (the console; proxies /api/v1 to backend)
+#   backend -> http://localhost:8080   (API; actuator health on :8081)
+#
+# The Next.js server proxies /api/v1/* to the backend, so browsers are
+# same-origin and the backend needs no CORS configuration.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nexxauth}
+      POSTGRES_USER: ${POSTGRES_USER:-nexxauth}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexxauth}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nexxauth} -d ${POSTGRES_DB:-nexxauth}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # No host ports: only reachable from within the compose network.
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # No host ports: only reachable from within the compose network.
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DOCKER_COMPOSE_ENABLED: "false"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-nexxauth}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-nexxauth}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-nexxauth}
+      # HS256 signing secret — MUST be a strong, stable value in production
+      # (rotate only with a strategy; changing it invalidates all access tokens).
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      # Shared rate-limit buckets across instances (horizontal scaling).
+      APP_RATE_LIMIT_STORE: redis
+      APP_RATE_LIMIT_REDIS_HOST: redis
+      APP_RATE_LIMIT_REDIS_PORT: "6379"
+      # Only read X-Forwarded-For if you run a trusted reverse proxy in front.
+      APP_RATE_LIMIT_USE_FORWARDED_FOR: "false"
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+    volumes:
+      # Prod profile rotates JSON logs here; keep them on a volume.
+      - app-logs:/var/log/nexxauth
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+      # Actuator management port — expose only if you need external probes
+      # (e.g. Prometheus); otherwise rely on the container healthcheck below.
+      - "${MANAGEMENT_PORT:-8081}:8081"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/actuator/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        # next.config.ts bakes the /api/v1 proxy target at build time.
+        BACKEND_URL: http://backend:8080
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      # Server-side org portal calls (server actions, session route, proxy).
+      API_SERVER_URL: http://backend:8080
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  postgres-data:
+  redis-data:
+  app-logs:
