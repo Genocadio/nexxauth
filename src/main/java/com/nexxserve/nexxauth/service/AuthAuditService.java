@@ -55,6 +55,7 @@ public class AuthAuditService {
     public static final String ORG_LOGIN_FAILURE = "ORG_LOGIN_FAILURE";
     public static final String ORG_REFRESH = "ORG_REFRESH";
     public static final String ORG_LOGOUT = "ORG_LOGOUT";
+    public static final String ORG_PASSWORD_CHANGED = "ORG_PASSWORD_CHANGED";
     public static final String ORG_KEY_ROTATED = "ORG_KEY_ROTATED";
     public static final String ORG_TOKEN_REUSE = "ORG_TOKEN_REUSE";
 

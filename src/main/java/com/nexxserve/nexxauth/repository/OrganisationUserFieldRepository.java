@@ -13,6 +13,10 @@ public interface OrganisationUserFieldRepository extends JpaRepository<Organisat
     /** All configured fields, for metadata validation. */
     List<OrganisationUserField> findByOrganisationId(Long organisationId);
 
+    /** Required fields - used to compute the UPDATE_PROFILE action for users
+     * missing a value. */
+    List<OrganisationUserField> findByOrganisationIdAndRequiredTrue(Long organisationId);
+
     /** Login resolution order: fields enabled for login, by key. */
     List<OrganisationUserField> findByOrganisationIdAndLoginEnabledTrueOrderByKeyAsc(Long organisationId);
 

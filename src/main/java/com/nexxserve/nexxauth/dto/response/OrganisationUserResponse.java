@@ -13,6 +13,7 @@ public record OrganisationUserResponse(
         String username,
         String email,
         boolean enabled,
+        boolean temporaryPassword,
         AuthType authType,
         List<OrganisationRoleResponse> roles,
         Instant createdAt,

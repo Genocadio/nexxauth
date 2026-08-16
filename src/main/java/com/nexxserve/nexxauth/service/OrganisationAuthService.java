@@ -7,10 +7,12 @@ import com.nexxserve.nexxauth.entity.AuthType;
 import com.nexxserve.nexxauth.entity.Organisation;
 import com.nexxserve.nexxauth.entity.OrganisationSigningKey;
 import com.nexxserve.nexxauth.entity.OrganisationUser;
+import com.nexxserve.nexxauth.entity.OrgUserAction;
 import com.nexxserve.nexxauth.entity.Platform;
 import com.nexxserve.nexxauth.exception.ConflictException;
 import com.nexxserve.nexxauth.exception.InvalidCredentialsException;
 import com.nexxserve.nexxauth.exception.PasswordExpiredException;
+import com.nexxserve.nexxauth.exception.RefreshTokenException;
 import com.nexxserve.nexxauth.exception.ResourceNotFoundException;
 import com.nexxserve.nexxauth.mapper.OrganisationUserMapper;
 import com.nexxserve.nexxauth.repository.OrganisationRepository;
@@ -24,6 +26,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Organisation-level authentication, completely independent of the platform
@@ -47,6 +51,7 @@ public class OrganisationAuthService {
     private final OrganisationSessionSettingsService sessionSettingsService;
     private final AuthTiming authTiming;
     private final OrganisationUserFieldService userFieldService;
+    private final OrgUserActions orgUserActions;
 
     public OrganisationAuthService(PlatformAccess platformAccess, OrganisationRepository organisationRepository,
                                    OrganisationUserRepository userRepository,
@@ -55,7 +60,8 @@ public class OrganisationAuthService {
                                    PasswordEncoder passwordEncoder, OrganisationUserMapper userMapper,
                                    AuthAuditService audit, OrganisationAuthConfigService authConfigService,
                                    OrganisationSessionSettingsService sessionSettingsService,
-                                   AuthTiming authTiming, OrganisationUserFieldService userFieldService) {
+                                   AuthTiming authTiming, OrganisationUserFieldService userFieldService,
+                                   OrgUserActions orgUserActions) {
         this.platformAccess = platformAccess;
         this.organisationRepository = organisationRepository;
         this.userRepository = userRepository;
@@ -69,6 +75,7 @@ public class OrganisationAuthService {
         this.sessionSettingsService = sessionSettingsService;
         this.authTiming = authTiming;
         this.userFieldService = userFieldService;
+        this.orgUserActions = orgUserActions;
     }
 
     /** Creates an org user (no roles by default) and returns its tokens. */
@@ -150,6 +157,12 @@ public class OrganisationAuthService {
 
     @Transactional
     public OrgAuthResponse refresh(String platformSlug, String rawRefreshToken) {
+        // A pending gating action (e.g. forced password change) blocks session
+        // refresh too: the user must resolve the action, then log in again.
+        OrganisationUser resolved = refreshTokenService.resolveSubject(rawRefreshToken);
+        if (orgUserActions.hasPendingGatingAction(resolved)) {
+            throw new RefreshTokenException("Pending action required: change password");
+        }
         var rotation = refreshTokenService.rotateWithSubject(rawRefreshToken,
                 subject -> sessionSettingsService.refreshTokenTtl(subject.getOrganisation()));
         audit.log(AuthAuditService.ORG_REFRESH,
@@ -190,6 +203,12 @@ public class OrganisationAuthService {
 
     private OrgAuthResponse issueTokens(OrganisationUser user) {
         Organisation organisation = user.getOrganisation();
+        if (orgUserActions.hasPendingGatingAction(user)) {
+            // A gating action (CHANGE_PASSWORD) is pending: the session is
+            // restricted - a short-lived access token to complete the action,
+            // no refresh token, regardless of the org's session settings.
+            return issueTokens(user, null, OrgUserActions.GATING_ACCESS_TTL);
+        }
         // A new session is about to be issued: evict the oldest sessions if the
         // user is at the org's concurrent-session limit.
         refreshTokenService.enforceSessionLimit(organisation, user.getId());
@@ -198,12 +217,17 @@ public class OrganisationAuthService {
     }
 
     private OrgAuthResponse issueTokens(OrganisationUser user, String refreshToken) {
+        return issueTokens(user, refreshToken, sessionSettingsService.accessTokenTtl(user.getOrganisation()));
+    }
+
+    private OrgAuthResponse issueTokens(OrganisationUser user, String refreshToken, Duration accessTtl) {
         Organisation organisation = user.getOrganisation();
-        Duration accessTtl = sessionSettingsService.accessTokenTtl(organisation);
         OrganisationSigningKey signingKey = orgKeyService.activeKey(organisation);
         String accessToken = orgJwtService.generateAccessToken(user, signingKey, accessTtl);
+        Map<String, String> metadata = userFieldService.readMetadata(user.getId());
+        List<OrgUserAction> actions = orgUserActions.of(user);
         return OrgAuthResponse.of(accessToken, refreshToken, accessTtl.toSeconds(),
-                userMapper.toResponse(user, userFieldService.readMetadata(user.getId())));
+                userMapper.toResponse(user, metadata), actions);
     }
 
     private void applyRegisterMetadata(OrgRegisterRequest request, OrganisationUser saved) {

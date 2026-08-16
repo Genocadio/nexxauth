@@ -28,6 +28,10 @@ public record CreateOrganisationUserFieldRequest(
 
         /** When true, the field's value can be used as an alternative login
          * identifier. Values of login-enabled fields must be unique per org. */
-        Boolean loginEnabled
+        Boolean loginEnabled,
+
+        /** When true, every user of the organisation must have a value for this
+         * field; users missing it get the UPDATE_PROFILE action at login. */
+        Boolean required
 ) {
 }

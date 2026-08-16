@@ -16,6 +16,10 @@ public record UpdateOrganisationUserFieldRequest(
 
         UserFieldType fieldType,
 
-        Boolean loginEnabled
+        Boolean loginEnabled,
+
+        /** When provided, sets whether the field is required for every user
+         * (missing values surface the UPDATE_PROFILE action at login). */
+        Boolean required
 ) {
 }

@@ -41,4 +41,11 @@ public class OrganisationUserField extends BaseEntity {
 
     @Column(name = "login_enabled", nullable = false)
     private boolean loginEnabled = false;
+
+    /** When true, every user of the organisation must have a value for this
+     * field. Users missing a required value get the UPDATE_PROFILE action at
+     * login (non-gating: it does not restrict tokens, only informs the client
+     * that the profile needs completing). */
+    @Column(name = "required", nullable = false)
+    private boolean required = false;
 }

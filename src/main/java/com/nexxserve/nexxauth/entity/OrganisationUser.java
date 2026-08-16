@@ -58,6 +58,14 @@ public class OrganisationUser extends BaseEntity {
     @Column(name = "password_changed_at")
     private java.time.Instant passwordChangedAt;
 
+    /** True while the password is temporary (set by a platform user or forced
+     * via the admin API): the user must change it at next login, which is
+     * surfaced as the CHANGE_PASSWORD action and gates the session (fixed
+     * 5-minute access token, no refresh token, only the change-password
+     * endpoint reachable). Cleared when the user changes their own password. */
+    @Column(name = "temporary_password", nullable = false)
+    private boolean temporaryPassword = false;
+
     @Column(name = "enabled", nullable = false)
     private boolean enabled = true;
 

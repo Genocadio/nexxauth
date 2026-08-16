@@ -99,6 +99,7 @@ public class OrganisationUserFieldService {
         field.setLabel(request.label().trim());
         field.setFieldType(request.fieldType());
         field.setLoginEnabled(Boolean.TRUE.equals(request.loginEnabled()));
+        field.setRequired(Boolean.TRUE.equals(request.required()));
         OrganisationUserFieldResponse response = toResponse(fieldRepository.save(field));
         audit.log(AuthAuditService.ORG_USER_FIELD_CREATED, null, organisation.getSlug(), key);
         return response;
@@ -127,6 +128,9 @@ public class OrganisationUserFieldService {
                 assertExistingValuesUnique(organisation, field);
             }
             field.setLoginEnabled(request.loginEnabled());
+        }
+        if (request.required() != null) {
+            field.setRequired(request.required());
         }
         OrganisationUserFieldResponse response = toResponse(fieldRepository.save(field));
         audit.log(AuthAuditService.ORG_USER_FIELD_UPDATED, null, organisation.getSlug(), field.getKey());
@@ -340,7 +344,7 @@ public class OrganisationUserFieldService {
 
     private OrganisationUserFieldResponse toResponse(OrganisationUserField field) {
         return new OrganisationUserFieldResponse(field.getId(), field.getKey(), field.getLabel(),
-                field.getFieldType(), field.isLoginEnabled(), field.getCreatedAt());
+                field.getFieldType(), field.isLoginEnabled(), field.isRequired(), field.getCreatedAt());
     }
 
     private Organisation resolve(String platformSlug, String organisationSlug, OrgActor requester, boolean write) {

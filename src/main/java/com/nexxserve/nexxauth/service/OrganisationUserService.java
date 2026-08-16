@@ -1,7 +1,9 @@
 package com.nexxserve.nexxauth.service;
 
+import com.nexxserve.nexxauth.dto.request.ChangePasswordRequest;
 import com.nexxserve.nexxauth.dto.request.CreateOrganisationUserRequest;
 import com.nexxserve.nexxauth.dto.request.UpdateOrganisationUserRequest;
+import com.nexxserve.nexxauth.dto.request.UpdateOwnProfileRequest;
 import com.nexxserve.nexxauth.dto.response.OrganisationUserResponse;
 import com.nexxserve.nexxauth.entity.Organisation;
 import com.nexxserve.nexxauth.entity.OrganisationRole;
@@ -11,13 +13,16 @@ import com.nexxserve.nexxauth.entity.Platform;
 import com.nexxserve.nexxauth.exception.BadRequestException;
 import com.nexxserve.nexxauth.exception.ConflictException;
 import com.nexxserve.nexxauth.exception.ForbiddenException;
+import com.nexxserve.nexxauth.exception.InvalidCredentialsException;
 import com.nexxserve.nexxauth.exception.ResourceNotFoundException;
 import com.nexxserve.nexxauth.mapper.OrganisationUserMapper;
 import com.nexxserve.nexxauth.repository.OrganisationRoleRepository;
 import com.nexxserve.nexxauth.repository.OrganisationUserRepository;
 import com.nexxserve.nexxauth.security.OrgActor;
+import com.nexxserve.nexxauth.security.OrgUserPrincipal;
 import com.nexxserve.nexxauth.util.Emails;
 import com.nexxserve.nexxauth.util.Usernames;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,13 +47,16 @@ public class OrganisationUserService {
     private final OrganisationAuthConfigService authConfigService;
     private final OrganisationRefreshTokenService refreshTokenService;
     private final OrganisationUserFieldService userFieldService;
+    private final PasswordEncoder passwordEncoder;
+    private final AuthAuditService audit;
 
     public OrganisationUserService(OrganisationUserRepository userRepository,
                                    OrganisationRoleRepository roleRepository, PlatformAccess platformAccess,
                                    OrganisationAccess organisationAccess, OrganisationUserMapper userMapper,
                                    OrganisationAuthConfigService authConfigService,
                                    OrganisationRefreshTokenService refreshTokenService,
-                                   OrganisationUserFieldService userFieldService) {
+                                   OrganisationUserFieldService userFieldService,
+                                   PasswordEncoder passwordEncoder, AuthAuditService audit) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.platformAccess = platformAccess;
@@ -57,6 +65,8 @@ public class OrganisationUserService {
         this.authConfigService = authConfigService;
         this.refreshTokenService = refreshTokenService;
         this.userFieldService = userFieldService;
+        this.passwordEncoder = passwordEncoder;
+        this.audit = audit;
     }
 
     @Transactional(readOnly = true)
@@ -121,6 +131,9 @@ public class OrganisationUserService {
             // A user created with a password gets the org's default auth type
             // (PASSWORD) and can log in; without one they have no auth yet.
             authConfigService.setPassword(saved, request.password());
+            // A temporary password (set by the platform user) makes the user
+            // change it at first login (CHANGE_PASSWORD action).
+            saved.setTemporaryPassword(Boolean.TRUE.equals(request.temporaryPassword()));
         }
         return userMapper.toResponse(saved, userFieldService.readMetadata(saved.getId()));
     }
@@ -172,6 +185,16 @@ public class OrganisationUserService {
             // with the old password.
             refreshTokenService.revokeAllForUser(user.getId());
         }
+        if (request.temporaryPassword() != null) {
+            user.setTemporaryPassword(request.temporaryPassword());
+            if (request.temporaryPassword()) {
+                // Triggering a forced password change kills existing sessions so
+                // the user re-authenticates into the gated action flow (fixed
+                // 5-minute access, no refresh, only the change-password endpoint)
+                // and cannot keep working under the old password.
+                refreshTokenService.revokeAllForUser(user.getId());
+            }
+        }
         if (request.metadata() != null) {
             userFieldService.setMetadata(user, request.metadata());
         }
@@ -182,6 +205,63 @@ public class OrganisationUserService {
     public void delete(String platformSlug, String organisationSlug, Long userId, OrgActor requester) {
         Organisation organisation = resolve(platformSlug, organisationSlug, requester, true, Permission.ORGANISATION_USER_DELETE);
         userRepository.delete(findUser(organisation, userId));
+    }
+
+    /** Self-service password change (any org user, regardless of permissions).
+     * Completes the CHANGE_PASSWORD action: the temporary flag is cleared so the
+     * next login issues a full session. */
+    @Transactional
+    public void changePassword(String platformSlug, String organisationSlug, OrgActor requester,
+                               ChangePasswordRequest request) {
+        OrganisationUser user = ownUser(platformSlug, organisationSlug, requester);
+        String hash = user.getPasswordHash();
+        if (hash == null || !passwordEncoder.matches(request.currentPassword(), hash)) {
+            throw new InvalidCredentialsException();
+        }
+        // Validated against the org's password rules (length + reuse history).
+        authConfigService.setPassword(user, request.newPassword());
+        user.setTemporaryPassword(false);
+        userRepository.save(user);
+        // Force re-authentication: revoke every outstanding refresh token so no
+        // session survives under the old password.
+        refreshTokenService.revokeAllForUser(user.getId());
+        audit.log(AuthAuditService.ORG_PASSWORD_CHANGED,
+                identifierOf(user), user.getOrganisation().getSlug());
+    }
+
+    /** Self-service partial profile update (any org user, regardless of
+     * permissions). Used to complete the UPDATE_PROFILE action, e.g. filling
+     * values for required organisation user fields. */
+    @Transactional
+    public OrganisationUserResponse updateOwnProfile(String platformSlug, String organisationSlug,
+                                                     OrgActor requester, UpdateOwnProfileRequest request) {
+        OrganisationUser user = ownUser(platformSlug, organisationSlug, requester);
+        if (request.firstName() != null) {
+            user.setFirstName(request.firstName());
+        }
+        if (request.lastName() != null) {
+            user.setLastName(request.lastName());
+        }
+        if (request.metadata() != null) {
+            userFieldService.setMetadata(user, request.metadata());
+        }
+        return userMapper.toResponse(userRepository.save(user), userFieldService.readMetadata(user.getId()));
+    }
+
+    /** Resolves the requesting org user's own account, forbidding platform
+     * users (they have no organisation profile). */
+    private OrganisationUser ownUser(String platformSlug, String organisationSlug, OrgActor requester) {
+        if (requester.isPlatformUser()) {
+            throw new ForbiddenException("Platform users have no organisation profile");
+        }
+        Platform platform = platformAccess.findPlatform(platformSlug);
+        Organisation organisation = organisationAccess.findOrganisation(platform, organisationSlug);
+        organisationAccess.requireOrgUserOf(organisation, requester);
+        return findUser(organisation, ((OrgUserPrincipal) requester).id());
+    }
+
+    private String identifierOf(OrganisationUser user) {
+        return user.getUsername() != null ? user.getUsername() : user.getEmail();
     }
 
     private void assertIdentifiersFree(Organisation organisation, String email, String username,

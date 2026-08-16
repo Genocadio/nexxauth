@@ -310,6 +310,52 @@ req PATCH /api/v1/platforms/analytical-engines/organisations/auth-corp/users/$PA
   -d '{"password":"longenoughpass"}'
 check "reuse of old password rejected" 400 "$(status)"
 
+echo "== org user actions (temporary password + required fields) =="
+# a temporary password (set by the platform user) gates the session until changed
+req POST /api/v1/platforms/analytical-engines/organisations/auth-corp/users -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+  -d '{"firstName":"Tina","lastName":"Temp","username":"tina","password":"temp-pass1","temporaryPassword":true}'
+check "create user with temporary password" 201 "$(status)"
+check "temporary flag echoed" True "$(field '["temporaryPassword"]')"
+req POST /api/v1/platforms/analytical-engines/auth/login -H 'Content-Type: application/json' \
+  -d "{\"organisationId\":$AORGID,\"identifier\":\"tina\",\"password\":\"temp-pass1\"}"
+check "temporary login gated" 200 "$(status)"
+check "change-password action returned" CHANGE_PASSWORD "$(field '["actions"][0]')"
+check "no refresh token while action pending" None "$(field '["refreshToken"]')"
+check "access ttl fixed at 5 min" 300 "$(field '["expiresInSeconds"]')"
+TAT=$(field '["accessToken"]')
+req GET /api/v1/platforms/analytical-engines/organisations/auth-corp/users/me -H "Authorization: Bearer $TAT"
+check "other endpoints closed while action pending" 401 "$(status)"
+req POST /api/v1/platforms/analytical-engines/organisations/auth-corp/users/me/change-password -H "Authorization: Bearer $TAT" -H 'Content-Type: application/json' \
+  -d '{"currentPassword":"temp-pass1","newPassword":"brand-new-pass"}'
+check "change password completes the action" 204 "$(status)"
+req POST /api/v1/platforms/analytical-engines/auth/login -H 'Content-Type: application/json' \
+  -d "{\"organisationId\":$AORGID,\"identifier\":\"tina\",\"password\":\"brand-new-pass\"}"
+check "tina logs in after the change" 200 "$(status)"
+check "no actions after the change" 0 "$(nlen '["actions"]')"
+check "normal access ttl restored" 900 "$(field '["expiresInSeconds"]')"
+
+# a required user field surfaces the advisory UPDATE_PROFILE action
+req POST /api/v1/platforms/analytical-engines/organisations/auth-corp/user-fields -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+  -d '{"key":"department","label":"Department","fieldType":"STRING","loginEnabled":false,"required":true}'
+check "create required field" 201 "$(status)"
+check "required flag echoed" True "$(field '["required"]')"
+req POST /api/v1/platforms/analytical-engines/organisations/auth-corp/users -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+  -d '{"firstName":"Uma","lastName":"Incomplete","username":"uma","password":"longpass1"}'
+check "create user without required field" 201 "$(status)"
+req POST /api/v1/platforms/analytical-engines/auth/login -H 'Content-Type: application/json' \
+  -d "{\"organisationId\":$AORGID,\"identifier\":\"uma\",\"password\":\"longpass1\"}"
+check "update-profile action returned" UPDATE_PROFILE "$(field '["actions"][0]')"
+check "non-gating: normal access ttl" 900 "$(field '["expiresInSeconds"]')"
+UMA=$(field '["accessToken"]')
+req GET /api/v1/platforms/analytical-engines/organisations/auth-corp/users/me -H "Authorization: Bearer $UMA"
+check "non-gating: profile reachable" 200 "$(status)"
+req PATCH /api/v1/platforms/analytical-engines/organisations/auth-corp/users/me -H "Authorization: Bearer $UMA" -H 'Content-Type: application/json' \
+  -d '{"metadata":{"department":"engineering"}}'
+check "complete the update-profile action" 200 "$(status)"
+req POST /api/v1/platforms/analytical-engines/auth/login -H 'Content-Type: application/json' \
+  -d "{\"organisationId\":$AORGID,\"identifier\":\"uma\",\"password\":\"longpass1\"}"
+check "no actions after completing profile" 0 "$(nlen '["actions"]')"
+
 # refresh rotation + reuse detection on org tokens
 req POST /api/v1/platforms/analytical-engines/auth/refresh -H 'Content-Type: application/json' \
   -d "{\"refreshToken\":\"$OBR\"}"

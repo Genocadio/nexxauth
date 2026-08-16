@@ -33,6 +33,11 @@ public class OrgJwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";
 
+    /** While a gating action (CHANGE_PASSWORD) is pending the user may only
+     * reach the action endpoints; every other org endpoint stays closed. */
+    private static final String ACTION_ENDPOINTS =
+            "^/api/v1/platforms/[^/]+/organisations/[^/]+/users/me/change-password$";
+
     private final OrgJwtService orgJwtService;
     private final OrganisationUserRepository organisationUserRepository;
 
@@ -51,6 +56,12 @@ public class OrgJwtAuthenticationFilter extends OncePerRequestFilter {
         return !request.getRequestURI().matches("^/api/v1/platforms/[^/]+/organisations(/.*)?$");
     }
 
+    /** True when the request targets an endpoint that stays reachable while a
+     * gating action is pending (e.g. completing the change-password action). */
+    private boolean isActionEndpoint(HttpServletRequest request) {
+        return request.getRequestURI().matches(ACTION_ENDPOINTS);
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
@@ -62,6 +73,9 @@ public class OrgJwtAuthenticationFilter extends OncePerRequestFilter {
                 Long userId = Long.valueOf(claims.getSubject());
                 organisationUserRepository.findWithRolesById(userId)
                         .filter(OrganisationUser::isEnabled)
+                        // A pending gating action (temporary password -> change
+                        // password) restricts access to the action endpoints.
+                        .filter(user -> !user.isTemporaryPassword() || isActionEndpoint(request))
                         .ifPresent(user -> {
                             Set<Permission> permissions = user.getRoles().stream()
                                     .flatMap(role -> role.getPermissions().stream())

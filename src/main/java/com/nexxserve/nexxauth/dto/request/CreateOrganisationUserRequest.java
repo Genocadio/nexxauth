@@ -38,6 +38,12 @@ public record CreateOrganisationUserRequest(
         @Size(max = 72, message = "Password must be at most 72 characters")
         String password,
 
+        /** When true, {@code password} is temporary: at the user's first login
+         * the CHANGE_PASSWORD action is returned, no refresh token is issued,
+         * and the access token is fixed at 5 minutes until the user sets a new
+         * password. Ignored when no password is set. */
+        Boolean temporaryPassword,
+
         /** Optional values for the organisation's configured user fields. Keys
          * must be defined fields; values are validated against each field's
          * type. Blank or null values are ignored (the field stays unset). */

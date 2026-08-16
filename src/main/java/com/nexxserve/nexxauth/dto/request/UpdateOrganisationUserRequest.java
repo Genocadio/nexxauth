@@ -38,6 +38,11 @@ public record UpdateOrganisationUserRequest(
         @Size(max = 72, message = "Password must be at most 72 characters")
         String password,
 
+        /** When true, forces the user to change their password at next login
+         * (CHANGE_PASSWORD action, gated session) and revokes existing
+         * sessions; when false, clears any pending forced change. */
+        Boolean temporaryPassword,
+
         /** Optional user-field values: partial, only the keys present are
          * touched. A null or blank value removes the field from the user;
          * values are validated against each field's type and login-enabled

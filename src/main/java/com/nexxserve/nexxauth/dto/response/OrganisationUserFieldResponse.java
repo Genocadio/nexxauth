@@ -15,6 +15,7 @@ public record OrganisationUserFieldResponse(
         String label,
         UserFieldType fieldType,
         boolean loginEnabled,
+        boolean required,
         Instant createdAt
 ) {
 }

@@ -3,7 +3,7 @@
 Step-by-step walkthroughs of how the system actually works — the request pipeline,
 every auth flow (platform and organisation), token issuance and enforcement, and the
 cross-cutting concerns (rate limiting, errors, audit). All flows are verified live in
-`scripts/smoke-test.sh` (167 checks) and in the integration tests (70 tests,
+`scripts/smoke-test.sh` (186 checks) and in the integration tests (105 tests,
 including a hardening suite proving malformed input never reaches a 500).
 
 - [1. Request pipeline (every request)](#1-request-pipeline-every-request)
@@ -21,9 +21,10 @@ including a hardening suite proving malformed input never reaches a 500).
 - [13. Password policy (org auth-config)](#13-password-policy-org-auth-config)
 - [14. Session settings (org session-settings)](#14-session-settings-org-session-settings)
 - [15. User fields (org user-fields)](#15-user-fields-org-user-fields)
-- [16. Error handling](#16-error-handling)
-- [17. Rate limiting](#17-rate-limiting)
-- [18. Audit trail](#18-audit-trail)
+- [16. Org user actions (temporary password & required fields)](#16-org-user-actions-temporary-password--required-fields)
+- [17. Error handling](#17-error-handling)
+- [18. Rate limiting](#18-rate-limiting)
+- [19. Audit trail](#19-audit-trail)
 
 ---
 
@@ -214,8 +215,12 @@ POST /api/v1/platforms/{slug}/auth/login
      5. **not expired** — if the org's `passwordExpirationDays` has passed since
         `passwordChangedAt` → 401 `Password has expired` (forces a password reset;
         existing sessions drain naturally since expiry is only checked at login).
-   - success → audit `ORG_LOGIN_SUCCESS`.
-3. **Org tokens issued** (§10).
+    - success → audit `ORG_LOGIN_SUCCESS`.
+3. **Actions computed** — the pending [`OrgUserAction`](#16-org-user-actions-temporary-password--required-fields)
+   list is appended to the response. When a **gating** action (CHANGE_PASSWORD) is
+   pending the login returns **no refresh token** and a **fixed 5-minute access
+   token** (see §16).
+4. **Org tokens issued** (§10).
 
 ## 8. Organisation refresh & logout
 
@@ -223,6 +228,8 @@ Mirror of the platform flow, on the org endpoints and the org's refresh-token ta
 (`organisation_refresh_tokens`):
 
 - `POST .../auth/refresh` — rotation + family revocation + `ORG_TOKEN_REUSE` audit.
+  **Denied (401) while a gating action is pending**: the user must resolve the
+  action and log in again before a session can be refreshed.
 - `POST .../auth/logout` — audit first, then revoke; 204 idempotent.
 - Both are rate-limited on their own `org-refresh` bucket.
 
@@ -261,7 +268,8 @@ keypair):
 - The **15m lifetime comes from the org's `session-settings`** (default 900s, same
   as `app.jwt.access-token-ttl`); the org's refresh-token TTL and concurrent-session
   limit come from the same settings row. Each org can shorten/lengthen these via
-  `PATCH .../session-settings`.
+  `PATCH .../session-settings`. **Exception:** while a gating action is pending the
+  access token is fixed at **5 minutes regardless of the settings** (§16).
 - `kid` lets any verifier pick the right public key from `GET .../keys` — including
   keys retired by rotation, so old tokens keep verifying until they expire.
 - Verification (`OrgJwtService.parseAccessToken`) requires: key exists for the
@@ -287,6 +295,11 @@ When a request carries a valid token, access is decided in three layers:
      hold the specific `Permission` for the operation. Exception: `users/me` and
      the org's own `GET /organisations/{org}` work for the org user **without any
      permission** ("every user can read himself / his own org").
+4. **Action gating** (`OrgJwtAuthenticationFilter`) — while a **gating** action is
+   pending the filter refuses to authenticate the user on anything but the action
+   endpoints, so every other org endpoint answers **401**. Today the only gating
+   action is CHANGE_PASSWORD; the only reachable endpoint while it is pending is
+   `POST .../users/me/change-password` (§16).
 
 Authorization is re-derived from the **database on every request** (the filter
 re-loads the user, roles and permissions from the DB — the token's roles are just
@@ -328,6 +341,13 @@ Where each rule is enforced:
   password change via `PATCH .../users/{id}`** additionally revokes every
   outstanding refresh token of that user — a reset forces re-authentication on
   all devices (mirror of the platform flow).
+- **Temporary / forced change** — `POST .../users` with `temporaryPassword: true`
+  (with a password) or `PATCH .../users/{id}` with `temporaryPassword: true`
+  mark the password as **temporary** (`temporary_password` on the user): at next
+  login the CHANGE_PASSWORD action is returned and the session is gated until
+  the user changes the password via `POST .../users/me/change-password` (which
+  clears the flag, revokes sessions and audits `ORG_PASSWORD_CHANGED`). Triggering
+  the flag on an existing user revokes their sessions immediately (§16).
 - **Clearing auth**: `PATCH .../users/{id}` with `"password": ""` → hash, authType
   and change-time are cleared; the user **cannot log in** until a new password is set.
 - **Login**: authType must be `PASSWORD`, hash present, not disabled, not expired.
@@ -378,6 +398,7 @@ every user and returned under `metadata` on all user objects.
 | `label` | human-readable name |
 | `fieldType` | `STRING` / `NUMBER` / `BOOLEAN` / `DATE` — how values are validated and canonicalized |
 | `loginEnabled` | when true, the field's value also works as a login identifier |
+| `required` | when true, every user must have a value for this field; users missing it get the UPDATE_PROFILE action at login (§16) |
 
 Values are stored as **canonical strings**: STRING trimmed, NUMBER
 `BigDecimal.toPlainString()` so `1.50 == 1.5`, BOOLEAN `true|false`, DATE ISO
@@ -411,7 +432,46 @@ sensitive data here.
 - **Audit** — field create/update/delete are logged as
   `ORG_USER_FIELD_CREATED/UPDATED/DELETED` on the `AUDIT` logger.
 
-## 16. Error handling
+## 16. Org user actions (temporary password & required fields)
+
+Every org register/login/refresh response carries an **`actions` array** — the
+pending things the user must resolve, in a stable order. It is computed by
+`OrgUserActions` from the user's `temporary_password` flag and the values of the
+org's **required** user fields, and is empty for a fully onboarded user. Each
+action is either **gating** (restricts the session) or **advisory**:
+
+| Action | Trigger | Gating? | Effect |
+|---|---|---|---|
+| `CHANGE_PASSWORD` | `temporary_password = true` | **yes** | access token fixed at **5 minutes**, **no refresh token**, only `POST .../users/me/change-password` reachable until resolved |
+| `UPDATE_PROFILE` | a **required** user field has no value for this user | no | advisory — refresh + access tokens unaffected, all endpoints keep working |
+
+**Temporary password flow** — a platform user registers an org user with
+`POST .../users` and `temporaryPassword: true` (or triggers it later with
+`PATCH .../users/{id}` `temporaryPassword: true`, which also **revokes the user's
+sessions**):
+
+1. First login returns `actions: ["CHANGE_PASSWORD"]`, `refreshToken: null`,
+   `expiresInSeconds: 300` — the 5 minutes are a **fixed constant**, independent
+   of the org's session settings.
+2. `OrgJwtAuthenticationFilter` refuses to authenticate the user on anything but
+   `POST .../users/me/change-password`, so all other org endpoints answer 401.
+3. `POST .../users/me/change-password { currentPassword, newPassword }` (the user
+   must be authenticated, i.e. hold the short-lived access token):
+   - verifies `currentPassword` (401 on mismatch),
+   - applies the org's password rules via `authConfigService.setPassword`,
+   - clears `temporary_password`,
+   - revokes every outstanding refresh token,
+   - audits `ORG_PASSWORD_CHANGED`.
+4. The next login issues a full session (`actions` empty, refresh token, org TTL).
+
+**Required-field flow** — a field with `required: true` means every user must have
+a value. A user missing one logs in with `actions: ["UPDATE_PROFILE"]` but gets the
+normal access + refresh tokens (advisory only). They complete the action via
+`PATCH .../users/me` (first/last name + `metadata`), after which the action
+disappears. A user can hold both actions at once (e.g. a temporary password plus a
+missing required field); the gating one still restricts the session.
+
+## 17. Error handling
 
 Two writers, one shape:
 
@@ -430,7 +490,7 @@ Two writers, one shape:
 Every response — success or error — includes the `X-Request-Id` header, and every
 error body includes the same id, so a failing request is traceable end to end.
 
-## 17. Rate limiting
+## 18. Rate limiting
 
 `RateLimitFilter` (runs before authentication, so brute force is throttled cheaply):
 
@@ -443,7 +503,7 @@ error body includes the same id, so a failing request is traceable end to end.
   proxy (`app.rate-limit.use-forwarded-for=true`).
 - Defaults: login 5/min, register 3/min, refresh 10/2-per-min.
 
-## 18. Audit trail
+## 19. Audit trail
 
 `AuthAuditService` writes to a dedicated `AUDIT` logger (INFO) — structured,
 greppable, and correlated with `requestId` via the MDC:

@@ -1,7 +1,9 @@
 package com.nexxserve.nexxauth.controller;
 
+import com.nexxserve.nexxauth.dto.request.ChangePasswordRequest;
 import com.nexxserve.nexxauth.dto.request.CreateOrganisationUserRequest;
 import com.nexxserve.nexxauth.dto.request.UpdateOrganisationUserRequest;
+import com.nexxserve.nexxauth.dto.request.UpdateOwnProfileRequest;
 import com.nexxserve.nexxauth.dto.response.OrganisationUserResponse;
 import com.nexxserve.nexxauth.security.OrgActor;
 import com.nexxserve.nexxauth.service.OrganisationUserService;
@@ -52,6 +54,30 @@ public class OrganisationUserController {
                                        @PathVariable String organisationSlug,
                                        @AuthenticationPrincipal OrgActor requester) {
         return userService.me(slug, organisationSlug, requester);
+    }
+
+    /** Self-service profile update: every org user can update their own profile
+     * (first/last name and metadata). Used to complete the UPDATE_PROFILE action
+     * (e.g. filling values for required org user fields). */
+    @PatchMapping("/me")
+    public OrganisationUserResponse updateOwnProfile(@PathVariable String slug,
+                                                     @PathVariable String organisationSlug,
+                                                     @AuthenticationPrincipal OrgActor requester,
+                                                     @Valid @RequestBody UpdateOwnProfileRequest request) {
+        return userService.updateOwnProfile(slug, organisationSlug, requester, request);
+    }
+
+    /** Self-service password change: completes the CHANGE_PASSWORD action. Every
+     * org user can change their own password; a temporary/forced password stays
+     * in force until changed here. */
+    @PostMapping("/me/change-password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public ResponseEntity<Void> changePassword(@PathVariable String slug,
+                                               @PathVariable String organisationSlug,
+                                               @AuthenticationPrincipal OrgActor requester,
+                                               @Valid @RequestBody ChangePasswordRequest request) {
+        userService.changePassword(slug, organisationSlug, requester, request);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping
