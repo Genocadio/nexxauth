@@ -71,6 +71,12 @@ services:
       # Only read X-Forwarded-For if you run a trusted reverse proxy in front.
       APP_RATE_LIMIT_USE_FORWARDED_FOR: "false"
       ENVIRONMENT: ${ENVIRONMENT:-production}
+      # Public domains: backend's own URL and the console origin the backend
+      # will serve CORS to. CORS_ALLOWED_ORIGINS defaults to the web origin so
+      # a direct browser call to the API is only allowed from the console's
+      # domain; org-level per-client CORS is still enforced separately.
+      BACKEND_PUBLIC_URL: ${BACKEND_PUBLIC_URL:-http://localhost:8080}
+      APP_CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-${WEB_PUBLIC_URL:-http://localhost:3000}}
     volumes:
       # Prod profile rotates JSON logs here; keep them on a volume.
       - app-logs:/var/log/nexxauth
@@ -91,6 +97,10 @@ services:
     environment:
       # Server-side org portal calls (server actions, session route, proxy).
       API_SERVER_URL: http://backend:8080
+      # Public domain the console is served from (used by the backend as the
+      # default CORS origin; informational for the web app itself).
+      WEB_PUBLIC_URL: ${WEB_PUBLIC_URL:-http://localhost:3000}
+      BACKEND_PUBLIC_URL: ${BACKEND_PUBLIC_URL:-http://localhost:8080}
       PORT: "3000"
       HOSTNAME: 0.0.0.0
     ports:
