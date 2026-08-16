@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
@@ -31,17 +31,17 @@ export default function RegisterPage() {
     platformSlug: "",
   });
 
-  // True from the moment the user submits the form: after a successful
-  // register the session appears in the store, and the bounce-below must not
-  // fight the onboarding redirect fired by the register mutation.
-  const submitted = useRef(false);
+  // Set synchronously on submit: after a successful register the session
+  // appears in the store, and the bounce-below must not fight the onboarding
+  // redirect fired by the register mutation's onSuccess.
+  const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
     // Already signed in (e.g. a returning user visiting /register): go to the
     // console. Skipped right after a fresh register — that navigation is
     // handled by usePlatformRegister (onboarding wizard).
-    if (mounted && session && !submitted.current) router.replace("/console");
-  }, [mounted, session, router]);
+    if (mounted && session && !submitted) router.replace("/console");
+  }, [mounted, session, router, submitted]);
 
   if (!mounted || session) return null;
 
@@ -60,7 +60,7 @@ export default function RegisterPage() {
     >
       <form
         onSubmit={form.handleSubmit((data) => {
-          submitted.current = true;
+          setSubmitted(true);
           return register.mutateAsync({
             firstName: data.firstName,
             lastName: data.lastName,
