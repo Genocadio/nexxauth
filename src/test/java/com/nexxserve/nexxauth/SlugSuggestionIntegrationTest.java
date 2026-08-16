@@ -105,7 +105,7 @@ class SlugSuggestionIntegrationTest {
                 .andExpect(jsonPath("$.candidate.available").value(true));
 
         // creating an organisation makes the derived slug unavailable
-        mockMvc.perform(post("/api/v1/platforms/org-slug-platform/organisations")
+        mockMvc.perform(post("/org-slug-platform/organisations")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "Nexx Labs"))))

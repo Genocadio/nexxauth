@@ -27,7 +27,7 @@ import java.util.List;
  * Reads require platform membership; writes require the super user role.
  */
 @RestController
-@RequestMapping("/api/v1/platforms/{slug}/organisations")
+@RequestMapping("/{slug}/organisations")
 public class OrganisationController {
 
     private final OrganisationService organisationService;

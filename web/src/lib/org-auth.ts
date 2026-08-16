@@ -8,7 +8,6 @@
  * only safe in the Node runtime.
  */
 
-import { API_BASE_URL } from "@/lib/constants";
 import { decodeJwtPayload } from "@/lib/jwt";
 import type { OrganisationUserResponse, OrgAuthResponse } from "@/types/api";
 import type { LogoutRequest, OrgLoginRequest, RefreshTokenRequest } from "@/types/requests";
@@ -35,7 +34,9 @@ export const orgCookieOptions = {
  */
 const API_SERVER_URL = process.env.API_SERVER_URL ?? "http://localhost:8080";
 
-const apiPath = (path: string) => `${API_SERVER_URL}${API_BASE_URL}${path}`;
+// Org endpoints live at the platform's clean root origin (/{slug}/...), so the
+// server-side calls skip the /api/v1 prefix the browser proxy adds.
+const apiPath = (path: string) => `${API_SERVER_URL}${path}`;
 
 /** Claims carried by the org access token (see backend OrgJwtService). */
 export interface OrgJwtClaims {
@@ -83,31 +84,31 @@ async function errorMessage(res: Response): Promise<string> {
   return res.statusText || "Request failed";
 }
 
-/** POST /platforms/{slug}/auth/login */
+/** POST /{slug}/auth/login */
 export function serverOrgLogin(platformSlug: string, body: OrgLoginRequest): Promise<ApiResult<OrgAuthResponse>> {
-  return postJson<OrgAuthResponse>(`/platforms/${platformSlug}/auth/login`, body);
+  return postJson<OrgAuthResponse>(`/${platformSlug}/auth/login`, body);
 }
 
-/** POST /platforms/{slug}/auth/refresh — rotates the refresh token. */
+/** POST /{slug}/auth/refresh — rotates the refresh token. */
 export function serverOrgRefresh(platformSlug: string, refreshToken: string): Promise<ApiResult<OrgAuthResponse>> {
   const body: RefreshTokenRequest = { refreshToken };
-  return postJson<OrgAuthResponse>(`/platforms/${platformSlug}/auth/refresh`, body);
+  return postJson<OrgAuthResponse>(`/${platformSlug}/auth/refresh`, body);
 }
 
-/** POST /platforms/{slug}/auth/logout — best effort (204 on success). */
+/** POST /{slug}/auth/logout — best effort (204 on success). */
 export function serverOrgLogout(platformSlug: string, refreshToken: string): Promise<ApiResult<void>> {
   const body: LogoutRequest = { refreshToken };
-  return postJson<void>(`/platforms/${platformSlug}/auth/logout`, body);
+  return postJson<void>(`/${platformSlug}/auth/logout`, body);
 }
 
-/** GET /platforms/{slug}/organisations/{orgSlug}/users/me */
+/** GET /{slug}/organisations/{orgSlug}/users/me */
 export function serverOrgMe(
   platformSlug: string,
   organisationSlug: string,
   accessToken: string,
 ): Promise<ApiResult<OrganisationUserResponse>> {
   return getJson<OrganisationUserResponse>(
-    `/platforms/${platformSlug}/organisations/${organisationSlug}/users/me`,
+    `/${platformSlug}/organisations/${organisationSlug}/users/me`,
     accessToken,
   );
 }

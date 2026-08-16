@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
  * session signed by the organisation's own RSA key.
  */
 @RestController
-@RequestMapping("/api/v1/platforms/{slug}/auth")
+@RequestMapping("/{slug}/auth")
 public class OrganisationAuthController {
 
     private final OrganisationAuthService authService;

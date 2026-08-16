@@ -9,6 +9,7 @@ import { StatCard } from "@/components/shared/stat-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { CopyButton } from "@/components/shared/copy-button";
 import { useOrganisations, usePlatform, usePlatformUsers } from "@/hooks/queries";
 import { formatDate } from "@/lib/constants";
 import { ROLE_META } from "@/types/enums";
@@ -24,6 +25,7 @@ export default function OverviewPage() {
   const platformData = platform.data;
   const userCount = platformData?.userCount ?? users.data?.length ?? 0;
   const orgCount = organisations.data?.length ?? 0;
+  const apiUrl = platformData?.apiBaseUrl ?? null;
 
   return (
     <div className="space-y-8">
@@ -62,6 +64,12 @@ export default function OverviewPage() {
               <CardTitle className="text-base">Platform details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 text-sm">
+              {apiUrl ? (
+                <>
+                  <UrlRow label="API URL" value={apiUrl} />
+                  <Separator />
+                </>
+              ) : null}
               <Row label="Name" value={platformData?.name} />
               <Row label="Slug" value={platformData?.slug} mono />
               <Row label="Created" value={platformData ? formatDate(platformData.createdAt) : undefined} />
@@ -129,6 +137,18 @@ function Row({ label, value, mono, muted }: { label: string; value?: string; mon
       >
         {value ?? "—"}
       </span>
+    </div>
+  );
+}
+
+function UrlRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-muted-foreground">{label}</span>
+      <div className="flex min-w-0 items-center justify-end gap-1.5">
+        <code className="max-w-[70%] truncate font-mono text-xs font-medium">{value}</code>
+        <CopyButton value={value} label={`Copy ${label}`} className="shrink-0" />
+      </div>
     </div>
   );
 }

@@ -26,10 +26,10 @@ class OrganisationRbacIntegrationTest {
     // Each test registers its own platform (unique name -> unique slug) because
     // all tests share one database; a shared platform name would slug-dedup the
     // later tests (rbac-platform-2, ...) and break their org paths.
-    private static final String ROLE_PLATFORM = "/api/v1/platforms/rbac-roles/organisations/rbac-org";
-    private static final String USER_PLATFORM = "/api/v1/platforms/rbac-users/organisations/rbac-org";
-    private static final String EMAIL_PLATFORM = "/api/v1/platforms/rbac-email-setting/organisations/rbac-org";
-    private static final String SCOPE_PLATFORM = "/api/v1/platforms/rbac-scope/organisations/rbac-org";
+    private static final String ROLE_PLATFORM = "/rbac-roles/organisations/rbac-org";
+    private static final String USER_PLATFORM = "/rbac-users/organisations/rbac-org";
+    private static final String EMAIL_PLATFORM = "/rbac-email-setting/organisations/rbac-org";
+    private static final String SCOPE_PLATFORM = "/rbac-scope/organisations/rbac-org";
 
     @Autowired
     private MockMvc mockMvc;
@@ -219,12 +219,12 @@ class OrganisationRbacIntegrationTest {
         createOrganisationIn(boss2, "rbac-other", "Other Org");
 
         long roleA = createRole(boss, SCOPE_PLATFORM, "Shared", "ORGANISATION_USER_READ");
-        long roleB = createRole(boss2, "/api/v1/platforms/rbac-other/organisations/rbac-other", "Shared", "ORGANISATION_USER_DELETE");
+        long roleB = createRole(boss2, "/rbac-other/organisations/rbac-other", "Shared", "ORGANISATION_USER_DELETE");
 
         // same role name in different organisations is fine
         mockMvc.perform(get(SCOPE_PLATFORM + "/roles").header("Authorization", bearer(boss)))
                 .andExpect(jsonPath("$.length()").value(1));
-        mockMvc.perform(get("/api/v1/platforms/rbac-other/organisations/rbac-other/roles")
+        mockMvc.perform(get("/rbac-other/organisations/rbac-other/roles")
                         .header("Authorization", bearer(boss2)))
                 .andExpect(jsonPath("$.length()").value(1));
 
@@ -244,7 +244,7 @@ class OrganisationRbacIntegrationTest {
                 .andExpect(status().isForbidden());
 
         // read-only platform member can read but not write org data
-        MvcResult add = mockMvc.perform(post("/api/v1/platforms/rbac-scope/users")
+        MvcResult add = mockMvc.perform(post("/rbac-scope/users")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
@@ -292,8 +292,8 @@ class OrganisationRbacIntegrationTest {
     }
 
     private void createOrganisation(String boss, String orgPath) throws Exception {
-        String platformSlug = orgPath.split("/")[4];
-        mockMvc.perform(post("/api/v1/platforms/" + platformSlug + "/organisations")
+        String platformSlug = orgPath.split("/")[1];
+        mockMvc.perform(post("/" + platformSlug + "/organisations")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "RBAC Org", "slug", "rbac-org"))))
@@ -301,7 +301,7 @@ class OrganisationRbacIntegrationTest {
     }
 
     private void createOrganisationIn(String boss, String slug, String name) throws Exception {
-        mockMvc.perform(post("/api/v1/platforms/rbac-other/organisations")
+        mockMvc.perform(post("/rbac-other/organisations")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", name, "slug", slug))))

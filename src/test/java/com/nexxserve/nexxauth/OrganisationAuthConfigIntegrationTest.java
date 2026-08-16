@@ -41,7 +41,7 @@ class OrganisationAuthConfigIntegrationTest {
 
     @Test
     void defaultsApplyAndConfigIsReadable() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[0];
+        String platform = "/" + SLUGS[0];
         String boss = registerPlatform("ac-boss@nexx.io", SLUGS[0]);
         long orgId = createOrganisationId(boss, platform, "Default Org", "default-org");
         String configPath = platform + "/organisations/default-org/auth-config";
@@ -64,7 +64,7 @@ class OrganisationAuthConfigIntegrationTest {
 
     @Test
     void minLengthRuleIsEnforcedOnRegister() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[1];
+        String platform = "/" + SLUGS[1];
         String boss = registerPlatform("ac-min-boss@nexx.io", SLUGS[1]);
         createOrganisation(boss, platform, "Min Org", "min-org");
         String orgAuth = platform + "/auth";
@@ -102,7 +102,7 @@ class OrganisationAuthConfigIntegrationTest {
 
     @Test
     void userWithoutPasswordCannotLoginUntilOneIsSet() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[2];
+        String platform = "/" + SLUGS[2];
         String boss = registerPlatform("ac-noauth-boss@nexx.io", SLUGS[2]);
         createOrganisation(boss, platform, "NoAuth Org", "noauth-org");
         String org = platform + "/organisations/noauth-org";
@@ -152,7 +152,7 @@ class OrganisationAuthConfigIntegrationTest {
 
     @Test
     void historyPreventsPasswordReuse() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[3];
+        String platform = "/" + SLUGS[3];
         String boss = registerPlatform("ac-hist-boss@nexx.io", SLUGS[3]);
         createOrganisation(boss, platform, "Hist Org", "hist-org");
         String org = platform + "/organisations/hist-org";
@@ -192,7 +192,7 @@ class OrganisationAuthConfigIntegrationTest {
 
     @Test
     void expiredPasswordBlocksLogin() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[4];
+        String platform = "/" + SLUGS[4];
         String boss = registerPlatform("ac-exp-boss@nexx.io", SLUGS[4]);
         createOrganisation(boss, platform, "Exp Org", "exp-org");
         String orgAuth = platform + "/auth";
@@ -219,7 +219,7 @@ class OrganisationAuthConfigIntegrationTest {
 
     @Test
     void configIsOrgScopedAndPlatformAuthIsUntouched() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[5];
+        String platform = "/" + SLUGS[5];
         String boss = registerPlatform("ac-scope-boss@nexx.io", SLUGS[5]);
         createOrganisation(boss, platform, "Scope Org", "scope-org");
         createOrganisation(boss, platform, "Other Org", "other-org");

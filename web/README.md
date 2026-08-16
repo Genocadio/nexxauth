@@ -24,7 +24,9 @@ bun run dev          # http://localhost:3000
 
 The backend must be running on `http://localhost:8080` (see the repo root
 `README.md` — `docker compose up -d && ./gradlew bootRun`). Override the API base
-with `NEXT_PUBLIC_API_BASE_URL` (see `.env.example`).
+with `NEXT_PUBLIC_API_BASE_URL` (see `.env.example`). Set `BACKEND_PUBLIC_URL` to
+the backend's public origin to show the copyable API URL on the org portal
+profile dashboard (the console dashboards get theirs from the backend).
 
 ```bash
 bun run build        # production build (typechecks + lints)

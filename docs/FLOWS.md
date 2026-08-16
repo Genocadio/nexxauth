@@ -45,7 +45,7 @@ RateLimitFilter         ② only for POST /auth/login|register|refresh (platform
                         429 + Retry-After when empty
   │
   ▼
-OrgJwtAuthenticationFilter   ③ only on /api/v1/platforms/*/organisations/... :
+OrgJwtAuthenticationFilter   ③ only on /*/organisations/... :
                         parse org token (RS256, per-org key via kid), re-validate
                         org user against the DB, load roles + permissions
   │
@@ -169,7 +169,7 @@ TTLs come from the same `session-settings` row and are applied at issue time.
 ## 6. Organisation register
 
 ```
-POST /api/v1/platforms/{slug}/auth/register
+POST /{slug}/auth/register
 { organisationId, identifier, password, firstName, lastName, metadata? }
 ```
 
@@ -196,7 +196,7 @@ POST /api/v1/platforms/{slug}/auth/register
 ## 7. Organisation login
 
 ```
-POST /api/v1/platforms/{slug}/auth/login
+POST /{slug}/auth/login
 { organisationId, identifier, password }
 ```
 

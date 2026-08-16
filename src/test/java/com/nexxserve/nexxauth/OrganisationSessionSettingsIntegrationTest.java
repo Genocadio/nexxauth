@@ -48,7 +48,7 @@ class OrganisationSessionSettingsIntegrationTest {
 
     @Test
     void defaultsApplyAndSettingsAreReadable() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[0];
+        String platform = "/" + SLUGS[0];
         String boss = registerPlatform("ss-boss@nexx.io", SLUGS[0]);
         long orgId = createOrganisationId(boss, platform, "Default Org", "default-org");
         String settingsPath = platform + "/organisations/default-org/session-settings";
@@ -69,7 +69,7 @@ class OrganisationSessionSettingsIntegrationTest {
 
     @Test
     void accessTtlIsAppliedToIssuedTokens() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[1];
+        String platform = "/" + SLUGS[1];
         String boss = registerPlatform("ss-ttl-boss@nexx.io", SLUGS[1]);
         createOrganisation(boss, platform, "Ttl Org", "ttl-org");
         String settingsPath = platform + "/organisations/ttl-org/session-settings";
@@ -93,7 +93,7 @@ class OrganisationSessionSettingsIntegrationTest {
 
     @Test
     void refreshTtlIsAppliedToIssuedTokens() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[2];
+        String platform = "/" + SLUGS[2];
         String boss = registerPlatform("ss-refttl-boss@nexx.io", SLUGS[2]);
         createOrganisation(boss, platform, "RefTtl Org", "refttl-org");
 
@@ -116,7 +116,7 @@ class OrganisationSessionSettingsIntegrationTest {
 
     @Test
     void maxSessionsEvictsOldestSession() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[3];
+        String platform = "/" + SLUGS[3];
         String boss = registerPlatform("ss-max-boss@nexx.io", SLUGS[3]);
         createOrganisation(boss, platform, "Max Org", "max-org");
         String orgAuth = platform + "/auth";
@@ -164,7 +164,7 @@ class OrganisationSessionSettingsIntegrationTest {
 
     @Test
     void readOnlyMemberAndOrgUserCannotWrite() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[4];
+        String platform = "/" + SLUGS[4];
         String boss = registerPlatform("ss-acl-boss@nexx.io", SLUGS[4]);
         createOrganisation(boss, platform, "Acl Org", "acl-org");
         String settingsPath = platform + "/organisations/acl-org/session-settings";
@@ -200,7 +200,7 @@ class OrganisationSessionSettingsIntegrationTest {
 
     @Test
     void invalidValuesAreRejected() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[5];
+        String platform = "/" + SLUGS[5];
         String boss = registerPlatform("ss-val-boss@nexx.io", SLUGS[5]);
         createOrganisation(boss, platform, "Val Org", "val-org");
         String settingsPath = platform + "/organisations/val-org/session-settings";

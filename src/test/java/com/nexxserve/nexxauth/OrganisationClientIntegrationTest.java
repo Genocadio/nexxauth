@@ -197,9 +197,9 @@ class OrganisationClientIntegrationTest {
         String platform = createOrg(boss, ORG_SLUG);
         String clients = clientsPath(platform);
         String users = usersPath(platform);
-        String orgLogin = "/api/v1/platforms/" + platform + "/auth/login";
-        String orgRegister = "/api/v1/platforms/" + platform + "/auth/register";
-        String orgRefresh = "/api/v1/platforms/" + platform + "/auth/refresh";
+        String orgLogin = "/" + platform + "/auth/login";
+        String orgRegister = "/" + platform + "/auth/register";
+        String orgRefresh = "/" + platform + "/auth/refresh";
 
         String webKey = createClient(boss, clients, "Web", "WEB", null);
         String disabledKey = createClient(boss, clients, "Disabled", "WEB", Map.of("enabled", false));
@@ -267,7 +267,7 @@ class OrganisationClientIntegrationTest {
 
         // clients are scoped to their own organisation
         createOrg(boss, "other-co");
-        mockMvc.perform(get("/api/v1/platforms/" + platform + "/organisations/other-co/users")
+        mockMvc.perform(get("/" + platform + "/organisations/other-co/users")
                         .header("X-Client-Id", server.clientKey)
                         .header("Authorization", bearer(server.token)))
                 .andExpect(status().isForbidden());
@@ -279,10 +279,10 @@ class OrganisationClientIntegrationTest {
         String platform = createOrg(boss, ORG_SLUG);
         String clients = clientsPath(platform);
         String users = usersPath(platform);
-        String orgAuth = "/api/v1/platforms/" + platform + "/auth";
+        String orgAuth = "/" + platform + "/auth";
 
         String webKey = createClient(boss, clients, "Web", "WEB", null);
-        String orgPath = "/api/v1/platforms/" + platform + "/organisations/" + ORG_SLUG;
+        String orgPath = "/" + platform + "/organisations/" + ORG_SLUG;
         long orgId = objectMapper.readTree(mockMvc.perform(get(orgPath)
                         .header("Authorization", bearer(boss)))
                 .andExpect(status().isOk())
@@ -336,9 +336,9 @@ class OrganisationClientIntegrationTest {
         String platform = createOrg(boss, ORG_SLUG);
         String clients = clientsPath(platform);
         String users = usersPath(platform);
-        String orgAuth = "/api/v1/platforms/" + platform + "/auth";
+        String orgAuth = "/" + platform + "/auth";
 
-        String orgPath = "/api/v1/platforms/" + platform + "/organisations/" + ORG_SLUG;
+        String orgPath = "/" + platform + "/organisations/" + ORG_SLUG;
         long orgId = objectMapper.readTree(mockMvc.perform(get(orgPath)
                         .header("Authorization", bearer(boss)))
                 .andExpect(status().isOk())
@@ -409,7 +409,7 @@ class OrganisationClientIntegrationTest {
                 Map.of("allowedOrigins", List.of("https://svc.example.com")));
 
         // matching preflight -> 200 with CORS headers, no auth involved
-        mockMvc.perform(options("/api/v1/platforms/" + platform + "/auth/login")
+        mockMvc.perform(options("/" + platform + "/auth/login")
                         .header("X-Client-Id", webKey)
                         .header("Origin", "https://app.example.com")
                         .header("Access-Control-Request-Method", "POST"))
@@ -419,14 +419,14 @@ class OrganisationClientIntegrationTest {
                 .andExpect(header().string("Access-Control-Allow-Headers", containsString("X-Client-Id")));
 
         // non-matching origin -> no CORS headers
-        mockMvc.perform(options("/api/v1/platforms/" + platform + "/auth/login")
+        mockMvc.perform(options("/" + platform + "/auth/login")
                         .header("X-Client-Id", webKey)
                         .header("Origin", "https://evil.example.com")
                         .header("Access-Control-Request-Method", "POST"))
                 .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
 
         // actual request echoes the allowed origin
-        mockMvc.perform(post("/api/v1/platforms/" + platform + "/auth/login")
+        mockMvc.perform(post("/" + platform + "/auth/login")
                         .header("X-Client-Id", webKey)
                         .header("Origin", "https://app.example.com")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -435,7 +435,7 @@ class OrganisationClientIntegrationTest {
                 .andExpect(header().string("Access-Control-Allow-Origin", "https://app.example.com"));
 
         // CORS applies to server clients too (trusted origins)
-        mockMvc.perform(options("/api/v1/platforms/" + platform + "/organisations/" + ORG_SLUG + "/users")
+        mockMvc.perform(options("/" + platform + "/organisations/" + ORG_SLUG + "/users")
                         .header("X-Client-Id", serverKey)
                         .header("Origin", "https://svc.example.com")
                         .header("Access-Control-Request-Method", "GET"))
@@ -468,7 +468,7 @@ class OrganisationClientIntegrationTest {
                                 .andReturn()
                                 .getResponse().getContentAsString())
                 .get("platform").get("slug").asText();
-        mockMvc.perform(post("/api/v1/platforms/" + platformSlug + "/organisations")
+        mockMvc.perform(post("/" + platformSlug + "/organisations")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", slug, "slug", slug))))
@@ -507,11 +507,11 @@ class OrganisationClientIntegrationTest {
     }
 
     private String clientsPath(String platformSlug) {
-        return "/api/v1/platforms/" + platformSlug + "/organisations/" + ORG_SLUG + "/clients";
+        return "/" + platformSlug + "/organisations/" + ORG_SLUG + "/clients";
     }
 
     private String usersPath(String platformSlug) {
-        return "/api/v1/platforms/" + platformSlug + "/organisations/" + ORG_SLUG + "/users";
+        return "/" + platformSlug + "/organisations/" + ORG_SLUG + "/users";
     }
 
     private String clientKey(MvcResult result) throws Exception {

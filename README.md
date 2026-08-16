@@ -54,7 +54,7 @@ row per org) but never to none; org users are never platform users.
 
 | | Platform | Organisation |
 |---|---|---|
-| Endpoints | `/api/v1/auth/*` | `/api/v1/platforms/{slug}/auth/*` |
+| Endpoints | `/api/v1/auth/*` | `/{slug}/auth/*` |
 | Identifier | email (unique globally) | username or email (unique per org) |
 | Access token | HS256 (shared secret) | RS256 (per-org keypair, `kid` in header) |
 | Refresh token | rotating + reuse detection | rotating + reuse detection |
@@ -107,7 +107,7 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
   -d '{"email":"ada@nexx.io","password":"sup3r-secret"}'
 # → { accessToken, refreshToken, tokenType, expiresInSeconds, user }
 
-curl http://localhost:8080/api/v1/platforms/analytical-engines \
+curl http://localhost:8080/analytical-engines \
   -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
@@ -131,6 +131,12 @@ Overridable via environment variables.
 | `app.http.max-body-bytes` | `65536` | max request body size (larger → 413, DoS guard) |
 | `management.server.port` | `8081` | actuator port (health/info/liveness/readiness) |
 | `spring.jpa.hibernate.ddl-auto` | `validate` | schema is owned by Flyway; Hibernate only validates |
+| `BACKEND_PUBLIC_URL` | — | public origin of the API (e.g. `https://auth.example.com`). Drives the copiable **API URL** shown on the platform/org dashboards (`BACKEND_PUBLIC_URL` + platform slug, Supabase-style) and returned as `apiBaseUrl` in `GET /{slug}`. Unset → dashboards omit the row |
+
+**Dashboards API URL.** Each platform lives at `BACKEND_PUBLIC_URL/{slug}`; each
+organisation at `BACKEND_PUBLIC_URL/{slug}/organisations/{organisationSlug}`.
+The console overview and org dashboards show these copyable (no `/api/v1`
+prefix) so clients have the exact base to call. See `docs/CLIENT_API.md`.
 
 **Rate-limit store & scaling.** The default `in-memory` store (Caffeine) keeps each
 instance's buckets local — correct for a single instance. To share buckets across
@@ -164,17 +170,17 @@ All endpoints are under `/api/v1`. Errors always use the unified shape:
 | `PATCH /auth/me` | any platform user | update own first/last name, phone |
 | `POST /auth/me/password` | any platform user | change own password; revokes all sessions |
 
-### Platform & users — `/api/v1/platforms`, `/api/v1/users`
+### Platform & users — `/{slug}`, `/api/v1/users`
 
 | Method & path | Auth | Description |
 |---|---|---|
-| `GET /platforms/{slug}` | member | platform details + user count |
-| `GET /platforms/{slug}/users` | member | platform user directory |
-| `POST /platforms/{slug}/users` | super user | add a platform user (default role `READ_ONLY`) |
+| `GET /{slug}` | member | platform details + user count |
+| `GET /{slug}/users` | member | platform user directory |
+| `POST /{slug}/users` | super user | add a platform user (default role `READ_ONLY`) |
 | `GET /users/{id}` | member | platform user by id |
 | `PATCH /users/{id}` | super user | change role / enable / disable / profile |
 
-### Organisations — `/api/v1/platforms/{slug}/organisations`
+### Organisations — `/{slug}/organisations`
 
 | Method & path | Auth | Description |
 |---|---|---|
@@ -184,7 +190,7 @@ All endpoints are under `/api/v1`. Errors always use the unified shape:
 | `PATCH /organisations/{organisationSlug}` | platform super user | update name / description / settings |
 | `DELETE /organisations/{organisationSlug}` | platform super user | delete org (users, roles, keys, tokens cascade) |
 
-### Organisation auth — `/api/v1/platforms/{slug}/auth`
+### Organisation auth — `/{slug}/auth`
 
 | Method & path | Auth | Description |
 |---|---|---|
@@ -193,7 +199,7 @@ All endpoints are under `/api/v1`. Errors always use the unified shape:
 | `POST /auth/refresh` | public | rotate the org refresh token |
 | `POST /auth/logout` | public | revoke the org refresh token (204) |
 
-### Organisation RBAC — under `/api/v1/platforms/{slug}/organisations/{organisationSlug}`
+### Organisation RBAC — under `/{slug}/organisations/{organisationSlug}`
 
 | Method & path | Auth | Description |
 |---|---|---|
@@ -373,3 +379,7 @@ version, so running instances report the exact build they came from.
 Step-by-step walkthroughs of every flow — register, login, refresh, logout,
 password change, token issuance, enforcement, key rotation, error handling, rate
 limiting, auditing — are in **[docs/FLOWS.md](docs/FLOWS.md)**.
+
+For external apps: how to authenticate to the organisation API, verify
+organisation tokens offline with the public key, extract roles, and refresh
+sessions — see **[docs/CLIENT_API.md](docs/CLIENT_API.md)**.

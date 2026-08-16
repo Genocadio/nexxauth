@@ -49,7 +49,7 @@ class OrganisationAuthIntegrationTest {
 
     @Test
     void orgUserCanRegisterLoginReadSelfAndBePermissionGated() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[0];
+        String platform = "/" + SLUGS[0];
         String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-boss@nexx.io", SLUGS[0]);
@@ -119,7 +119,7 @@ class OrganisationAuthIntegrationTest {
 
     @Test
     void orgRolesGateOrgEndpointsForOrgUsers() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[1];
+        String platform = "/" + SLUGS[1];
         String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-role-boss@nexx.io", SLUGS[1]);
@@ -175,7 +175,7 @@ class OrganisationAuthIntegrationTest {
 
     @Test
     void orgUserPermissionsGateUpdatesAndDeletes() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[6];
+        String platform = "/" + SLUGS[6];
         String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-crud-boss@nexx.io", SLUGS[6]);
@@ -226,7 +226,7 @@ class OrganisationAuthIntegrationTest {
 
     @Test
     void orgUserCanReadOwnOrganisationButNotThePlatformDirectory() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[7];
+        String platform = "/" + SLUGS[7];
         String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-orgread-boss@nexx.io", SLUGS[7]);
@@ -256,7 +256,7 @@ class OrganisationAuthIntegrationTest {
 
     @Test
     void orgTokensAreScopedToTheirOrganisationAndDoNotTouchPlatform() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[2];
+        String platform = "/" + SLUGS[2];
         String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-iso-boss@nexx.io", SLUGS[2]);
@@ -290,7 +290,7 @@ class OrganisationAuthIntegrationTest {
 
     @Test
     void orgKeysArePublicRotatableAndOldTokensKeepVerifying() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[3];
+        String platform = "/" + SLUGS[3];
         String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-key-boss@nexx.io", SLUGS[3]);
@@ -340,7 +340,7 @@ class OrganisationAuthIntegrationTest {
 
     @Test
     void orgRefreshRotatesAndReuseRevokesFamily() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[4];
+        String platform = "/" + SLUGS[4];
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-refresh-boss@nexx.io", SLUGS[4]);
         createOrganisation(boss, platform);
@@ -375,7 +375,7 @@ class OrganisationAuthIntegrationTest {
 
     @Test
     void usernamesAreCaseInsensitive() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[8];
+        String platform = "/" + SLUGS[8];
         String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-case-boss@nexx.io", SLUGS[8]);
@@ -419,7 +419,7 @@ class OrganisationAuthIntegrationTest {
 
     @Test
     void adminPasswordResetRevokesExistingSessions() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[9];
+        String platform = "/" + SLUGS[9];
         String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-reset-boss@nexx.io", SLUGS[9]);
@@ -461,7 +461,7 @@ class OrganisationAuthIntegrationTest {
 
     @Test
     void useEmailAsUsernameSettingMakesEmailTheLoginIdentifier() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[5];
+        String platform = "/" + SLUGS[5];
         String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-email-boss@nexx.io", SLUGS[5]);

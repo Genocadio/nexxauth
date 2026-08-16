@@ -3,9 +3,11 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { OrgLogoutButton } from "@/components/org/org-logout-button";
+import { CopyButton } from "@/components/shared/copy-button";
 import { InitialsAvatar } from "@/components/shared/initials-avatar";
 import { UserRoles } from "@/components/shared/status-badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { organisationApiUrl, platformApiUrl } from "@/lib/api-url";
 import { formatDate } from "@/lib/constants";
 import { ORG_ACCESS_COOKIE, orgSlugFromToken } from "@/lib/org-auth";
 import { fetchOrgSession } from "@/lib/org-session";
@@ -36,12 +38,19 @@ export default async function OrgProfilePage({
   const organisationSlug =
     orgSlugFromToken(cookieStore.get(ORG_ACCESS_COOKIE)?.value ?? "") ?? `#${organisationId}`;
 
+  const platformBase = platformApiUrl(process.env.BACKEND_PUBLIC_URL ?? "", platformSlug);
+  const apiUrl =
+    platformBase && !organisationSlug.startsWith("#")
+      ? organisationApiUrl(platformBase, organisationSlug)
+      : null;
+
   return (
     <OrgProfile
       user={session.user}
       organisationSlug={organisationSlug}
       platformSlug={platformSlug}
       organisationId={organisationId}
+      apiUrl={apiUrl}
     />
   );
 }
@@ -51,11 +60,13 @@ function OrgProfile({
   organisationSlug,
   platformSlug,
   organisationId,
+  apiUrl,
 }: {
   user: OrganisationUserResponse;
   organisationSlug: string;
   platformSlug: string;
   organisationId: number;
+  apiUrl: string | null;
 }) {
   const name = fullName(user);
 
@@ -75,6 +86,7 @@ function OrgProfile({
             <CardDescription>{user?.email ?? user?.username ?? "Organisation user"}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
+            {apiUrl ? <UrlRow label="API URL" value={apiUrl} /> : null}
             <Row label="Username" value={user?.username ?? "—"} />
             <Row label="Email" value={user?.email ?? "—"} />
             <Row label="Status" value={user?.enabled ? "Active" : "Disabled"} />
@@ -112,6 +124,18 @@ function Row({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between gap-4">
       <span className="text-muted-foreground">{label}</span>
       <span className="max-w-[65%] truncate text-right font-medium">{value}</span>
+    </div>
+  );
+}
+
+function UrlRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-muted-foreground">{label}</span>
+      <div className="flex min-w-0 items-center justify-end gap-1.5">
+        <code className="max-w-[70%] truncate font-mono text-xs font-medium">{value}</code>
+        <CopyButton value={value} label={`Copy ${label}`} className="shrink-0" />
+      </div>
     </div>
   );
 }

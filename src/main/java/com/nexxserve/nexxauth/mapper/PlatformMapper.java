@@ -9,5 +9,6 @@ import org.mapstruct.Mapping;
 public interface PlatformMapper {
 
     @Mapping(target = "userCount", source = "userCount")
-    PlatformResponse toResponse(Platform platform, long userCount);
+    @Mapping(target = "apiBaseUrl", source = "apiBaseUrl")
+    PlatformResponse toResponse(Platform platform, long userCount, String apiBaseUrl);
 }

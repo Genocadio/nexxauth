@@ -71,11 +71,12 @@ class AuthFlowIntegrationTest {
         String loginAccess = loginBody.get("accessToken").asText();
 
         // --- platform view ---
-        mockMvc.perform(get("/api/v1/platforms/analytical-engines")
+        mockMvc.perform(get("/analytical-engines")
                         .header("Authorization", bearer(loginAccess)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.slug").value("analytical-engines"))
-                .andExpect(jsonPath("$.userCount").value(1));
+                .andExpect(jsonPath("$.userCount").value(1))
+                .andExpect(jsonPath("$.apiBaseUrl").value(org.hamcrest.Matchers.nullValue()));
 
         // --- self profile update ---
         mockMvc.perform(patch("/api/v1/auth/me")
@@ -86,7 +87,7 @@ class AuthFlowIntegrationTest {
                 .andExpect(jsonPath("$.phone").value("+000000000"));
 
         // --- super user adds a read-only member ---
-        MvcResult addUser = mockMvc.perform(post("/api/v1/platforms/analytical-engines/users")
+        MvcResult addUser = mockMvc.perform(post("/analytical-engines/users")
                         .header("Authorization", bearer(loginAccess))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
@@ -108,12 +109,12 @@ class AuthFlowIntegrationTest {
         JsonNode graceBody = objectMapper.readTree(graceLogin.getResponse().getContentAsString());
         String graceAccess = graceBody.get("accessToken").asText();
 
-        mockMvc.perform(get("/api/v1/platforms/analytical-engines/users")
+        mockMvc.perform(get("/analytical-engines/users")
                         .header("Authorization", bearer(graceAccess)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2));
 
-        mockMvc.perform(post("/api/v1/platforms/analytical-engines/users")
+        mockMvc.perform(post("/analytical-engines/users")
                         .header("Authorization", bearer(graceAccess))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(

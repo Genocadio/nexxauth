@@ -29,7 +29,7 @@ import java.util.List;
  * the only time it is ever shown.
  */
 @RestController
-@RequestMapping("/api/v1/platforms/{slug}/organisations/{organisationSlug}/clients")
+@RequestMapping("/{slug}/organisations/{organisationSlug}/clients")
 public class OrganisationClientController {
 
     private final OrganisationClientService clientService;

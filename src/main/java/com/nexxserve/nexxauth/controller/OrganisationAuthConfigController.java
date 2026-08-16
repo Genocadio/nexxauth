@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
  * user. Never applies to the platform auth flow.
  */
 @RestController
-@RequestMapping("/api/v1/platforms/{slug}/organisations/{organisationSlug}/auth-config")
+@RequestMapping("/{slug}/organisations/{organisationSlug}/auth-config")
 public class OrganisationAuthConfigController {
 
     private final PlatformAccess platformAccess;

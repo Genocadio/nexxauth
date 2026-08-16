@@ -14,6 +14,7 @@ import com.nexxserve.nexxauth.repository.PlatformUserRepository;
 import com.nexxserve.nexxauth.security.AuthenticatedUser;
 import com.nexxserve.nexxauth.util.Emails;
 import com.nexxserve.nexxauth.util.Slugs;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +30,11 @@ public class PlatformService {
     private final PlatformUserMapper platformUserMapper;
     private final PasswordEncoder passwordEncoder;
     private final PlatformAccess platformAccess;
+
+    /** Public origin of this backend ({@code BACKEND_PUBLIC_URL}), used to
+     * build the platform's copiable API base URL shown on the console. */
+    @Value("${app.cors.backend-origin:}")
+    private String backendOrigin;
 
     public PlatformService(PlatformRepository platformRepository, PlatformUserRepository platformUserRepository,
                            PlatformMapper platformMapper, PlatformUserMapper platformUserMapper,
@@ -76,7 +82,17 @@ public class PlatformService {
         Platform platform = platformAccess.findPlatform(slug);
         platformAccess.requireMember(platform, requester);
         long userCount = platformUserRepository.countByPlatformId(platform.getId());
-        return platformMapper.toResponse(platform, userCount);
+        return platformMapper.toResponse(platform, userCount, apiBaseUrl(platform.getSlug()));
+    }
+
+    /** {@code https://api.example.com/acme} — the public API base of a platform,
+     * surfaced on the dashboards. Null when the backend's public origin is not
+     * configured. */
+    private String apiBaseUrl(String slug) {
+        if (backendOrigin == null || backendOrigin.isBlank()) {
+            return null;
+        }
+        return backendOrigin.replaceAll("/+$", "") + "/" + slug;
     }
 
     @Transactional(readOnly = true)

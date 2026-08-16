@@ -105,7 +105,7 @@ class RateLimitIntegrationTest {
     @Test
     void orgRefreshHasItsOwnBucket() throws Exception {
         String body = json(Map.of("refreshToken", "garbage-token"));
-        String path = "/api/v1/platforms/some-slug/auth/refresh";
+        String path = "/some-slug/auth/refresh";
 
         // Org refresh is limited independently from the platform refresh
         // bucket (org-* key): even if the platform bucket is exhausted, org

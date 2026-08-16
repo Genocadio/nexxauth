@@ -44,8 +44,8 @@ class HardeningIntegrationTest {
     void malformedBodiesAre400Never500() throws Exception {
         for (String path : List.of(
                 "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh",
-                "/api/v1/auth/logout", "/api/v1/platforms/" + SLUGS[0] + "/auth/register",
-                "/api/v1/platforms/" + SLUGS[0] + "/auth/login")) {
+                "/api/v1/auth/logout", "/" + SLUGS[0] + "/auth/register",
+                "/" + SLUGS[0] + "/auth/login")) {
             mockMvc.perform(post(path)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{ this is not json"))
@@ -67,7 +67,7 @@ class HardeningIntegrationTest {
     @Test
     void wrongJsonTypesAre400Never500() throws Exception {
         // string where number expected
-        mockMvc.perform(post("/api/v1/platforms/" + SLUGS[0] + "/auth/register")
+        mockMvc.perform(post("/" + SLUGS[0] + "/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", "abc", "identifier", "u",
                                 "password", "password1", "firstName", "F", "lastName", "L"))))
@@ -87,13 +87,13 @@ class HardeningIntegrationTest {
         // object where list of ids expected
         String boss = registerPlatform("hd-types@nexx.io", SLUGS[0]);
         createOrganisation(boss, SLUGS[0], "Types Org", "types-org");
-        mockMvc.perform(post("/api/v1/platforms/" + SLUGS[0] + "/organisations/types-org/users")
+        mockMvc.perform(post("/" + SLUGS[0] + "/organisations/types-org/users")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("firstName", "F", "lastName", "L", "roleIds", "not-a-list"))))
                 .andExpect(status().isBadRequest());
         // session-settings with wrong type
-        mockMvc.perform(patch("/api/v1/platforms/" + SLUGS[0] + "/organisations/types-org/session-settings")
+        mockMvc.perform(patch("/" + SLUGS[0] + "/organisations/types-org/session-settings")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"maxSessionsPerUser\":\"many\"}"))
@@ -105,20 +105,20 @@ class HardeningIntegrationTest {
         String boss = registerPlatform("hd-enum@nexx.io", SLUGS[1]);
         createOrganisation(boss, SLUGS[1], "Enum Org", "enum-org");
         // invalid permission enum in role create
-        mockMvc.perform(post("/api/v1/platforms/" + SLUGS[1] + "/organisations/enum-org/roles")
+        mockMvc.perform(post("/" + SLUGS[1] + "/organisations/enum-org/roles")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"Bad\",\"permissions\":[\"NOT_A_REAL_PERMISSION\"]}"))
                 .andExpect(status().isBadRequest());
         // null element inside the permission set (would otherwise fail the
         // NOT NULL join-table constraint with a confusing 409)
-        mockMvc.perform(post("/api/v1/platforms/" + SLUGS[1] + "/organisations/enum-org/roles")
+        mockMvc.perform(post("/" + SLUGS[1] + "/organisations/enum-org/roles")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"NullPerm\",\"permissions\":[null]}"))
                 .andExpect(status().isBadRequest());
         // invalid auth type enum
-        mockMvc.perform(patch("/api/v1/platforms/" + SLUGS[1] + "/organisations/enum-org/auth-config")
+        mockMvc.perform(patch("/" + SLUGS[1] + "/organisations/enum-org/auth-config")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"authType\":\"OTP\"}"))
@@ -135,8 +135,8 @@ class HardeningIntegrationTest {
     void outOfRangeValuesAre400Never500() throws Exception {
         String boss = registerPlatform("hd-range@nexx.io", SLUGS[2]);
         createOrganisation(boss, SLUGS[2], "Range Org", "range-org");
-        String orgUsers = "/api/v1/platforms/" + SLUGS[2] + "/organisations/range-org/users";
-        String org = "/api/v1/platforms/" + SLUGS[2] + "/organisations/range-org";
+        String orgUsers = "/" + SLUGS[2] + "/organisations/range-org/users";
+        String org = "/" + SLUGS[2] + "/organisations/range-org";
 
         // invalid email format
         mockMvc.perform(post(orgUsers)
@@ -151,12 +151,12 @@ class HardeningIntegrationTest {
                         .content(json(Map.of("firstName", "x".repeat(101), "lastName", "L"))))
                 .andExpect(status().isBadRequest());
         // invalid slug pattern + slug too long on organisation create
-        mockMvc.perform(post("/api/v1/platforms/" + SLUGS[2] + "/organisations")
+        mockMvc.perform(post("/" + SLUGS[2] + "/organisations")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "Slug Org", "slug", "UPPER CASE!"))))
                 .andExpect(status().isBadRequest());
-        mockMvc.perform(post("/api/v1/platforms/" + SLUGS[2] + "/organisations")
+        mockMvc.perform(post("/" + SLUGS[2] + "/organisations")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "Slug Org", "slug", "s".repeat(101)))))
@@ -208,7 +208,7 @@ class HardeningIntegrationTest {
     void pathAndMethodErrorsNever500() throws Exception {
         String boss = registerPlatform("hd-path@nexx.io", SLUGS[3]);
         createOrganisation(boss, SLUGS[3], "Path Org", "path-org");
-        String org = "/api/v1/platforms/" + SLUGS[3] + "/organisations/path-org";
+        String org = "/" + SLUGS[3] + "/organisations/path-org";
 
         // path variable of wrong type
         mockMvc.perform(get(org + "/users/abc").header("Authorization", bearer(boss)))
@@ -225,7 +225,7 @@ class HardeningIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/login").contentType(MediaType.TEXT_PLAIN).content("x"))
                 .andExpect(status().isUnsupportedMediaType());
         // unknown platform slug -> 404
-        mockMvc.perform(get("/api/v1/platforms/no-such-platform").header("Authorization", bearer(boss)))
+        mockMvc.perform(get("/no-such-platform").header("Authorization", bearer(boss)))
                 .andExpect(status().isNotFound());
         // oversized request body -> 413 before it is ever buffered
         mockMvc.perform(post("/api/v1/auth/login")
@@ -244,8 +244,8 @@ class HardeningIntegrationTest {
         String boss = registerPlatform("hd-role@nexx.io", SLUGS[4]);
         createOrganisation(boss, SLUGS[4], "Role Org", "role-org");
         createOrganisation(boss, SLUGS[4], "Other Org", "other-org");
-        String org = "/api/v1/platforms/" + SLUGS[4] + "/organisations/role-org";
-        String other = "/api/v1/platforms/" + SLUGS[4] + "/organisations/other-org";
+        String org = "/" + SLUGS[4] + "/organisations/role-org";
+        String other = "/" + SLUGS[4] + "/organisations/other-org";
 
         long otherRoleId = createRole(boss, other, "Foreign Role");
 
@@ -277,7 +277,7 @@ class HardeningIntegrationTest {
     void identifierEdgeCasesNever500() throws Exception {
         String boss = registerPlatform("hd-id@nexx.io", SLUGS[5]);
         createOrganisation(boss, SLUGS[5], "Id Org", "id-org");
-        String orgAuth = "/api/v1/platforms/" + SLUGS[5] + "/auth";
+        String orgAuth = "/" + SLUGS[5] + "/auth";
 
         // negative / zero / unknown organisation ids -> 404, never 500
         for (long id : List.of(-1L, 0L, 999999L)) {
@@ -312,7 +312,7 @@ class HardeningIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("refreshToken", "not-a-token"))))
                 .andExpect(status().isUnauthorized());
-        mockMvc.perform(post("/api/v1/platforms/" + SLUGS[0] + "/auth/refresh")
+        mockMvc.perform(post("/" + SLUGS[0] + "/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("refreshToken", "not-a-token"))))
                 .andExpect(status().isUnauthorized());
@@ -327,7 +327,7 @@ class HardeningIntegrationTest {
                 .andReturn();
         String platformToken = objectMapper.readTree(reg.getResponse().getContentAsString())
                 .get("accessToken").asText();
-        mockMvc.perform(get("/api/v1/platforms/token-co/organisations")
+        mockMvc.perform(get("/token-co/organisations")
                         .header("Authorization", bearer(platformToken)))
                 .andExpect(status().isOk());
     }
@@ -347,7 +347,7 @@ class HardeningIntegrationTest {
     }
 
     private void createOrganisation(String boss, String slug, String name, String orgSlug) throws Exception {
-        mockMvc.perform(post("/api/v1/platforms/" + slug + "/organisations")
+        mockMvc.perform(post("/" + slug + "/organisations")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", name, "slug", orgSlug))))

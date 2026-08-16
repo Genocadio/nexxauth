@@ -31,7 +31,7 @@ import java.util.List;
  * own profile via {@code /me} regardless of permissions.
  */
 @RestController
-@RequestMapping("/api/v1/platforms/{slug}/organisations/{organisationSlug}/users")
+@RequestMapping("/{slug}/organisations/{organisationSlug}/users")
 public class OrganisationUserController {
 
     private final OrganisationUserService userService;

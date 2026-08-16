@@ -57,12 +57,12 @@ check "me email" ada@nexx.io "$(field '["email"]')"
 req PATCH /api/v1/auth/me -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' -d '{"phone":"+999"}'
 check "patch me" 200 "$(status)"
 check "patch me phone" +999 "$(field '["phone"]')"
-req GET /api/v1/platforms/analytical-engines -H "Authorization: Bearer $BA"
+req GET /analytical-engines -H "Authorization: Bearer $BA"
 check "get platform" 200 "$(status)"
 check "user count" 1 "$(field '["userCount"]')"
 
 echo "== member lifecycle =="
-req POST /api/v1/platforms/analytical-engines/users -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req POST /analytical-engines/users -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"firstName":"Grace","lastName":"Hopper","email":"grace@nexx.io","password":"readonly-pw"}'
 check "add member" 201 "$(status)"
 check "member role default" READ_ONLY "$(field '["role"]')"
@@ -72,119 +72,119 @@ req POST /api/v1/auth/login -H 'Content-Type: application/json' -d '{"email":"gr
 check "member login" 200 "$(status)"
 MA=$(field '["accessToken"]')
 
-req GET /api/v1/platforms/analytical-engines/users -H "Authorization: Bearer $MA"
+req GET /analytical-engines/users -H "Authorization: Bearer $MA"
 check "member lists users" 200 "$(status)"
 check "member sees 2 users" 2 "$(jlen)"
 
-req POST /api/v1/platforms/analytical-engines/users -H "Authorization: Bearer $MA" -H 'Content-Type: application/json' \
+req POST /analytical-engines/users -H "Authorization: Bearer $MA" -H 'Content-Type: application/json' \
   -d '{"firstName":"X","lastName":"Y","email":"x@nexx.io","password":"password1"}'
 check "read-only cannot add" 403 "$(status)"
 
 echo "== organisations (platform-scoped CRUD) =="
-req POST /api/v1/platforms/analytical-engines/organisations -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req POST /analytical-engines/organisations -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"name":"Nexx Labs","description":"R&D"}'
 check "create org (auto slug)" 201 "$(status)"
 check "org slug derived" nexx-labs "$(field '["slug"]')"
-req POST /api/v1/platforms/analytical-engines/organisations -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req POST /analytical-engines/organisations -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"name":"Nexx Services","slug":"services"}'
 check "create org (explicit slug)" 201 "$(status)"
-req GET /api/v1/platforms/analytical-engines/organisations -H "Authorization: Bearer $MA"
+req GET /analytical-engines/organisations -H "Authorization: Bearer $MA"
 check "read-only lists orgs" 200 "$(status)"
 check "two orgs" 2 "$(jlen)"
-req POST /api/v1/platforms/analytical-engines/organisations -H "Authorization: Bearer $MA" -H 'Content-Type: application/json' \
+req POST /analytical-engines/organisations -H "Authorization: Bearer $MA" -H 'Content-Type: application/json' \
   -d '{"name":"Nope"}'
 check "read-only cannot create org" 403 "$(status)"
-req POST /api/v1/platforms/analytical-engines/organisations -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req POST /analytical-engines/organisations -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"name":"Dup","slug":"services"}'
 check "duplicate org slug" 409 "$(status)"
-req GET /api/v1/platforms/analytical-engines/organisations/nexx-labs -H "Authorization: Bearer $BA"
+req GET /analytical-engines/organisations/nexx-labs -H "Authorization: Bearer $BA"
 check "get org" 200 "$(status)"
-req PATCH /api/v1/platforms/analytical-engines/organisations/nexx-labs -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req PATCH /analytical-engines/organisations/nexx-labs -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"name":"Nexx Labs HQ","slug":"hq"}'
 check "update org" 200 "$(status)"
 check "org renamed slug" hq "$(field '["slug"]')"
-req DELETE /api/v1/platforms/analytical-engines/organisations/hq -H "Authorization: Bearer $BA"
+req DELETE /analytical-engines/organisations/hq -H "Authorization: Bearer $BA"
 check "delete org" 204 "$(status)"
-req GET /api/v1/platforms/analytical-engines/organisations/hq -H "Authorization: Bearer $BA"
+req GET /analytical-engines/organisations/hq -H "Authorization: Bearer $BA"
 check "deleted org 404" 404 "$(status)"
 
 echo "== organisation RBAC (roles + org users, no org auth) =="
-req POST /api/v1/platforms/analytical-engines/organisations -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req POST /analytical-engines/organisations -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"name":"Rbac Corp","slug":"rbac-corp"}'
 check "create rbac org" 201 "$(status)"
-req POST /api/v1/platforms/analytical-engines/organisations/rbac-corp/roles -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req POST /analytical-engines/organisations/rbac-corp/roles -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"name":"Admin","permissions":["ORGANISATION_USER_READ","ORGANISATION_USER_CREATE"]}'
 check "create role with permissions" 201 "$(status)"
 check "role permissions count" 2 "$(nlen '["permissions"]')"
 RID=$(field '["id"]')
-req POST /api/v1/platforms/analytical-engines/organisations/rbac-corp/roles -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req POST /analytical-engines/organisations/rbac-corp/roles -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"name":"Viewer"}'
 check "create role without permissions" 201 "$(status)"
 check "role zero permissions" 0 "$(nlen '["permissions"]')"
-req GET /api/v1/platforms/analytical-engines/organisations/rbac-corp/roles -H "Authorization: Bearer $BA"
+req GET /analytical-engines/organisations/rbac-corp/roles -H "Authorization: Bearer $BA"
 check "list roles" 200 "$(status)"
 check "two roles" 2 "$(jlen)"
-req POST /api/v1/platforms/analytical-engines/organisations/rbac-corp/roles -H "Authorization: Bearer $MA" -H 'Content-Type: application/json' \
+req POST /analytical-engines/organisations/rbac-corp/roles -H "Authorization: Bearer $MA" -H 'Content-Type: application/json' \
   -d '{"name":"Nope"}'
 check "read-only cannot create role" 403 "$(status)"
-req POST /api/v1/platforms/analytical-engines/organisations/rbac-corp/roles -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req POST /analytical-engines/organisations/rbac-corp/roles -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"name":"Admin"}'
 check "duplicate role name" 409 "$(status)"
-req POST /api/v1/platforms/analytical-engines/organisations/rbac-corp/users -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req POST /analytical-engines/organisations/rbac-corp/users -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d "{\"firstName\":\"Org\",\"lastName\":\"User\",\"username\":\"orguser\",\"email\":\"org@acme.io\",\"roleIds\":[$RID]}"
 check "create org user" 201 "$(status)"
 check "org user username" orguser "$(field '["username"]')"
 check "org user role" Admin "$(field '["roles"][0]["name"]')"
 OUID=$(field '["id"]')
-req POST /api/v1/platforms/analytical-engines/organisations/rbac-corp/users -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req POST /analytical-engines/organisations/rbac-corp/users -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"firstName":"No","lastName":"Id"}'
 check "org user without identifiers" 201 "$(status)"
-req POST /api/v1/platforms/analytical-engines/organisations/rbac-corp/users -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req POST /analytical-engines/organisations/rbac-corp/users -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"firstName":"D","lastName":"Up","username":"orguser"}'
 check "duplicate org username" 409 "$(status)"
-req GET /api/v1/platforms/analytical-engines/organisations/rbac-corp/users -H "Authorization: Bearer $MA"
+req GET /analytical-engines/organisations/rbac-corp/users -H "Authorization: Bearer $MA"
 check "read-only lists org users" 200 "$(status)"
-req POST /api/v1/platforms/analytical-engines/organisations/rbac-corp/users -H "Authorization: Bearer $MA" -H 'Content-Type: application/json' \
+req POST /analytical-engines/organisations/rbac-corp/users -H "Authorization: Bearer $MA" -H 'Content-Type: application/json' \
   -d '{"firstName":"X","lastName":"Y"}'
 check "read-only cannot create org user" 403 "$(status)"
-req PATCH /api/v1/platforms/analytical-engines/organisations/rbac-corp -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req PATCH /analytical-engines/organisations/rbac-corp -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"useEmailAsUsername":true}'
 check "enable email-as-username" 200 "$(status)"
 check "setting reflected" True "$(field '["useEmailAsUsername"]')"
-req POST /api/v1/platforms/analytical-engines/organisations/rbac-corp/users -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req POST /analytical-engines/organisations/rbac-corp/users -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"firstName":"No","lastName":"Email"}'
 check "email required when setting on" 400 "$(status)"
-req PATCH /api/v1/platforms/analytical-engines/organisations/rbac-corp/users/$OUID -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req PATCH /analytical-engines/organisations/rbac-corp/users/$OUID -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"email":""}'
 check "clearing email rejected when setting on" 400 "$(status)"
-req PATCH /api/v1/platforms/analytical-engines/organisations/rbac-corp/users/$OUID -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req PATCH /analytical-engines/organisations/rbac-corp/users/$OUID -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"firstName":"Renamed","roleIds":[]}'
 check "update org user" 200 "$(status)"
 check "org user renamed" Renamed "$(field '["firstName"]')"
 check "org user roles cleared" 0 "$(nlen '["roles"]')"
-req DELETE /api/v1/platforms/analytical-engines/organisations/rbac-corp/users/$OUID -H "Authorization: Bearer $BA"
+req DELETE /analytical-engines/organisations/rbac-corp/users/$OUID -H "Authorization: Bearer $BA"
 check "delete org user" 204 "$(status)"
-req GET /api/v1/platforms/analytical-engines/organisations/rbac-corp/users/$OUID -H "Authorization: Bearer $BA"
+req GET /analytical-engines/organisations/rbac-corp/users/$OUID -H "Authorization: Bearer $BA"
 check "deleted org user 404" 404 "$(status)"
-req DELETE /api/v1/platforms/analytical-engines/organisations/rbac-corp/roles/$RID -H "Authorization: Bearer $BA"
+req DELETE /analytical-engines/organisations/rbac-corp/roles/$RID -H "Authorization: Bearer $BA"
 check "delete role" 204 "$(status)"
-req GET /api/v1/platforms/analytical-engines/organisations/rbac-corp/roles/$RID -H "Authorization: Bearer $BA"
+req GET /analytical-engines/organisations/rbac-corp/roles/$RID -H "Authorization: Bearer $BA"
 check "deleted role 404" 404 "$(status)"
 
 echo "== organisation auth (org users log in under the platform slug) =="
-req POST /api/v1/platforms/analytical-engines/organisations -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req POST /analytical-engines/organisations -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"name":"Auth Corp","slug":"auth-corp"}'
 check "create auth org" 201 "$(status)"
 AORGID=$(field '["id"]')
 
 # public verification keys are fetchable without auth
-req GET /api/v1/platforms/analytical-engines/organisations/auth-corp/keys
+req GET /analytical-engines/organisations/auth-corp/keys
 check "public keys (no auth)" 200 "$(status)"
 check "one active key" 1 "$(jlen)"
 check "key is active" True "$(field '[0]["active"]')"
 
 # org register returns org tokens (signed by the org's own RSA key)
-req POST /api/v1/platforms/analytical-engines/auth/register -H 'Content-Type: application/json' \
+req POST /analytical-engines/auth/register -H 'Content-Type: application/json' \
   -d "{\"organisationId\":$AORGID,\"identifier\":\"bob\",\"password\":\"orgpass1\",\"firstName\":\"Bob\",\"lastName\":\"Builder\"}"
 check "org register" 201 "$(status)"
 OBA=$(field '["accessToken"]')
@@ -192,76 +192,76 @@ check "org token type" Bearer "$(field '["tokenType"]')"
 check "org user role count" 0 "$(nlen '["user"]["roles"]')"
 
 # org login
-req POST /api/v1/platforms/analytical-engines/auth/login -H 'Content-Type: application/json' \
+req POST /analytical-engines/auth/login -H 'Content-Type: application/json' \
   -d "{\"organisationId\":$AORGID,\"identifier\":\"bob\",\"password\":\"orgpass1\"}"
 check "org login" 200 "$(status)"
 OBA2=$(field '["accessToken"]'); OBR=$(field '["refreshToken"]')
-req POST /api/v1/platforms/analytical-engines/auth/login -H 'Content-Type: application/json' \
+req POST /analytical-engines/auth/login -H 'Content-Type: application/json' \
   -d "{\"organisationId\":$AORGID,\"identifier\":\"bob\",\"password\":\"wrong\"}"
 check "org login wrong password" 401 "$(status)"
 
 # org users can read themselves by default
-req GET /api/v1/platforms/analytical-engines/organisations/auth-corp/users/me -H "Authorization: Bearer $OBA2"
+req GET /analytical-engines/organisations/auth-corp/users/me -H "Authorization: Bearer $OBA2"
 check "org users/me" 200 "$(status)"
 check "org me identifier" bob "$(field '["username"]')"
 
 # org token has no platform power
 req GET /api/v1/auth/me -H "Authorization: Bearer $OBA2"
 check "org token not a platform token" 401 "$(status)"
-req GET /api/v1/platforms/analytical-engines -H "Authorization: Bearer $OBA2"
+req GET /analytical-engines -H "Authorization: Bearer $OBA2"
 check "org token cannot read platform" 401 "$(status)"
 
 # org users without permissions cannot read the org's user list
-req GET /api/v1/platforms/analytical-engines/organisations/auth-corp/users -H "Authorization: Bearer $OBA2"
+req GET /analytical-engines/organisations/auth-corp/users -H "Authorization: Bearer $OBA2"
 check "org user w/o permission cannot list" 403 "$(status)"
 
 # give bob a role with the read permission, then the list works
-req POST /api/v1/platforms/analytical-engines/organisations/auth-corp/roles -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req POST /analytical-engines/organisations/auth-corp/roles -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"name":"Readers","permissions":["ORGANISATION_USER_READ"]}'
 check "create reader role" 201 "$(status)"
 BROLE=$(field '["id"]')
-req GET /api/v1/platforms/analytical-engines/organisations/auth-corp/users -H "Authorization: Bearer $BA"
+req GET /analytical-engines/organisations/auth-corp/users -H "Authorization: Bearer $BA"
 check "list org users as platform super" 200 "$(status)"
 BOBID=$(python3 -c "import json; d=json.load(open('$RESP')); print([u['id'] for u in d if u['username']=='bob'][0])")
-req PATCH /api/v1/platforms/analytical-engines/organisations/auth-corp/users/$BOBID -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req PATCH /analytical-engines/organisations/auth-corp/users/$BOBID -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d "{\"roleIds\":[$BROLE]}"
 check "assign read role" 200 "$(status)"
-req GET /api/v1/platforms/analytical-engines/organisations/auth-corp/users -H "Authorization: Bearer $OBA2"
+req GET /analytical-engines/organisations/auth-corp/users -H "Authorization: Bearer $OBA2"
 check "org user with permission lists" 200 "$(status)"
-req POST /api/v1/platforms/analytical-engines/organisations/auth-corp/users -H "Authorization: Bearer $OBA2" -H 'Content-Type: application/json' \
+req POST /analytical-engines/organisations/auth-corp/users -H "Authorization: Bearer $OBA2" -H 'Content-Type: application/json' \
   -d '{"firstName":"Nope","lastName":"Nope","username":"nope"}'
 check "org user w/o create permission" 403 "$(status)"
 
 # every org user reads their own org context by default (no permission needed)
-req GET /api/v1/platforms/analytical-engines/organisations/auth-corp -H "Authorization: Bearer $OBA2"
+req GET /analytical-engines/organisations/auth-corp -H "Authorization: Bearer $OBA2"
 check "org user reads own org" 200 "$(status)"
 check "own org slug" auth-corp "$(field '["slug"]')"
 
 # ...but the platform's org directory is off-limits to org users
-req GET /api/v1/platforms/analytical-engines/organisations -H "Authorization: Bearer $OBA2"
+req GET /analytical-engines/organisations -H "Authorization: Bearer $OBA2"
 check "org user cannot list org directory" 403 "$(status)"
 
 # give bob UPDATE permission: he can edit others, but not delete (no DELETE)
-req POST /api/v1/platforms/analytical-engines/organisations/auth-corp/roles -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req POST /analytical-engines/organisations/auth-corp/roles -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"name":"Editors","permissions":["ORGANISATION_USER_UPDATE"]}'
 check "create editor role" 201 "$(status)"
 EROLE=$(field '["id"]')
-req POST /api/v1/platforms/analytical-engines/organisations/auth-corp/users -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req POST /analytical-engines/organisations/auth-corp/users -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"firstName":"Eve","lastName":"Target","username":"eve"}'
 check "create target user" 201 "$(status)"
 EVEID=$(field '["id"]')
-req PATCH /api/v1/platforms/analytical-engines/organisations/auth-corp/users/$BOBID -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req PATCH /analytical-engines/organisations/auth-corp/users/$BOBID -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d "{\"roleIds\":[$BROLE,$EROLE]}"
 check "assign read+update roles" 200 "$(status)"
-req PATCH /api/v1/platforms/analytical-engines/organisations/auth-corp/users/$EVEID -H "Authorization: Bearer $OBA2" -H 'Content-Type: application/json' \
+req PATCH /analytical-engines/organisations/auth-corp/users/$EVEID -H "Authorization: Bearer $OBA2" -H 'Content-Type: application/json' \
   -d '{"firstName":"Eve Edited"}'
 check "org user with UPDATE edits another" 200 "$(status)"
 check "edited name" "Eve Edited" "$(field '["firstName"]')"
-req DELETE /api/v1/platforms/analytical-engines/organisations/auth-corp/users/$EVEID -H "Authorization: Bearer $OBA2"
+req DELETE /analytical-engines/organisations/auth-corp/users/$EVEID -H "Authorization: Bearer $OBA2"
 check "org user w/o DELETE permission" 403 "$(status)"
 
 echo "== org auth config (password rules, org-level only) =="
-req GET /api/v1/platforms/analytical-engines/organisations/auth-corp/auth-config -H "Authorization: Bearer $BA"
+req GET /analytical-engines/organisations/auth-corp/auth-config -H "Authorization: Bearer $BA"
 check "get auth config" 200 "$(status)"
 check "default auth type" PASSWORD "$(field '["authType"]')"
 check "default min length" 8 "$(field '["passwordMinLength"]')"
@@ -270,161 +270,161 @@ check "default no expiry" 0 "$(field '["passwordExpirationDays"]')"
 check "default no history" 0 "$(field '["passwordHistoryCount"]')"
 
 # org users of the org can read the config too; platform-only list is untouched
-req GET /api/v1/platforms/analytical-engines/organisations/auth-corp/auth-config -H "Authorization: Bearer $OBA2"
+req GET /analytical-engines/organisations/auth-corp/auth-config -H "Authorization: Bearer $OBA2"
 check "org user reads auth config" 200 "$(status)"
 
 # tighten min length to 12; register with an 8-char password now fails
-req PATCH /api/v1/platforms/analytical-engines/organisations/auth-corp/auth-config -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req PATCH /analytical-engines/organisations/auth-corp/auth-config -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"passwordMinLength":12}'
 check "update auth config" 200 "$(status)"
 check "min length updated" 12 "$(field '["passwordMinLength"]')"
-req POST /api/v1/platforms/analytical-engines/auth/register -H 'Content-Type: application/json' \
+req POST /analytical-engines/auth/register -H 'Content-Type: application/json' \
   -d "{\"organisationId\":$AORGID,\"identifier\":\"shortpw\",\"password\":\"shortpass\",\"firstName\":\"S\",\"lastName\":\"P\"}"
 check "org register rejects too-short password" 400 "$(status)"
 
 # create user without password: no auth, cannot login; then set one via PATCH
-req POST /api/v1/platforms/analytical-engines/organisations/auth-corp/users -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req POST /analytical-engines/organisations/auth-corp/users -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"firstName":"Pam","lastName":"NoAuth","username":"pam"}'
 check "create user without password" 201 "$(status)"
 PAMID=$(field '["id"]')
 check "no auth type yet" None "$(field '["authType"]')"
-req POST /api/v1/platforms/analytical-engines/auth/login -H 'Content-Type: application/json' \
+req POST /analytical-engines/auth/login -H 'Content-Type: application/json' \
   -d "{\"organisationId\":$AORGID,\"identifier\":\"pam\",\"password\":\"whatever1\"}"
 check "user without auth cannot login" 401 "$(status)"
-req PATCH /api/v1/platforms/analytical-engines/organisations/auth-corp/users/$PAMID -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req PATCH /analytical-engines/organisations/auth-corp/users/$PAMID -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d "{\"password\":\"longenoughpass\"}"
 check "set password via patch" 200 "$(status)"
 check "auth type set" PASSWORD "$(field '["authType"]')"
-req POST /api/v1/platforms/analytical-engines/auth/login -H 'Content-Type: application/json' \
+req POST /analytical-engines/auth/login -H 'Content-Type: application/json' \
   -d "{\"organisationId\":$AORGID,\"identifier\":\"pam\",\"password\":\"longenoughpass\"}"
 check "user can login after password set" 200 "$(status)"
 
 # history: enable keep-2, change password, reuse of the original is rejected
-req PATCH /api/v1/platforms/analytical-engines/organisations/auth-corp/auth-config -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req PATCH /analytical-engines/organisations/auth-corp/auth-config -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"passwordMinLength":8,"passwordHistoryCount":2}'
 check "enable password history" 200 "$(status)"
-req PATCH /api/v1/platforms/analytical-engines/organisations/auth-corp/users/$PAMID -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req PATCH /analytical-engines/organisations/auth-corp/users/$PAMID -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"password":"secondpass"}'
 check "change to second password" 200 "$(status)"
-req PATCH /api/v1/platforms/analytical-engines/organisations/auth-corp/users/$PAMID -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req PATCH /analytical-engines/organisations/auth-corp/users/$PAMID -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"password":"longenoughpass"}'
 check "reuse of old password rejected" 400 "$(status)"
 
 echo "== org user actions (temporary password + required fields) =="
 # a temporary password (set by the platform user) gates the session until changed
-req POST /api/v1/platforms/analytical-engines/organisations/auth-corp/users -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req POST /analytical-engines/organisations/auth-corp/users -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"firstName":"Tina","lastName":"Temp","username":"tina","password":"temp-pass1","temporaryPassword":true}'
 check "create user with temporary password" 201 "$(status)"
 check "temporary flag echoed" True "$(field '["temporaryPassword"]')"
-req POST /api/v1/platforms/analytical-engines/auth/login -H 'Content-Type: application/json' \
+req POST /analytical-engines/auth/login -H 'Content-Type: application/json' \
   -d "{\"organisationId\":$AORGID,\"identifier\":\"tina\",\"password\":\"temp-pass1\"}"
 check "temporary login gated" 200 "$(status)"
 check "change-password action returned" CHANGE_PASSWORD "$(field '["actions"][0]')"
 check "no refresh token while action pending" None "$(field '["refreshToken"]')"
 check "access ttl fixed at 5 min" 300 "$(field '["expiresInSeconds"]')"
 TAT=$(field '["accessToken"]')
-req GET /api/v1/platforms/analytical-engines/organisations/auth-corp/users/me -H "Authorization: Bearer $TAT"
+req GET /analytical-engines/organisations/auth-corp/users/me -H "Authorization: Bearer $TAT"
 check "other endpoints closed while action pending" 401 "$(status)"
-req POST /api/v1/platforms/analytical-engines/organisations/auth-corp/users/me/change-password -H "Authorization: Bearer $TAT" -H 'Content-Type: application/json' \
+req POST /analytical-engines/organisations/auth-corp/users/me/change-password -H "Authorization: Bearer $TAT" -H 'Content-Type: application/json' \
   -d '{"currentPassword":"temp-pass1","newPassword":"brand-new-pass"}'
 check "change password completes the action" 204 "$(status)"
-req POST /api/v1/platforms/analytical-engines/auth/login -H 'Content-Type: application/json' \
+req POST /analytical-engines/auth/login -H 'Content-Type: application/json' \
   -d "{\"organisationId\":$AORGID,\"identifier\":\"tina\",\"password\":\"brand-new-pass\"}"
 check "tina logs in after the change" 200 "$(status)"
 check "no actions after the change" 0 "$(nlen '["actions"]')"
 check "normal access ttl restored" 900 "$(field '["expiresInSeconds"]')"
 
 # a required user field surfaces the advisory UPDATE_PROFILE action
-req POST /api/v1/platforms/analytical-engines/organisations/auth-corp/user-fields -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req POST /analytical-engines/organisations/auth-corp/user-fields -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"key":"department","label":"Department","fieldType":"STRING","loginEnabled":false,"required":true}'
 check "create required field" 201 "$(status)"
 check "required flag echoed" True "$(field '["required"]')"
-req POST /api/v1/platforms/analytical-engines/organisations/auth-corp/users -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req POST /analytical-engines/organisations/auth-corp/users -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"firstName":"Uma","lastName":"Incomplete","username":"uma","password":"longpass1"}'
 check "create user without required field" 201 "$(status)"
-req POST /api/v1/platforms/analytical-engines/auth/login -H 'Content-Type: application/json' \
+req POST /analytical-engines/auth/login -H 'Content-Type: application/json' \
   -d "{\"organisationId\":$AORGID,\"identifier\":\"uma\",\"password\":\"longpass1\"}"
 check "update-profile action returned" UPDATE_PROFILE "$(field '["actions"][0]')"
 check "non-gating: normal access ttl" 900 "$(field '["expiresInSeconds"]')"
 UMA=$(field '["accessToken"]')
-req GET /api/v1/platforms/analytical-engines/organisations/auth-corp/users/me -H "Authorization: Bearer $UMA"
+req GET /analytical-engines/organisations/auth-corp/users/me -H "Authorization: Bearer $UMA"
 check "non-gating: profile reachable" 200 "$(status)"
-req PATCH /api/v1/platforms/analytical-engines/organisations/auth-corp/users/me -H "Authorization: Bearer $UMA" -H 'Content-Type: application/json' \
+req PATCH /analytical-engines/organisations/auth-corp/users/me -H "Authorization: Bearer $UMA" -H 'Content-Type: application/json' \
   -d '{"metadata":{"department":"engineering"}}'
 check "complete the update-profile action" 200 "$(status)"
-req POST /api/v1/platforms/analytical-engines/auth/login -H 'Content-Type: application/json' \
+req POST /analytical-engines/auth/login -H 'Content-Type: application/json' \
   -d "{\"organisationId\":$AORGID,\"identifier\":\"uma\",\"password\":\"longpass1\"}"
 check "no actions after completing profile" 0 "$(nlen '["actions"]')"
 
 # refresh rotation + reuse detection on org tokens
-req POST /api/v1/platforms/analytical-engines/auth/refresh -H 'Content-Type: application/json' \
+req POST /analytical-engines/auth/refresh -H 'Content-Type: application/json' \
   -d "{\"refreshToken\":\"$OBR\"}"
 check "org refresh rotates" 200 "$(status)"
 OBR2=$(field '["refreshToken"]')
-req POST /api/v1/platforms/analytical-engines/auth/refresh -H 'Content-Type: application/json' \
+req POST /analytical-engines/auth/refresh -H 'Content-Type: application/json' \
   -d "{\"refreshToken\":\"$OBR\"}"
 check "org reused token rejected" 401 "$(status)"
-req POST /api/v1/platforms/analytical-engines/auth/logout -H 'Content-Type: application/json' \
+req POST /analytical-engines/auth/logout -H 'Content-Type: application/json' \
   -d "{\"refreshToken\":\"$OBR2\"}"
 check "org logout" 204 "$(status)"
 
 echo "== org session settings (token TTLs + concurrent session limit) =="
-req GET /api/v1/platforms/analytical-engines/organisations/auth-corp/session-settings -H "Authorization: Bearer $BA"
+req GET /analytical-engines/organisations/auth-corp/session-settings -H "Authorization: Bearer $BA"
 check "session settings defaults" 200 "$(status)"
 check "default access ttl" 900 "$(field '["accessTokenTtlSeconds"]')"
 check "default refresh ttl" 604800 "$(field '["refreshTokenTtlSeconds"]')"
 check "default max sessions" 5 "$(field '["maxSessionsPerUser"]')"
 
 # tighten: 2-min access tokens, 1-hour refresh tokens, one session per user
-req PATCH /api/v1/platforms/analytical-engines/organisations/auth-corp/session-settings -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req PATCH /analytical-engines/organisations/auth-corp/session-settings -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"accessTokenTtlSeconds":120,"refreshTokenTtlSeconds":3600,"maxSessionsPerUser":1}'
 check "update session settings" 200 "$(status)"
 check "access ttl applied" 120 "$(field '["accessTokenTtlSeconds"]')"
 
 # the register/login response reports the org-specific access-token lifetime
-req POST /api/v1/platforms/analytical-engines/auth/register -H 'Content-Type: application/json' \
+req POST /analytical-engines/auth/register -H 'Content-Type: application/json' \
   -d "{\"organisationId\":$AORGID,\"identifier\":\"carol\",\"password\":\"orgpass1\",\"firstName\":\"Carol\",\"lastName\":\"C\"}"
 check "register carol" 201 "$(status)"
 check "carol access ttl reported" 120 "$(field '["expiresInSeconds"]')"
 CBR=$(field '["refreshToken"]')
 
 # max sessions = 1: the next login evicts the previous session, quietly
-req POST /api/v1/platforms/analytical-engines/auth/login -H 'Content-Type: application/json' \
+req POST /analytical-engines/auth/login -H 'Content-Type: application/json' \
   -d "{\"organisationId\":$AORGID,\"identifier\":\"carol\",\"password\":\"orgpass1\"}"
 check "carol second session" 200 "$(status)"
 CBR2=$(field '["refreshToken"]')
-req POST /api/v1/platforms/analytical-engines/auth/refresh -H 'Content-Type: application/json' \
+req POST /analytical-engines/auth/refresh -H 'Content-Type: application/json' \
   -d "{\"refreshToken\":\"$CBR\"}"
 check "evicted session refresh rejected" 401 "$(status)"
-req POST /api/v1/platforms/analytical-engines/auth/refresh -H 'Content-Type: application/json' \
+req POST /analytical-engines/auth/refresh -H 'Content-Type: application/json' \
   -d "{\"refreshToken\":\"$CBR2\"}"
 check "newest session survives eviction (not theft)" 200 "$(status)"
 
 # restore defaults so later checks are unaffected
-req PATCH /api/v1/platforms/analytical-engines/organisations/auth-corp/session-settings -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
+req PATCH /analytical-engines/organisations/auth-corp/session-settings -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"accessTokenTtlSeconds":900,"refreshTokenTtlSeconds":604800,"maxSessionsPerUser":5}'
 check "restore session defaults" 200 "$(status)"
 
 # key rotation: a new active key appears, the old token still verifies
-req POST /api/v1/platforms/analytical-engines/organisations/auth-corp/keys/rotate -H "Authorization: Bearer $BA"
+req POST /analytical-engines/organisations/auth-corp/keys/rotate -H "Authorization: Bearer $BA"
 check "rotate keys" 200 "$(status)"
 check "rotated key active" True "$(field '["active"]')"
-req GET /api/v1/platforms/analytical-engines/organisations/auth-corp/keys
+req GET /analytical-engines/organisations/auth-corp/keys
 check "two keys after rotation" 2 "$(jlen)"
-req GET /api/v1/platforms/analytical-engines/organisations/auth-corp/users/me -H "Authorization: Bearer $OBA2"
+req GET /analytical-engines/organisations/auth-corp/users/me -H "Authorization: Bearer $OBA2"
 check "old token still verifies after rotation" 200 "$(status)"
 
 # deleting an org with users/keys cascades cleanly
-req DELETE /api/v1/platforms/analytical-engines/organisations/auth-corp -H "Authorization: Bearer $BA"
+req DELETE /analytical-engines/organisations/auth-corp -H "Authorization: Bearer $BA"
 check "delete org with children" 204 "$(status)"
-req GET /api/v1/platforms/analytical-engines/organisations/auth-corp -H "Authorization: Bearer $BA"
+req GET /analytical-engines/organisations/auth-corp -H "Authorization: Bearer $BA"
 check "deleted auth org 404" 404 "$(status)"
 
 req PATCH /api/v1/users/$MID -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' -d '{"role":"SUPER_USER"}'
 check "promote member" 200 "$(status)"
 check "promoted role" SUPER_USER "$(field '["role"]')"
 
-req POST /api/v1/platforms/analytical-engines/users -H "Authorization: Bearer $MA" -H 'Content-Type: application/json' \
+req POST /analytical-engines/users -H "Authorization: Bearer $MA" -H 'Content-Type: application/json' \
   -d '{"firstName":"New","lastName":"Member","email":"newbie@nexx.io","password":"password1"}'
 check "promoted member can add (no re-login)" 201 "$(status)"
 

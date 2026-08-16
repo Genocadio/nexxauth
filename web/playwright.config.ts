@@ -27,7 +27,7 @@ export default defineConfig({
       // Backend (Spring Boot). Any response counts as ready — the probe is
       // unauthenticated and answers 401.
       command: "cd .. && ./gradlew bootRun -q",
-      url: "http://localhost:8080/api/v1/platforms/health",
+      url: "http://localhost:8080/health",
       reuseExistingServer: true,
       timeout: 180_000,
     },

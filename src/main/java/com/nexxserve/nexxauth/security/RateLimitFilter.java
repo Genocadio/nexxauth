@@ -32,9 +32,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private static final String REGISTER_PATH = "/api/v1/auth/register";
     private static final String REFRESH_PATH = "/api/v1/auth/refresh";
     private static final String SUGGESTIONS_PATH = "/api/v1/slug-suggestions";
-    // Org-level auth (variable platform slug) shares the same brute-force
-    // protection; the path identifies the endpoint for the bucket key.
-    private static final String ORG_AUTH_PREFIX = "/api/v1/platforms/";
+    // Platform auth stays under /api/v1; anything else ending in /auth/... is
+    // org auth at a platform's clean root origin /{slug}/auth/...
+    private static final String API_PREFIX = "/api/v1/";
 
     private final RateLimitService rateLimitService;
     private final RateLimitProperties properties;
@@ -89,7 +89,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private boolean isOrgAuth(String path, String endpoint) {
-        return path.startsWith(ORG_AUTH_PREFIX) && path.endsWith("/auth/" + endpoint);
+        return !path.startsWith(API_PREFIX) && path.endsWith("/auth/" + endpoint);
     }
 
     private String endpointFor(String path) {
@@ -97,7 +97,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         // Org auth is a separate auth system: give it its own bucket so
         // brute-forcing org logins cannot exhaust the platform budget (and
         // vice versa).
-        if (path.startsWith(ORG_AUTH_PREFIX)) {
+        if (!path.startsWith(API_PREFIX)) {
             return "org-" + endpoint;
         }
         return endpoint;

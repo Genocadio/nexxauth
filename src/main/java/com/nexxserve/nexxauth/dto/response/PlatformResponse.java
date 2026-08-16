@@ -7,6 +7,7 @@ public record PlatformResponse(
         String name,
         String slug,
         long userCount,
+        String apiBaseUrl,
         Instant createdAt
 ) {
 }

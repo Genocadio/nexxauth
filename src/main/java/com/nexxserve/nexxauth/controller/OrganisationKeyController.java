@@ -23,7 +23,7 @@ import java.util.List;
  * platform super-user action. The private key never leaves the server.
  */
 @RestController
-@RequestMapping("/api/v1/platforms/{slug}/organisations/{organisationSlug}/keys")
+@RequestMapping("/{slug}/organisations/{organisationSlug}/keys")
 public class OrganisationKeyController {
 
     private final PlatformAccess platformAccess;

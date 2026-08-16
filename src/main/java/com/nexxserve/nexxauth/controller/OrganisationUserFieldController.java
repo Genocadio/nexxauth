@@ -28,7 +28,7 @@ import java.util.List;
  * role permission, mirroring the user management endpoints.
  */
 @RestController
-@RequestMapping("/api/v1/platforms/{slug}/organisations/{organisationSlug}/user-fields")
+@RequestMapping("/{slug}/organisations/{organisationSlug}/user-fields")
 public class OrganisationUserFieldController {
 
     private final OrganisationUserFieldService fieldService;

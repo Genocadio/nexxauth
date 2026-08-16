@@ -34,7 +34,7 @@ class OrganisationIntegrationTest {
         String boss = register("org-boss@nexx.io", "Org Platform");
 
         // create: slug derived from name
-        mockMvc.perform(post("/api/v1/platforms/org-platform/organisations")
+        mockMvc.perform(post("/org-platform/organisations")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "Nexx Labs", "description", "R&D"))))
@@ -43,7 +43,7 @@ class OrganisationIntegrationTest {
                 .andExpect(jsonPath("$.name").value("Nexx Labs"));
 
         // create with explicit slug + second organisation
-        mockMvc.perform(post("/api/v1/platforms/org-platform/organisations")
+        mockMvc.perform(post("/org-platform/organisations")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "Nexx Services", "slug", "services"))))
@@ -51,19 +51,19 @@ class OrganisationIntegrationTest {
                 .andExpect(jsonPath("$.slug").value("services"));
 
         // a platform can have many organisations
-        mockMvc.perform(get("/api/v1/platforms/org-platform/organisations")
+        mockMvc.perform(get("/org-platform/organisations")
                         .header("Authorization", bearer(boss)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2));
 
         // get one
-        mockMvc.perform(get("/api/v1/platforms/org-platform/organisations/nexx-labs")
+        mockMvc.perform(get("/org-platform/organisations/nexx-labs")
                         .header("Authorization", bearer(boss)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.description").value("R&D"));
 
         // partial update: name + description
-        mockMvc.perform(patch("/api/v1/platforms/org-platform/organisations/nexx-labs")
+        mockMvc.perform(patch("/org-platform/organisations/nexx-labs")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "Nexx Labs HQ", "description", "HQ"))))
@@ -72,7 +72,7 @@ class OrganisationIntegrationTest {
                 .andExpect(jsonPath("$.description").value("HQ"));
 
         // rename slug
-        mockMvc.perform(patch("/api/v1/platforms/org-platform/organisations/nexx-labs")
+        mockMvc.perform(patch("/org-platform/organisations/nexx-labs")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("slug", "hq"))))
@@ -80,18 +80,18 @@ class OrganisationIntegrationTest {
                 .andExpect(jsonPath("$.slug").value("hq"));
 
         // old slug 404s, new slug resolves
-        mockMvc.perform(get("/api/v1/platforms/org-platform/organisations/nexx-labs")
+        mockMvc.perform(get("/org-platform/organisations/nexx-labs")
                         .header("Authorization", bearer(boss)))
                 .andExpect(status().isNotFound());
-        mockMvc.perform(get("/api/v1/platforms/org-platform/organisations/hq")
+        mockMvc.perform(get("/org-platform/organisations/hq")
                         .header("Authorization", bearer(boss)))
                 .andExpect(status().isOk());
 
         // delete
-        mockMvc.perform(delete("/api/v1/platforms/org-platform/organisations/hq")
+        mockMvc.perform(delete("/org-platform/organisations/hq")
                         .header("Authorization", bearer(boss)))
                 .andExpect(status().isNoContent());
-        mockMvc.perform(get("/api/v1/platforms/org-platform/organisations/hq")
+        mockMvc.perform(get("/org-platform/organisations/hq")
                         .header("Authorization", bearer(boss)))
                 .andExpect(status().isNotFound());
     }
@@ -99,13 +99,13 @@ class OrganisationIntegrationTest {
     @Test
     void readOnlyMembersCanReadButNotWrite() throws Exception {
         String boss = register("org-ro-boss@nexx.io", "Ro Platform");
-        mockMvc.perform(post("/api/v1/platforms/ro-platform/organisations")
+        mockMvc.perform(post("/ro-platform/organisations")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "Readable"))))
                 .andExpect(status().isCreated());
 
-        MvcResult add = mockMvc.perform(post("/api/v1/platforms/ro-platform/users")
+        MvcResult add = mockMvc.perform(post("/ro-platform/users")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
@@ -125,23 +125,23 @@ class OrganisationIntegrationTest {
         String member = objectMapper.readTree(login.getResponse().getContentAsString()).get("accessToken").asText();
 
         // reads allowed for any member
-        mockMvc.perform(get("/api/v1/platforms/ro-platform/organisations")
+        mockMvc.perform(get("/ro-platform/organisations")
                         .header("Authorization", bearer(member)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1));
 
         // writes denied for read-only members
-        mockMvc.perform(post("/api/v1/platforms/ro-platform/organisations")
+        mockMvc.perform(post("/ro-platform/organisations")
                         .header("Authorization", bearer(member))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "Nope"))))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(patch("/api/v1/platforms/ro-platform/organisations/readable")
+        mockMvc.perform(patch("/ro-platform/organisations/readable")
                         .header("Authorization", bearer(member))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "Nope"))))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(delete("/api/v1/platforms/ro-platform/organisations/readable")
+        mockMvc.perform(delete("/ro-platform/organisations/readable")
                         .header("Authorization", bearer(member)))
                 .andExpect(status().isForbidden());
     }
@@ -152,37 +152,37 @@ class OrganisationIntegrationTest {
         String bossB = register("iso-b@nexx.io", "Isolation B");
 
         // same slug is fine in different platforms
-        mockMvc.perform(post("/api/v1/platforms/isolation-a/organisations")
+        mockMvc.perform(post("/isolation-a/organisations")
                         .header("Authorization", bearer(bossA))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "Shared", "slug", "shared"))))
                 .andExpect(status().isCreated());
-        mockMvc.perform(post("/api/v1/platforms/isolation-b/organisations")
+        mockMvc.perform(post("/isolation-b/organisations")
                         .header("Authorization", bearer(bossB))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "Shared", "slug", "shared"))))
                 .andExpect(status().isCreated());
 
         // duplicate slug within the same platform conflicts
-        mockMvc.perform(post("/api/v1/platforms/isolation-a/organisations")
+        mockMvc.perform(post("/isolation-a/organisations")
                         .header("Authorization", bearer(bossA))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "Shared Again", "slug", "shared"))))
                 .andExpect(status().isConflict());
 
         // a member of another platform cannot see or touch these organisations
-        mockMvc.perform(get("/api/v1/platforms/isolation-a/organisations")
+        mockMvc.perform(get("/isolation-a/organisations")
                         .header("Authorization", bearer(bossB)))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(delete("/api/v1/platforms/isolation-a/organisations/shared")
+        mockMvc.perform(delete("/isolation-a/organisations/shared")
                         .header("Authorization", bearer(bossB)))
                 .andExpect(status().isForbidden());
 
         // unknown platform / organisation
-        mockMvc.perform(get("/api/v1/platforms/does-not-exist/organisations")
+        mockMvc.perform(get("/does-not-exist/organisations")
                         .header("Authorization", bearer(bossA)))
                 .andExpect(status().isNotFound());
-        mockMvc.perform(get("/api/v1/platforms/isolation-a/organisations/nope")
+        mockMvc.perform(get("/isolation-a/organisations/nope")
                         .header("Authorization", bearer(bossA)))
                 .andExpect(status().isNotFound());
     }
@@ -191,14 +191,14 @@ class OrganisationIntegrationTest {
     void validationIsEnforced() throws Exception {
         String boss = register("org-valid@nexx.io", "Valid Platform");
 
-        mockMvc.perform(post("/api/v1/platforms/valid-platform/organisations")
+        mockMvc.perform(post("/valid-platform/organisations")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("name"));
 
-        mockMvc.perform(post("/api/v1/platforms/valid-platform/organisations")
+        mockMvc.perform(post("/valid-platform/organisations")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "Bad Slug", "slug", "UPPER_CASE"))))

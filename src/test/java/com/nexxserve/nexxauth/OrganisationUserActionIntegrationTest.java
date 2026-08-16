@@ -39,7 +39,7 @@ class OrganisationUserActionIntegrationTest {
 
     @Test
     void temporaryPasswordGatesSessionUntilChanged() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[0];
+        String platform = "/" + SLUGS[0];
         String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("action-boss@nexx.io", SLUGS[0]);
@@ -96,7 +96,7 @@ class OrganisationUserActionIntegrationTest {
 
     @Test
     void wrongCurrentPasswordCannotCompleteTheAction() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[3];
+        String platform = "/" + SLUGS[3];
         String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("action-wrong@nexx.io", SLUGS[3]);
@@ -138,7 +138,7 @@ class OrganisationUserActionIntegrationTest {
 
     @Test
     void adminTriggeredPasswordChangeKillsSessionsAndGates() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[1];
+        String platform = "/" + SLUGS[1];
         String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("action-force@nexx.io", SLUGS[1]);
@@ -181,7 +181,7 @@ class OrganisationUserActionIntegrationTest {
 
     @Test
     void requiredFieldSurfacesNonGatingUpdateProfileAction() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[2];
+        String platform = "/" + SLUGS[2];
         String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("action-profile@nexx.io", SLUGS[2]);

@@ -56,7 +56,7 @@ async function postJson(
   body: unknown,
   token?: string,
 ): Promise<JsonResponse> {
-  const res = await api.post(`${API_BASE}/api/v1${path}`, {
+  const res = await api.post(`${API_BASE}${path}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     data: body,
   });
@@ -83,7 +83,7 @@ export async function registerPlatform(api: APIRequestContext): Promise<Platform
   const platformName = `E2E ${platformSlug}`;
 
   for (let attempt = 0; attempt < 5; attempt++) {
-    const res = await postJson(api, "/auth/register", {
+    const res = await postJson(api, "/api/v1/auth/register", {
       firstName: "Ada",
       lastName: "Lovelace",
       email,
@@ -125,7 +125,7 @@ export async function createOrganisation(
   platformSlug: string,
   body: { name: string; slug: string; description?: string },
 ): Promise<OrgBody> {
-  const res = await postJson(api, `/platforms/${platformSlug}/organisations`, body, token);
+  const res = await postJson(api, `/${platformSlug}/organisations`, body, token);
   if (res.status !== 201) fail("create organisation", res);
   return res.json as unknown as OrgBody;
 }
@@ -145,7 +145,7 @@ export async function createRole(
 ): Promise<RoleBody> {
   const res = await postJson(
     api,
-    `/platforms/${platformSlug}/organisations/${organisationSlug}/roles`,
+    `/${platformSlug}/organisations/${organisationSlug}/roles`,
     body,
     token,
   );
@@ -162,7 +162,7 @@ export async function createUserField(
 ): Promise<{ id: number; key: string }> {
   const res = await postJson(
     api,
-    `/platforms/${platformSlug}/organisations/${organisationSlug}/user-fields`,
+    `/${platformSlug}/organisations/${organisationSlug}/user-fields`,
     body,
     token,
   );
@@ -196,7 +196,7 @@ export async function createOrgUser(
 ): Promise<OrgUserBody> {
   const res = await postJson(
     api,
-    `/platforms/${platformSlug}/organisations/${organisationSlug}/users`,
+    `/${platformSlug}/organisations/${organisationSlug}/users`,
     body,
     token,
   );

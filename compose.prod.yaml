@@ -102,6 +102,9 @@ services:
       # Public domain the console is served from (used by the backend as the
       # default CORS origin; informational for the web app itself).
       WEB_PUBLIC_URL: ${WEB_PUBLIC_URL:-http://localhost:3000}
+      # Public API origin; the org portal profile shows it (+ slug) as the
+      # copiable org API URL. The platform-level apiBaseUrl instead comes from
+      # the backend's own BACKEND_PUBLIC_URL below.
       BACKEND_PUBLIC_URL: ${BACKEND_PUBLIC_URL:-http://localhost:8080}
       PORT: "3000"
       HOSTNAME: 0.0.0.0

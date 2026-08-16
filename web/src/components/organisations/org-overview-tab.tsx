@@ -7,6 +7,7 @@ import { FormField } from "@/components/shared/form-field";
 import { TableSkeleton } from "@/components/shared/loading";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CopyButton } from "@/components/shared/copy-button";
 import {
   Dialog,
   DialogContent,
@@ -18,8 +19,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useUpdateOrganisation } from "@/hooks/mutations";
-import { useOrganisation } from "@/hooks/queries";
+import { useOrganisation, usePlatform } from "@/hooks/queries";
 import { useForm } from "@/hooks/use-form";
+import { organisationApiUrl } from "@/lib/api-url";
 import { formatDate } from "@/lib/constants";
 import { updateOrganisationSchema } from "@/lib/validation";
 
@@ -30,9 +32,12 @@ interface OrgOverviewTabProps {
 
 export function OrgOverviewTab({ platformSlug, organisationSlug }: OrgOverviewTabProps) {
   const org = useOrganisation(organisationSlug);
+  const platform = usePlatform();
 
   const [editOpen, setEditOpen] = useState(false);
   const update = useUpdateOrganisation(platformSlug, organisationSlug);
+
+  const apiUrl = organisationApiUrl(platform.data?.apiBaseUrl, organisationSlug);
 
   const form = useForm(updateOrganisationSchema, {
     name: org.data?.name ?? "",
@@ -59,6 +64,7 @@ export function OrgOverviewTab({ platformSlug, organisationSlug }: OrgOverviewTa
           <CardDescription>Identity and sign-in behaviour of this organisation.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
+          {apiUrl ? <UrlRow label="API URL" value={apiUrl} /> : null}
           <DetailRow label="Name" value={data.name} />
           <DetailRow label="Slug" value={data.slug} mono />
           <DetailRow label="Description" value={data.description ?? "—"} />
@@ -127,6 +133,18 @@ function DetailRow({ label, value, mono }: { label: string; value: string; mono?
       <span className={`max-w-[65%] truncate text-right font-medium ${mono ? "font-mono text-xs" : ""}`}>
         {value}
       </span>
+    </div>
+  );
+}
+
+function UrlRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-muted-foreground">{label}</span>
+      <div className="flex min-w-0 items-center justify-end gap-1.5">
+        <code className="max-w-[70%] truncate font-mono text-xs font-medium">{value}</code>
+        <CopyButton value={value} label={`Copy ${label}`} className="shrink-0" />
+      </div>
     </div>
   );
 }

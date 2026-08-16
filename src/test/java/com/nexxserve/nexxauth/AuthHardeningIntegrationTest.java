@@ -32,7 +32,7 @@ class AuthHardeningIntegrationTest {
     void disabledUserAccessTokenIsRejectedImmediately() throws Exception {
         String superAccess = tokenOf(register("boss@hardening.com", "Boss Co", "password1"));
 
-        MvcResult add = mockMvc.perform(post("/api/v1/platforms/boss-co/users")
+        MvcResult add = mockMvc.perform(post("/boss-co/users")
                         .header("Authorization", bearer(superAccess))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(

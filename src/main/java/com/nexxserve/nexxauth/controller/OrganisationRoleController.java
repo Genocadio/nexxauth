@@ -28,7 +28,7 @@ import java.util.List;
  * super user role.
  */
 @RestController
-@RequestMapping("/api/v1/platforms/{slug}/organisations/{organisationSlug}/roles")
+@RequestMapping("/{slug}/organisations/{organisationSlug}/roles")
 public class OrganisationRoleController {
 
     private final OrganisationRoleService roleService;

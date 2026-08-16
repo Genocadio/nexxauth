@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
  * org. Writes: platform super user. Never applies to the platform auth flow.
  */
 @RestController
-@RequestMapping("/api/v1/platforms/{slug}/organisations/{organisationSlug}/session-settings")
+@RequestMapping("/{slug}/organisations/{organisationSlug}/session-settings")
 public class OrganisationSessionSettingsController {
 
     private final PlatformAccess platformAccess;

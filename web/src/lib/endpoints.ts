@@ -15,8 +15,8 @@ export const endpoints = {
   },
 
   platform: (slug: string) => ({
-    get: `${API_BASE_URL}/platforms/${slug}`,
-    users: `${API_BASE_URL}/platforms/${slug}/users`,
+    get: `${API_BASE_URL}/${slug}`,
+    users: `${API_BASE_URL}/${slug}/users`,
   }),
 
   user: (id: number) => `${API_BASE_URL}/users/${id}`,
@@ -25,41 +25,41 @@ export const endpoints = {
   slugSuggestions: `${API_BASE_URL}/slug-suggestions`,
 
   organisations: (platformSlug: string) => ({
-    list: `${API_BASE_URL}/platforms/${platformSlug}/organisations`,
+    list: `${API_BASE_URL}/${platformSlug}/organisations`,
     one: (organisationSlug: string) =>
-      `${API_BASE_URL}/platforms/${platformSlug}/organisations/${organisationSlug}`,
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}`,
     users: (organisationSlug: string) =>
-      `${API_BASE_URL}/platforms/${platformSlug}/organisations/${organisationSlug}/users`,
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}/users`,
     user: (organisationSlug: string, userId: number) =>
-      `${API_BASE_URL}/platforms/${platformSlug}/organisations/${organisationSlug}/users/${userId}`,
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}/users/${userId}`,
     roles: (organisationSlug: string) =>
-      `${API_BASE_URL}/platforms/${platformSlug}/organisations/${organisationSlug}/roles`,
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}/roles`,
     role: (organisationSlug: string, roleId: number) =>
-      `${API_BASE_URL}/platforms/${platformSlug}/organisations/${organisationSlug}/roles/${roleId}`,
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}/roles/${roleId}`,
     authConfig: (organisationSlug: string) =>
-      `${API_BASE_URL}/platforms/${platformSlug}/organisations/${organisationSlug}/auth-config`,
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}/auth-config`,
     sessionSettings: (organisationSlug: string) =>
-      `${API_BASE_URL}/platforms/${platformSlug}/organisations/${organisationSlug}/session-settings`,
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}/session-settings`,
     userFields: (organisationSlug: string) =>
-      `${API_BASE_URL}/platforms/${platformSlug}/organisations/${organisationSlug}/user-fields`,
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}/user-fields`,
     userField: (organisationSlug: string, fieldId: number) =>
-      `${API_BASE_URL}/platforms/${platformSlug}/organisations/${organisationSlug}/user-fields/${fieldId}`,
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}/user-fields/${fieldId}`,
     keys: (organisationSlug: string) =>
-      `${API_BASE_URL}/platforms/${platformSlug}/organisations/${organisationSlug}/keys`,
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}/keys`,
     rotateKey: (organisationSlug: string) =>
-      `${API_BASE_URL}/platforms/${platformSlug}/organisations/${organisationSlug}/keys/rotate`,
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}/keys/rotate`,
     clients: (organisationSlug: string) =>
-      `${API_BASE_URL}/platforms/${platformSlug}/organisations/${organisationSlug}/clients`,
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}/clients`,
     client: (organisationSlug: string, clientKey: string) =>
-      `${API_BASE_URL}/platforms/${platformSlug}/organisations/${organisationSlug}/clients/${clientKey}`,
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}/clients/${clientKey}`,
     rotateClientToken: (organisationSlug: string, clientKey: string) =>
-      `${API_BASE_URL}/platforms/${platformSlug}/organisations/${organisationSlug}/clients/${clientKey}/rotate-token`,
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}/clients/${clientKey}/rotate-token`,
   }),
 
   orgAuth: (platformSlug: string) => ({
-    register: `${API_BASE_URL}/platforms/${platformSlug}/auth/register`,
-    login: `${API_BASE_URL}/platforms/${platformSlug}/auth/login`,
-    refresh: `${API_BASE_URL}/platforms/${platformSlug}/auth/refresh`,
-    logout: `${API_BASE_URL}/platforms/${platformSlug}/auth/logout`,
+    register: `${API_BASE_URL}/${platformSlug}/auth/register`,
+    login: `${API_BASE_URL}/${platformSlug}/auth/login`,
+    refresh: `${API_BASE_URL}/${platformSlug}/auth/refresh`,
+    logout: `${API_BASE_URL}/${platformSlug}/auth/logout`,
   }),
 };

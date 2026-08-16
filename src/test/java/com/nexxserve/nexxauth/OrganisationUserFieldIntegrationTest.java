@@ -39,7 +39,7 @@ class OrganisationUserFieldIntegrationTest {
 
     @Test
     void fieldCrudMetadataRoundTripAndValidation() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[0];
+        String platform = "/" + SLUGS[0];
         String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("ouf-roundtrip@nexx.io", SLUGS[0]);
@@ -121,7 +121,7 @@ class OrganisationUserFieldIntegrationTest {
 
     @Test
     void loginByLoginEnabledFieldsWithNormalizedValuesAndUniqueness() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[1];
+        String platform = "/" + SLUGS[1];
         String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("ouf-login@nexx.io", SLUGS[1]);
@@ -207,7 +207,7 @@ class OrganisationUserFieldIntegrationTest {
 
     @Test
     void fieldManagementIsGatedByOrgRolePermissions() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[2];
+        String platform = "/" + SLUGS[2];
         String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("ouf-rbac@nexx.io", SLUGS[2]);
@@ -281,7 +281,7 @@ class OrganisationUserFieldIntegrationTest {
 
     @Test
     void registerAcceptsValidatedMetadata() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[3];
+        String platform = "/" + SLUGS[3];
         String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("ouf-reg@nexx.io", SLUGS[3]);
@@ -315,7 +315,7 @@ class OrganisationUserFieldIntegrationTest {
 
     @Test
     void typeChangeBlockedAndLoginEnableRejectsDuplicateValues() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[4];
+        String platform = "/" + SLUGS[4];
         String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("ouf-guard@nexx.io", SLUGS[4]);
@@ -365,7 +365,7 @@ class OrganisationUserFieldIntegrationTest {
 
     @Test
     void deletingFieldRemovesValuesAndBreaksLogin() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[5];
+        String platform = "/" + SLUGS[5];
         String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("ouf-del@nexx.io", SLUGS[5]);

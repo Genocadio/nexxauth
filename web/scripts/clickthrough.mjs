@@ -151,7 +151,7 @@ async function main() {
   step("org portal: sign in as the org user");
   const orgId = await page.evaluate(async (slug) => {
     const state = JSON.parse(localStorage.getItem("nexxauth.platform.session") ?? "null");
-    const res = await fetch(`/api/v1/platforms/${slug}/organisations`, {
+    const res = await fetch(`/api/v1/${slug}/organisations`, {
       headers: { Authorization: `Bearer ${state.accessToken}` },
     });
     const orgs = await res.json();

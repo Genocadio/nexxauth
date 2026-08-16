@@ -19,6 +19,9 @@ export interface PlatformResponse {
   name: string;
   slug: string;
   userCount: number;
+  /** Public API base of this platform (e.g. https://auth.example.com/acme),
+   * derived from the backend's BACKEND_PUBLIC_URL. Null when not configured. */
+  apiBaseUrl: string | null;
   createdAt: IsoDate;
 }
 

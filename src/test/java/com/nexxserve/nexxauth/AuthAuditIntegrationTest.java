@@ -108,7 +108,7 @@ class AuthAuditIntegrationTest {
 
     @Test
     void orgAuthEmitsAuditEventsIncludingKeyRotation() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[1];
+        String platform = "/" + SLUGS[1];
         String boss = registerPlatform("audit-org-boss@nexx.io", SLUGS[1]);
 
         MvcResult org = mockMvc.perform(post(platform + "/organisations")
@@ -167,7 +167,7 @@ class AuthAuditIntegrationTest {
 
     @Test
     void refreshReuseIsAuditedAsTokenTheft() throws Exception {
-        String platform = "/api/v1/platforms/" + SLUGS[2];
+        String platform = "/" + SLUGS[2];
         String orgSlug = "reuse-org";
         String org = platform + "/organisations/" + orgSlug;
         String boss = registerPlatform("audit-reuse-boss@nexx.io", SLUGS[2]);
