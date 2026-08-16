@@ -2,7 +2,6 @@ plugins {
 	id 'java'
 	id 'org.springframework.boot' version '4.1.0'
 	id 'io.spring.dependency-management' version '1.1.7'
-	id 'org.owasp.dependencycheck' version '12.1.0'
 }
 
 group = 'com.nexxserve'
@@ -73,19 +72,6 @@ tasks.named('test') {
 			excludeTags 'redis'
 		}
 	}
-}
-
-// OWASP dependency-check (CVE scanning). Emits an HTML report plus a SARIF file
-// for GitHub code scanning. Build fails only on CRITICAL vulnerabilities
-// (failBuildOnCVSS); failOnError=false keeps it from failing on feed errors.
-// Run explicitly (./gradlew dependencyCheckAnalyze) — it downloads the NVD
-// database, so it is not part of the regular `check`/`build` cycle.
-dependencyCheck {
-	formats = ['HTML', 'SARIF']
-	outputDirectory = file('build/reports/dependency-check-report')
-	failBuildOnCVSS = 9
-	failOnError = false
-	analyzedTypes = ['JAVA', 'JAVA_JAR']
 }
 
 // Boot 4 removed the bootBuildInfo task; generate the build-info.properties

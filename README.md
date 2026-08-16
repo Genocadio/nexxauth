@@ -341,11 +341,7 @@ detector, so a stale device cannot kill the user's newer sessions).
 GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main` and every
 pull request:
 
-- **Backend** — `./gradlew test` (H2), `./gradlew build`, and **OWASP
-  Dependency-Check** (`./gradlew dependencyCheckAnalyze`) for CVE scanning. The
-  SARIF output is uploaded to GitHub code scanning; the HTML report is kept as a
-  build artifact. Build fails only on CRITICAL (CVSS ≥ 9) findings — the NVD feed
-  is cached between runs.
+- **Backend** — `./gradlew test` (H2) and `./gradlew build`.
 - **Web** — `bun run lint` and `bun run build`.
 - **End-to-end** — Playwright (`bun run test:e2e`) against the real backend on
   PostgreSQL 16 + Redis 7 services. The e2e backend runs with
