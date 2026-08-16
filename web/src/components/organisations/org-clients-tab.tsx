@@ -5,6 +5,7 @@ import { AppWindow, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { ClientTokenDialog } from "@/components/organisations/client-token-dialog";
 import { OrgClientDialog } from "@/components/organisations/org-client-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { CopyButton } from "@/components/shared/copy-button";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { TableSkeleton } from "@/components/shared/loading";
@@ -85,10 +86,19 @@ export function OrgClientsTab({ platformSlug, organisationSlug }: OrgClientsTabP
                 {clients.data.map((client) => {
                   const auth = authLabel(client);
                   return (
-                    <TableRow key={client.id}>
+                    <TableRow key={client.clientKey}>
                       <TableCell>
                         <p className="truncate text-sm font-medium">{client.name}</p>
-                        <p className="truncate text-xs text-muted-foreground">id {client.id}</p>
+                        <div className="flex items-center gap-1">
+                          <span className="truncate font-mono text-xs text-muted-foreground">
+                            {client.clientKey}
+                          </span>
+                          <CopyButton
+                            value={client.clientKey}
+                            label={`Copy client key for ${client.name}`}
+                            className="size-6"
+                          />
+                        </div>
                       </TableCell>
                       <TableCell>
                         <ToneBadge tone={CLIENT_TYPE_TONE[client.type]}>
@@ -185,7 +195,7 @@ export function OrgClientsTab({ platformSlug, organisationSlug }: OrgClientsTabP
         confirmLabel="Delete client"
         pending={deleteMutation.isPending}
         onConfirm={async () => {
-          if (deleting) await deleteMutation.mutateAsync(deleting.id);
+          if (deleting) await deleteMutation.mutateAsync(deleting.clientKey);
           setDeleting(null);
         }}
       />
@@ -199,7 +209,7 @@ export function OrgClientsTab({ platformSlug, organisationSlug }: OrgClientsTabP
         pending={rotateMutation.isPending}
         onConfirm={async () => {
           if (rotating) {
-            const result = await rotateMutation.mutateAsync(rotating.id);
+            const result = await rotateMutation.mutateAsync(rotating.clientKey);
             if (result.token) setToken(result.token);
           }
           setRotating(null);

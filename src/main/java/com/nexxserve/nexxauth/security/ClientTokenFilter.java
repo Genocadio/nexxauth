@@ -83,9 +83,7 @@ public class ClientTokenFilter extends OncePerRequestFilter {
             return;
         }
 
-        Long clientId = parseId(clientIdHeader);
-        OrganisationClient client = clientId == null ? null
-                : clientRepository.findById(clientId).orElse(null);
+        OrganisationClient client = clientRepository.findByClientKey(clientIdHeader.trim()).orElse(null);
         if (client == null) {
             write(response, HttpStatus.UNAUTHORIZED, "Unknown client", request.getRequestURI());
             return;
@@ -160,15 +158,6 @@ public class ClientTokenFilter extends OncePerRequestFilter {
         String portSuffix = (scheme.equals("https") && port == 443) || (scheme.equals("http") && port == 80)
                 ? "" : ":" + port;
         return scheme + "://" + host + portSuffix;
-    }
-
-    private Long parseId(String raw) {
-        try {
-            long id = Long.parseLong(raw.trim());
-            return id > 0 ? id : null;
-        } catch (NumberFormatException e) {
-            return null;
-        }
     }
 
     private void write(HttpServletResponse response, HttpStatus status, String message, String path)

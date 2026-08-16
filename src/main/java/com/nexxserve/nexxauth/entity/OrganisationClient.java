@@ -13,7 +13,8 @@ import lombok.Setter;
 
 /**
  * An external app talking to an organisation's API. Identified on requests via
- * the {@code X-Client-Id} header; auth-required clients additionally present
+ * an opaque, non-guessable {@link #getClientKey()} sent as the {@code X-Client-Id}
+ * header; auth-required clients additionally present
  * {@code Authorization: Bearer <static token>} (stored only as a SHA-256 hash).
  * See {@link ClientType} for the per-type access rules.
  */
@@ -29,6 +30,10 @@ public class OrganisationClient extends BaseEntity {
 
     @Column(name = "name", nullable = false, length = 100)
     private String name;
+
+    /** Opaque, non-guessable identifier apps send as {@code X-Client-Id}. */
+    @Column(name = "client_key", length = 64)
+    private String clientKey;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "client_type", nullable = false, length = 20)

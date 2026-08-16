@@ -65,10 +65,10 @@ public class OrganisationClientService {
     }
 
     @Transactional(readOnly = true)
-    public OrganisationClientResponse get(String platformSlug, String organisationSlug, Long clientId,
+    public OrganisationClientResponse get(String platformSlug, String organisationSlug, String clientKey,
                                           OrgActor requester) {
         Organisation organisation = resolve(platformSlug, organisationSlug, requester, false);
-        return toResponse(findClientEntity(organisation, clientId), null);
+        return toResponse(findClientEntity(organisation, clientKey), null);
     }
 
     @Transactional
@@ -85,6 +85,7 @@ public class OrganisationClientService {
 
         OrganisationClient client = clientMapper.toEntity(request);
         client.setOrganisation(organisation);
+        client.setClientKey(ClientTokens.generateKey());
         client.setRequireAuthentication(requireAuth);
         client.setEnabled(request.enabled() == null || request.enabled());
         client.setAllowedOrigins(clientMapper.joinOrigins(parseOrigins(request.allowedOrigins())));
@@ -99,10 +100,10 @@ public class OrganisationClientService {
     }
 
     @Transactional
-    public OrganisationClientResponse update(String platformSlug, String organisationSlug, Long clientId,
+    public OrganisationClientResponse update(String platformSlug, String organisationSlug, String clientKey,
                                              OrgActor requester, UpdateOrganisationClientRequest request) {
         Organisation organisation = resolve(platformSlug, organisationSlug, requester, true);
-        OrganisationClient client = findClientEntity(organisation, clientId);
+        OrganisationClient client = findClientEntity(organisation, clientKey);
 
         if (request.name() != null && !request.name().equals(client.getName())) {
             if (clientRepository.existsByOrganisationIdAndName(organisation.getId(), request.name())) {
@@ -140,16 +141,16 @@ public class OrganisationClientService {
     }
 
     @Transactional
-    public void delete(String platformSlug, String organisationSlug, Long clientId, OrgActor requester) {
+    public void delete(String platformSlug, String organisationSlug, String clientKey, OrgActor requester) {
         Organisation organisation = resolve(platformSlug, organisationSlug, requester, true);
-        clientRepository.delete(findClientEntity(organisation, clientId));
+        clientRepository.delete(findClientEntity(organisation, clientKey));
     }
 
     @Transactional
-    public OrganisationClientResponse rotateToken(String platformSlug, String organisationSlug, Long clientId,
+    public OrganisationClientResponse rotateToken(String platformSlug, String organisationSlug, String clientKey,
                                                   OrgActor requester) {
         Organisation organisation = resolve(platformSlug, organisationSlug, requester, true);
-        OrganisationClient client = findClientEntity(organisation, clientId);
+        OrganisationClient client = findClientEntity(organisation, clientKey);
         if (!client.isRequireAuthentication()) {
             throw new BadRequestException("This client does not require authentication, so it has no token");
         }
@@ -184,9 +185,9 @@ public class OrganisationClientService {
 
     // --- helpers -----------------------------------------------------------
 
-    private OrganisationClient findClientEntity(Organisation organisation, Long clientId) {
-        return clientRepository.findByIdAndOrganisationId(clientId, organisation.getId())
-                .orElseThrow(() -> ResourceNotFoundException.of("Organisation client", clientId));
+    private OrganisationClient findClientEntity(Organisation organisation, String clientKey) {
+        return clientRepository.findByClientKeyAndOrganisationId(clientKey, organisation.getId())
+                .orElseThrow(() -> ResourceNotFoundException.of("Organisation client", clientKey));
     }
 
     private Organisation resolve(String platformSlug, String organisationSlug, OrgActor requester,
@@ -245,7 +246,7 @@ public class OrganisationClientService {
     private OrganisationClientResponse toResponse(OrganisationClient client, String token) {
         OrganisationClientResponse base = clientMapper.toResponse(client);
         return new OrganisationClientResponse(
-                base.id(), base.name(), base.type(), base.requireAuthentication(),
+                base.clientKey(), base.name(), base.type(), base.requireAuthentication(),
                 base.allowedOrigins(), base.enabled(), deserializeSettings(client.getSettings()),
                 base.createdAt(), token);
     }

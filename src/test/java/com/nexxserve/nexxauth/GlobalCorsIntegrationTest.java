@@ -12,12 +12,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Global CORS allowlist ({@code app.cors.allowed-origins} /
- * {@code CORS_ALLOWED_ORIGINS}). Complements the org-level per-client CORS
+ * Global CORS allowlist: frontend origin + backend origin + extra origins
+ * ({@code app.cors.frontend-origin} / {@code app.cors.backend-origin} /
+ * {@code app.cors.extra-origins}). Complements the org-level per-client CORS
  * enforced by {@code ClientCorsFilter}: non-client browser origins are
  * restricted to the configured list.
  */
-@SpringBootTest(properties = "app.cors.allowed-origins=https://app.example.com,https://portal.example.com")
+@SpringBootTest(properties = {
+        "app.cors.frontend-origin=https://app.example.com",
+        "app.cors.backend-origin=https://api.example.com",
+        "app.cors.extra-origins=https://portal.example.com, https://third.example.com"
+})
 @AutoConfigureMockMvc
 class GlobalCorsIntegrationTest {
 
@@ -25,7 +30,7 @@ class GlobalCorsIntegrationTest {
     private MockMvc mockMvc;
 
     @Test
-    void allowsConfiguredOriginPreflight() throws Exception {
+    void allowsFrontendOriginPreflight() throws Exception {
         mockMvc.perform(options("/api/v1/auth/login")
                         .header("Origin", "https://app.example.com")
                         .header("Access-Control-Request-Method", "POST"))
@@ -35,12 +40,22 @@ class GlobalCorsIntegrationTest {
     }
 
     @Test
-    void allowsSecondConfiguredOrigin() throws Exception {
+    void allowsBackendOriginPreflight() throws Exception {
         mockMvc.perform(options("/api/v1/auth/login")
-                        .header("Origin", "https://portal.example.com")
+                        .header("Origin", "https://api.example.com")
                         .header("Access-Control-Request-Method", "POST"))
                 .andExpect(status().isOk())
-                .andExpect(header().string("Access-Control-Allow-Origin", "https://portal.example.com"));
+                .andExpect(header().string("Access-Control-Allow-Origin", "https://api.example.com"));
+    }
+
+    @Test
+    void allowsExtraOriginPreflight() throws Exception {
+        // Extra origins behave exactly like the frontend origin.
+        mockMvc.perform(options("/api/v1/auth/login")
+                        .header("Origin", "https://third.example.com")
+                        .header("Access-Control-Request-Method", "POST"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "https://third.example.com"));
     }
 
     @Test

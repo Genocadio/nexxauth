@@ -99,7 +99,7 @@ export function OrgClientDialog({
 
     if (isEdit && client) {
       await update.mutateAsync({
-        clientId: client.id,
+        clientKey: client.clientKey,
         body: {
           name: data.name,
           enabled: data.enabled,

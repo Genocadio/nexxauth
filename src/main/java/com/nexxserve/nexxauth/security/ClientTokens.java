@@ -19,6 +19,13 @@ public final class ClientTokens {
     private ClientTokens() {
     }
 
+    /** A fresh opaque client key, e.g. {@code cli_abCd...} (32 random bytes, URL-safe base64). */
+    public static String generateKey() {
+        byte[] bytes = new byte[32];
+        RANDOM.nextBytes(bytes);
+        return "cli_" + Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
     /** A fresh opaque token, e.g. {@code nx_abCd...} (32 random bytes, URL-safe base64). */
     public static String generate() {
         byte[] bytes = new byte[32];

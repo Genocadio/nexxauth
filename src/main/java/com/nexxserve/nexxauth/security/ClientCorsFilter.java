@@ -75,13 +75,12 @@ public class ClientCorsFilter extends OncePerRequestFilter {
     }
 
     private OrganisationClient findEnabledClient(String clientIdHeader) {
-        try {
-            long id = Long.parseLong(clientIdHeader.trim());
-            OrganisationClient client = clientRepository.findById(id).orElse(null);
-            return client != null && client.isEnabled() ? client : null;
-        } catch (NumberFormatException e) {
+        String key = clientIdHeader.trim();
+        if (key.isEmpty()) {
             return null;
         }
+        OrganisationClient client = clientRepository.findByClientKey(key).orElse(null);
+        return client != null && client.isEnabled() ? client : null;
     }
 
     private static boolean isPreflight(HttpServletRequest request) {

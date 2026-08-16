@@ -50,10 +50,10 @@ export const endpoints = {
       `${API_BASE_URL}/platforms/${platformSlug}/organisations/${organisationSlug}/keys/rotate`,
     clients: (organisationSlug: string) =>
       `${API_BASE_URL}/platforms/${platformSlug}/organisations/${organisationSlug}/clients`,
-    client: (organisationSlug: string, clientId: number) =>
-      `${API_BASE_URL}/platforms/${platformSlug}/organisations/${organisationSlug}/clients/${clientId}`,
-    rotateClientToken: (organisationSlug: string, clientId: number) =>
-      `${API_BASE_URL}/platforms/${platformSlug}/organisations/${organisationSlug}/clients/${clientId}/rotate-token`,
+    client: (organisationSlug: string, clientKey: string) =>
+      `${API_BASE_URL}/platforms/${platformSlug}/organisations/${organisationSlug}/clients/${clientKey}`,
+    rotateClientToken: (organisationSlug: string, clientKey: string) =>
+      `${API_BASE_URL}/platforms/${platformSlug}/organisations/${organisationSlug}/clients/${clientKey}/rotate-token`,
   }),
 
   orgAuth: (platformSlug: string) => ({

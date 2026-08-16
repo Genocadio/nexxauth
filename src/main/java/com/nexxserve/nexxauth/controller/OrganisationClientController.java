@@ -56,42 +56,42 @@ public class OrganisationClientController {
         return clientService.create(slug, organisationSlug, requester, request);
     }
 
-    @GetMapping("/{clientId}")
+    @GetMapping("/{clientKey}")
     @PreAuthorize("hasAnyRole('SUPER_USER','READ_ONLY') or hasAuthority('PERM_ORGANISATION_USER_READ')")
     public OrganisationClientResponse get(@PathVariable String slug,
                                           @PathVariable String organisationSlug,
-                                          @PathVariable Long clientId,
+                                          @PathVariable String clientKey,
                                           @AuthenticationPrincipal OrgActor requester) {
-        return clientService.get(slug, organisationSlug, clientId, requester);
+        return clientService.get(slug, organisationSlug, clientKey, requester);
     }
 
-    @PatchMapping("/{clientId}")
+    @PatchMapping("/{clientKey}")
     @PreAuthorize("hasRole('SUPER_USER')")
     public OrganisationClientResponse update(@PathVariable String slug,
                                              @PathVariable String organisationSlug,
-                                             @PathVariable Long clientId,
+                                             @PathVariable String clientKey,
                                              @AuthenticationPrincipal OrgActor requester,
                                              @Valid @RequestBody UpdateOrganisationClientRequest request) {
-        return clientService.update(slug, organisationSlug, clientId, requester, request);
+        return clientService.update(slug, organisationSlug, clientKey, requester, request);
     }
 
-    @DeleteMapping("/{clientId}")
+    @DeleteMapping("/{clientKey}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('SUPER_USER')")
     public ResponseEntity<Void> delete(@PathVariable String slug,
                                        @PathVariable String organisationSlug,
-                                       @PathVariable Long clientId,
+                                       @PathVariable String clientKey,
                                        @AuthenticationPrincipal OrgActor requester) {
-        clientService.delete(slug, organisationSlug, clientId, requester);
+        clientService.delete(slug, organisationSlug, clientKey, requester);
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/{clientId}/rotate-token")
+    @PostMapping("/{clientKey}/rotate-token")
     @PreAuthorize("hasRole('SUPER_USER')")
     public OrganisationClientResponse rotateToken(@PathVariable String slug,
                                                   @PathVariable String organisationSlug,
-                                                  @PathVariable Long clientId,
+                                                  @PathVariable String clientKey,
                                                   @AuthenticationPrincipal OrgActor requester) {
-        return clientService.rotateToken(slug, organisationSlug, clientId, requester);
+        return clientService.rotateToken(slug, organisationSlug, clientKey, requester);
     }
 }

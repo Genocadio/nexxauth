@@ -152,8 +152,8 @@ export const organisationsApi = {
   // -- clients -------------------------------------------------------------
   clients: (platformSlug: string, organisationSlug: string) =>
     get<OrganisationClientResponse[]>(endpoints.organisations(platformSlug).clients(organisationSlug), "platform"),
-  getClient: (platformSlug: string, organisationSlug: string, clientId: number) =>
-    get<OrganisationClientResponse>(endpoints.organisations(platformSlug).client(organisationSlug, clientId), "platform"),
+  getClient: (platformSlug: string, organisationSlug: string, clientKey: string) =>
+    get<OrganisationClientResponse>(endpoints.organisations(platformSlug).client(organisationSlug, clientKey), "platform"),
   createClient: (platformSlug: string, organisationSlug: string, body: CreateOrganisationClientRequest) =>
     post<OrganisationClientResponse>(
       endpoints.organisations(platformSlug).clients(organisationSlug),
@@ -163,19 +163,19 @@ export const organisationsApi = {
   updateClient: (
     platformSlug: string,
     organisationSlug: string,
-    clientId: number,
+    clientKey: string,
     body: UpdateOrganisationClientRequest,
   ) =>
     patch<OrganisationClientResponse>(
-      endpoints.organisations(platformSlug).client(organisationSlug, clientId),
+      endpoints.organisations(platformSlug).client(organisationSlug, clientKey),
       body,
       "platform",
     ),
-  deleteClient: (platformSlug: string, organisationSlug: string, clientId: number) =>
-    del<void>(endpoints.organisations(platformSlug).client(organisationSlug, clientId), "platform"),
-  rotateClientToken: (platformSlug: string, organisationSlug: string, clientId: number) =>
+  deleteClient: (platformSlug: string, organisationSlug: string, clientKey: string) =>
+    del<void>(endpoints.organisations(platformSlug).client(organisationSlug, clientKey), "platform"),
+  rotateClientToken: (platformSlug: string, organisationSlug: string, clientKey: string) =>
     post<OrganisationClientResponse>(
-      endpoints.organisations(platformSlug).rotateClientToken(organisationSlug, clientId),
+      endpoints.organisations(platformSlug).rotateClientToken(organisationSlug, clientKey),
       undefined,
       "platform",
     ),

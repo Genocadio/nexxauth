@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -28,13 +29,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Organisation clients: CRUD (with the once-only static token), per-type auth
- * rules enforced by the client token filter, and per-client CORS.
+ * rules enforced by the client token filter, and per-client CORS. Clients are
+ * identified by an opaque {@code clientKey} (sent as {@code X-Client-Id}),
+ * never the numeric id.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
 class OrganisationClientIntegrationTest {
 
     private static final String ORG_SLUG = "clients-co";
+    private static final String CLIENT_KEY_PATTERN = "cli_[A-Za-z0-9_-]{40,}";
 
     @Autowired
     private MockMvc mockMvc;
@@ -57,12 +61,13 @@ class OrganisationClientIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("Web App"))
                 .andExpect(jsonPath("$.type").value("WEB"))
+                .andExpect(jsonPath("$.clientKey").value(matchesPattern(CLIENT_KEY_PATTERN)))
                 .andExpect(jsonPath("$.requireAuthentication").value(false))
                 .andExpect(jsonPath("$.enabled").value(true))
                 .andExpect(jsonPath("$.allowedOrigins[0]").value("https://app.example.com"))
                 .andExpect(jsonPath("$.token").value(nullValue()))
                 .andReturn();
-        long webId = id(web);
+        String webKey = clientKey(web);
 
         // server client: always authenticated, token shown exactly once
         MvcResult server = mockMvc.perform(post(clients)
@@ -75,7 +80,7 @@ class OrganisationClientIntegrationTest {
                 .andExpect(jsonPath("$.token").isNotEmpty())
                 .andReturn();
         JsonNode serverJson = objectMapper.readTree(server.getResponse().getContentAsString());
-        long serverId = serverJson.get("id").asLong();
+        String serverKey = serverJson.get("clientKey").asText();
         String serverToken = serverJson.get("token").asText();
 
         // list: both present, no token leaks
@@ -84,12 +89,12 @@ class OrganisationClientIntegrationTest {
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].token").value(nullValue()));
 
-        mockMvc.perform(get(clients + "/" + webId).header("Authorization", bearer(boss)))
+        mockMvc.perform(get(clients + "/" + webKey).header("Authorization", bearer(boss)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Web App"));
 
         // update: name, origins, disable
-        mockMvc.perform(patch(clients + "/" + webId)
+        mockMvc.perform(patch(clients + "/" + webKey)
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "Web App v2", "enabled", false,
@@ -101,7 +106,7 @@ class OrganisationClientIntegrationTest {
                 .andExpect(jsonPath("$.token").value(nullValue()));
 
         // rotate: fresh token, shown once again
-        MvcResult rotated = mockMvc.perform(post(clients + "/" + serverId + "/rotate-token")
+        MvcResult rotated = mockMvc.perform(post(clients + "/" + serverKey + "/rotate-token")
                         .header("Authorization", bearer(boss)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").isNotEmpty())
@@ -112,18 +117,18 @@ class OrganisationClientIntegrationTest {
         // rotating changes the accepted token
         String users = usersPath(platform);
         mockMvc.perform(get(users)
-                        .header("X-Client-Id", String.valueOf(serverId))
+                        .header("X-Client-Id", serverKey)
                         .header("Authorization", bearer(serverToken)))
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(get(users)
-                        .header("X-Client-Id", String.valueOf(serverId))
+                        .header("X-Client-Id", serverKey)
                         .header("Authorization", bearer(rotatedToken)))
                 .andExpect(status().isOk());
 
         // delete
-        mockMvc.perform(delete(clients + "/" + webId).header("Authorization", bearer(boss)))
+        mockMvc.perform(delete(clients + "/" + webKey).header("Authorization", bearer(boss)))
                 .andExpect(status().isNoContent());
-        mockMvc.perform(get(clients + "/" + webId).header("Authorization", bearer(boss)))
+        mockMvc.perform(get(clients + "/" + webKey).header("Authorization", bearer(boss)))
                 .andExpect(status().isNotFound());
     }
 
@@ -154,10 +159,10 @@ class OrganisationClientIntegrationTest {
                 .andExpect(jsonPath("$.requireAuthentication").value(false))
                 .andExpect(jsonPath("$.token").value(nullValue()))
                 .andReturn();
-        long appId = id(app);
+        String appKey = clientKey(app);
 
         // toggling auth on for an app issues a token once
-        mockMvc.perform(patch(clients + "/" + appId)
+        mockMvc.perform(patch(clients + "/" + appKey)
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("requireAuthentication", true))))
@@ -166,7 +171,7 @@ class OrganisationClientIntegrationTest {
                 .andExpect(jsonPath("$.token").isNotEmpty());
 
         // toggling it back off clears the token
-        mockMvc.perform(patch(clients + "/" + appId)
+        mockMvc.perform(patch(clients + "/" + appKey)
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("requireAuthentication", false))))
@@ -175,13 +180,13 @@ class OrganisationClientIntegrationTest {
                 .andExpect(jsonPath("$.token").value(nullValue()));
 
         // the type is immutable: an unrelated update leaves it unchanged
-        mockMvc.perform(get(clients + "/" + appId).header("Authorization", bearer(boss)))
+        mockMvc.perform(get(clients + "/" + appKey).header("Authorization", bearer(boss)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.type").value("IOS"))
                 .andExpect(jsonPath("$.requireAuthentication").value(false));
 
         // rotating a token for a non-auth client is rejected
-        mockMvc.perform(post(clients + "/" + appId + "/rotate-token")
+        mockMvc.perform(post(clients + "/" + appKey + "/rotate-token")
                         .header("Authorization", bearer(boss)))
                 .andExpect(status().isBadRequest());
     }
@@ -196,65 +201,65 @@ class OrganisationClientIntegrationTest {
         String orgRegister = "/api/v1/platforms/" + platform + "/auth/register";
         String orgRefresh = "/api/v1/platforms/" + platform + "/auth/refresh";
 
-        long webId = createClient(boss, clients, "Web", "WEB", null);
-        long disabledId = createClient(boss, clients, "Disabled", "WEB", Map.of("enabled", false));
+        String webKey = createClient(boss, clients, "Web", "WEB", null);
+        String disabledKey = createClient(boss, clients, "Disabled", "WEB", Map.of("enabled", false));
         Client server = createTokenClient(boss, clients, "Server", "SERVER");
-        long noAuthAppId = createClient(boss, clients, "App", "ANDROID", null);
+        String noAuthAppKey = createClient(boss, clients, "App", "ANDROID", null);
         Client authApp = createTokenClient(boss, clients, "App Auth", "IOS");
 
         // non-auth clients may only hit org login/register
         mockMvc.perform(post(orgLogin)
-                        .header("X-Client-Id", String.valueOf(webId))
+                        .header("X-Client-Id", webKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isBadRequest());
         mockMvc.perform(post(orgRegister)
-                        .header("X-Client-Id", String.valueOf(webId))
+                        .header("X-Client-Id", webKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isBadRequest());
 
-        mockMvc.perform(get(users).header("X-Client-Id", String.valueOf(webId)))
+        mockMvc.perform(get(users).header("X-Client-Id", webKey))
                 .andExpect(status().isForbidden());
         mockMvc.perform(post(orgRefresh)
-                        .header("X-Client-Id", String.valueOf(webId))
+                        .header("X-Client-Id", webKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(get(users).header("X-Client-Id", String.valueOf(noAuthAppId)))
+        mockMvc.perform(get(users).header("X-Client-Id", noAuthAppKey))
                 .andExpect(status().isForbidden());
 
         // unknown / disabled clients are rejected up front
-        mockMvc.perform(get(users).header("X-Client-Id", "999999"))
+        mockMvc.perform(get(users).header("X-Client-Id", "cli_unknown"))
                 .andExpect(status().isUnauthorized());
-        mockMvc.perform(get(users).header("X-Client-Id", "not-a-number"))
+        mockMvc.perform(get(users).header("X-Client-Id", "cli_another-missing"))
                 .andExpect(status().isUnauthorized());
-        mockMvc.perform(get(users).header("X-Client-Id", String.valueOf(disabledId)))
+        mockMvc.perform(get(users).header("X-Client-Id", disabledKey))
                 .andExpect(status().isForbidden());
 
         // auth clients need their token
-        mockMvc.perform(get(users).header("X-Client-Id", String.valueOf(server.id)))
+        mockMvc.perform(get(users).header("X-Client-Id", server.clientKey))
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(get(users)
-                        .header("X-Client-Id", String.valueOf(server.id))
+                        .header("X-Client-Id", server.clientKey)
                         .header("Authorization", bearer("nx_wrong")))
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(get(users)
-                        .header("X-Client-Id", String.valueOf(server.id))
+                        .header("X-Client-Id", server.clientKey)
                         .header("Authorization", bearer(server.token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
 
         // an auth-capable app works the same once its auth is on
         mockMvc.perform(get(users)
-                        .header("X-Client-Id", String.valueOf(authApp.id))
+                        .header("X-Client-Id", authApp.clientKey)
                         .header("Authorization", bearer(authApp.token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
 
         // an authenticated client can still hit org auth endpoints
         mockMvc.perform(post(orgLogin)
-                        .header("X-Client-Id", String.valueOf(server.id))
+                        .header("X-Client-Id", server.clientKey)
                         .header("Authorization", bearer(server.token))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
@@ -263,7 +268,7 @@ class OrganisationClientIntegrationTest {
         // clients are scoped to their own organisation
         createOrg(boss, "other-co");
         mockMvc.perform(get("/api/v1/platforms/" + platform + "/organisations/other-co/users")
-                        .header("X-Client-Id", String.valueOf(server.id))
+                        .header("X-Client-Id", server.clientKey)
                         .header("Authorization", bearer(server.token)))
                 .andExpect(status().isForbidden());
     }
@@ -276,7 +281,7 @@ class OrganisationClientIntegrationTest {
         String users = usersPath(platform);
         String orgAuth = "/api/v1/platforms/" + platform + "/auth";
 
-        long webId = createClient(boss, clients, "Web", "WEB", null);
+        String webKey = createClient(boss, clients, "Web", "WEB", null);
         String orgPath = "/api/v1/platforms/" + platform + "/organisations/" + ORG_SLUG;
         long orgId = objectMapper.readTree(mockMvc.perform(get(orgPath)
                         .header("Authorization", bearer(boss)))
@@ -309,18 +314,18 @@ class OrganisationClientIntegrationTest {
                 .andReturn().getResponse().getContentAsString()).get("accessToken").asText();
 
         // the web client alone is still blocked from the org API
-        mockMvc.perform(get(users).header("X-Client-Id", String.valueOf(webId)))
+        mockMvc.perform(get(users).header("X-Client-Id", webKey))
                 .andExpect(status().isForbidden());
 
         // but with a valid org-user JWT, the user proceeds under their own roles
         mockMvc.perform(get(users)
-                        .header("X-Client-Id", String.valueOf(webId))
+                        .header("X-Client-Id", webKey)
                         .header("Authorization", bearer(aliceToken)))
                 .andExpect(status().isOk());
 
         // a disabled/unknown org-user token is still blocked (no org auth set)
         mockMvc.perform(get(users)
-                        .header("X-Client-Id", String.valueOf(webId))
+                        .header("X-Client-Id", webKey)
                         .header("Authorization", bearer("nx_not-a-real-token")))
                 .andExpect(status().isForbidden());
     }
@@ -398,14 +403,14 @@ class OrganisationClientIntegrationTest {
         String platform = createOrg(boss, ORG_SLUG);
         String clients = clientsPath(platform);
 
-        long webId = createClient(boss, clients, "Web", "WEB",
+        String webKey = createClient(boss, clients, "Web", "WEB",
                 Map.of("allowedOrigins", List.of("https://app.example.com")));
-        long serverId = createClient(boss, clients, "Server", "SERVER",
+        String serverKey = createClient(boss, clients, "Server", "SERVER",
                 Map.of("allowedOrigins", List.of("https://svc.example.com")));
 
         // matching preflight -> 200 with CORS headers, no auth involved
         mockMvc.perform(options("/api/v1/platforms/" + platform + "/auth/login")
-                        .header("X-Client-Id", String.valueOf(webId))
+                        .header("X-Client-Id", webKey)
                         .header("Origin", "https://app.example.com")
                         .header("Access-Control-Request-Method", "POST"))
                 .andExpect(status().isOk())
@@ -415,14 +420,14 @@ class OrganisationClientIntegrationTest {
 
         // non-matching origin -> no CORS headers
         mockMvc.perform(options("/api/v1/platforms/" + platform + "/auth/login")
-                        .header("X-Client-Id", String.valueOf(webId))
+                        .header("X-Client-Id", webKey)
                         .header("Origin", "https://evil.example.com")
                         .header("Access-Control-Request-Method", "POST"))
                 .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
 
         // actual request echoes the allowed origin
         mockMvc.perform(post("/api/v1/platforms/" + platform + "/auth/login")
-                        .header("X-Client-Id", String.valueOf(webId))
+                        .header("X-Client-Id", webKey)
                         .header("Origin", "https://app.example.com")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
@@ -431,7 +436,7 @@ class OrganisationClientIntegrationTest {
 
         // CORS applies to server clients too (trusted origins)
         mockMvc.perform(options("/api/v1/platforms/" + platform + "/organisations/" + ORG_SLUG + "/users")
-                        .header("X-Client-Id", String.valueOf(serverId))
+                        .header("X-Client-Id", serverKey)
                         .header("Origin", "https://svc.example.com")
                         .header("Access-Control-Request-Method", "GET"))
                 .andExpect(status().isOk())
@@ -471,15 +476,15 @@ class OrganisationClientIntegrationTest {
         return platformSlug;
     }
 
-    private long createClient(String boss, String clients, String name, String type,
-                              Map<String, Object> extra) throws Exception {
+    private String createClient(String boss, String clients, String name, String type,
+                                Map<String, Object> extra) throws Exception {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("name", name);
         body.put("type", type);
         if (extra != null) {
             body.putAll(extra);
         }
-        return id(mockMvc.perform(post(clients)
+        return clientKey(mockMvc.perform(post(clients)
                 .header("Authorization", bearer(boss))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json(body)))
@@ -495,10 +500,10 @@ class OrganisationClientIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn();
         JsonNode node = objectMapper.readTree(result.getResponse().getContentAsString());
-        return new Client(node.get("id").asLong(), node.get("token").asText());
+        return new Client(node.get("clientKey").asText(), node.get("token").asText());
     }
 
-    private record Client(long id, String token) {
+    private record Client(String clientKey, String token) {
     }
 
     private String clientsPath(String platformSlug) {
@@ -509,8 +514,8 @@ class OrganisationClientIntegrationTest {
         return "/api/v1/platforms/" + platformSlug + "/organisations/" + ORG_SLUG + "/users";
     }
 
-    private long id(MvcResult result) throws Exception {
-        return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
+    private String clientKey(MvcResult result) throws Exception {
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("clientKey").asText();
     }
 
     private String bearer(String token) {

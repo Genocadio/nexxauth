@@ -7,12 +7,13 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A client's configuration. {@code token} is only ever present on create and
+ * A client's configuration. {@code clientKey} is the opaque identifier apps
+ * send as {@code X-Client-Id}. {@code token} is only ever present on create and
  * rotate responses (the static token is shown exactly once); all other
  * responses carry {@code null} so it never leaks.
  */
 public record OrganisationClientResponse(
-        Long id,
+        String clientKey,
         String name,
         ClientType type,
         boolean requireAuthentication,

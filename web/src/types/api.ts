@@ -121,7 +121,7 @@ export interface OrganisationKeyResponse {
 }
 
 export interface OrganisationClientResponse {
-  id: number;
+  clientKey: string;
   name: string;
   type: ClientType;
   requireAuthentication: boolean;

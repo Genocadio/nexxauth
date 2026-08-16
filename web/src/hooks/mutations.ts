@@ -267,25 +267,25 @@ export function useCreateOrgClient(platformSlug: string, organisationSlug: strin
 }
 
 export function useUpdateOrgClient(platformSlug: string, organisationSlug: string) {
-  return useApiMutation<OrganisationClientResponse, { clientId: number; body: UpdateOrganisationClientRequest }>({
-    mutationFn: ({ clientId, body }) =>
-      organisationsApi.updateClient(platformSlug, organisationSlug, clientId, body),
+  return useApiMutation<OrganisationClientResponse, { clientKey: string; body: UpdateOrganisationClientRequest }>({
+    mutationFn: ({ clientKey, body }) =>
+      organisationsApi.updateClient(platformSlug, organisationSlug, clientKey, body),
     invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgClients(organisationSlug) })],
     successMessage: "Client updated",
   });
 }
 
 export function useDeleteOrgClient(platformSlug: string, organisationSlug: string) {
-  return useApiMutation<void, number>({
-    mutationFn: (clientId) => organisationsApi.deleteClient(platformSlug, organisationSlug, clientId),
+  return useApiMutation<void, string>({
+    mutationFn: (clientKey) => organisationsApi.deleteClient(platformSlug, organisationSlug, clientKey),
     invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgClients(organisationSlug) })],
     successMessage: "Client deleted",
   });
 }
 
 export function useRotateOrgClientToken(platformSlug: string, organisationSlug: string) {
-  return useApiMutation<OrganisationClientResponse, number>({
-    mutationFn: (clientId) => organisationsApi.rotateClientToken(platformSlug, organisationSlug, clientId),
+  return useApiMutation<OrganisationClientResponse, string>({
+    mutationFn: (clientKey) => organisationsApi.rotateClientToken(platformSlug, organisationSlug, clientKey),
     invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgClients(organisationSlug) })],
     successMessage: "Client token rotated",
   });
