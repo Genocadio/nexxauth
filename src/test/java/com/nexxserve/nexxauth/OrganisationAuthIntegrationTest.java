@@ -38,7 +38,7 @@ class OrganisationAuthIntegrationTest {
 
     // Each test registers its own platform (unique slug) because all tests
     // share one database; a shared slug would 409 on the second registration.
-    private static final String[] SLUGS = {"orgauth1", "orgauth2", "orgauth3", "orgauth4", "orgauth5", "orgauth6", "orgauth7", "orgauth8", "orgauth9", "orgauth10", "orgauth11", "orgauth12", "orgauth13", "orgauth14", "orgauth15", "orgauth16"};
+    private static final String[] SLUGS = {"orgauth1", "orgauth2", "orgauth3", "orgauth4", "orgauth5", "orgauth6", "orgauth7", "orgauth8", "orgauth9", "orgauth10", "orgauth11", "orgauth12", "orgauth13", "orgauth14", "orgauth15", "orgauth16", "orgauth17"};
     private static final String ORG_SLUG = "oa-org";
 
     @Autowired
@@ -415,6 +415,61 @@ class OrganisationAuthIntegrationTest {
                                 "password", "orgpass1",
                                 "firstName", "G", "lastName", "R"))))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    void defaultRolesAreInheritedOnRegisterAndUserResponsesNeverExposePermissions() throws Exception {
+        String platform = "/" + SLUGS[16];
+        String org = platform + "/organisations/" + ORG_SLUG;
+        String orgAuth = platform + "/auth";
+        String boss = registerPlatform("orgauth-default-boss@nexx.io", SLUGS[16]);
+        createOrganisation(boss, platform);
+        long orgId = getOrgId(boss, org);
+
+        // boss marks "Member" as default (with READ) and leaves "Support" unmarked
+        long memberRole = createRole(boss, org, "Member", true,
+                "ORGANISATION_USER_READ");
+        createRole(boss, org, "Support", false);
+
+        // role responses carry the flag; the marked role is the default one
+        mockMvc.perform(get(org + "/roles").header("Authorization", bearer(boss)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].isDefault").value(true))
+                .andExpect(jsonPath("$[1].isDefault").value(false));
+
+        // a registered user inherits the default role automatically
+        MvcResult reg = mockMvc.perform(post(orgAuth + "/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "organisationId", orgId,
+                                "username", "newbie",
+                                "password", "orgpass1",
+                                "firstName", "N", "lastName", "B"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.user.roles.length()").value(1))
+                .andExpect(jsonPath("$.user.roles[0].id").value(memberRole))
+                .andExpect(jsonPath("$.user.roles[0].name").value("Member"))
+                // user responses carry roles only - never permissions
+                .andExpect(jsonPath("$.user.roles[0].permissions").doesNotExist())
+                .andReturn();
+
+        // the access token carries the inherited role name too
+        String token = objectMapper.readTree(reg.getResponse().getContentAsString()).get("accessToken").asText();
+        JsonNode claims = decodeClaims(token);
+        assertEquals(1, claims.get("roles").size());
+        assertEquals("Member", claims.get("roles").get(0).asText());
+
+        // and the inherited permission is live: the user can list users
+        mockMvc.perform(get(org + "/users").header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+
+        // the user response from the users endpoint is equally permission-free
+        mockMvc.perform(get(org + "/users/me").header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.roles[0].name").value("Member"))
+                .andExpect(jsonPath("$.roles[0].permissions").doesNotExist());
     }
 
     @Test
@@ -842,10 +897,21 @@ class OrganisationAuthIntegrationTest {
     }
 
     private long createRole(String boss, String org, String name, String... permissions) throws Exception {
+        return createRole(boss, org, name, null, permissions);
+    }
+
+    private long createRole(String boss, String org, String name, Boolean isDefault,
+                            String... permissions) throws Exception {
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("name", name);
+        body.put("permissions", List.of(permissions));
+        if (isDefault != null) {
+            body.put("isDefault", isDefault);
+        }
         MvcResult result = mockMvc.perform(post(org + "/roles")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("name", name, "permissions", List.of(permissions)))))
+                        .content(json(body)))
                 .andExpect(status().isCreated())
                 .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();

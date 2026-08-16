@@ -79,6 +79,15 @@ export interface OrganisationRoleResponse {
   id: number;
   name: string;
   permissions: Permission[];
+  /** When true, new users of the org inherit this role automatically on register. */
+  isDefault: boolean;
+}
+
+/** A role as it appears on a user object: id + name only — permissions are
+ * never exposed on user responses (they are resolved server-side). */
+export interface OrganisationUserRoleResponse {
+  id: number;
+  name: string;
 }
 
 export interface OrganisationUserResponse {
@@ -90,7 +99,7 @@ export interface OrganisationUserResponse {
   phone: string | null;
   enabled: boolean;
   authType: AuthType | null;
-  roles: OrganisationRoleResponse[];
+  roles: OrganisationUserRoleResponse[];
   createdAt: IsoDate;
   /** Values of the org's configured user fields, keyed by field key. */
   metadata: Record<string, string> | null;

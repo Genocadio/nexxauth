@@ -42,7 +42,7 @@ class OrganisationRbacIntegrationTest {
         String boss = register("rbac-boss@nexx.io", "RBAC Roles Platform", "rbac-roles");
         createOrganisation(boss, ROLE_PLATFORM);
 
-        // create a role with permissions
+        // create a role with permissions; default is off unless asked
         MvcResult created = mockMvc.perform(post(ROLE_PLATFORM + "/roles")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -51,8 +51,27 @@ class OrganisationRbacIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("Admin"))
                 .andExpect(jsonPath("$.permissions.length()").value(2))
+                .andExpect(jsonPath("$.isDefault").value(false))
                 .andReturn();
         long adminRoleId = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
+
+        // a role created as default reports isDefault=true and can be toggled off
+        MvcResult defaultRole = mockMvc.perform(post(ROLE_PLATFORM + "/roles")
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("name", "Defaulted",
+                                "permissions", java.util.List.of("ORGANISATION_USER_READ"),
+                                "isDefault", true))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.isDefault").value(true))
+                .andReturn();
+        long defaultRoleId = objectMapper.readTree(defaultRole.getResponse().getContentAsString()).get("id").asLong();
+        mockMvc.perform(patch(ROLE_PLATFORM + "/roles/" + defaultRoleId)
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("isDefault", false))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isDefault").value(false));
 
         // a role with no permissions is valid
         MvcResult viewer = mockMvc.perform(post(ROLE_PLATFORM + "/roles")
@@ -67,7 +86,7 @@ class OrganisationRbacIntegrationTest {
         // list + get
         mockMvc.perform(get(ROLE_PLATFORM + "/roles").header("Authorization", bearer(boss)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2));
+                .andExpect(jsonPath("$.length()").value(3));
         mockMvc.perform(get(ROLE_PLATFORM + "/roles/" + viewerRoleId).header("Authorization", bearer(boss)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Viewer"));
@@ -118,6 +137,8 @@ class OrganisationRbacIntegrationTest {
                 .andExpect(jsonPath("$.email").value("jane@acme.io"))
                 .andExpect(jsonPath("$.roles.length()").value(1))
                 .andExpect(jsonPath("$.roles[0].name").value("Admin"))
+                // user responses carry roles only - never permissions
+                .andExpect(jsonPath("$.roles[0].permissions").doesNotExist())
                 .andReturn();
         long userId = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
 

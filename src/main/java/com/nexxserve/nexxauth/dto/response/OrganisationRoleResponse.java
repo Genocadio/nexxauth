@@ -7,6 +7,9 @@ import java.util.Set;
 public record OrganisationRoleResponse(
         Long id,
         String name,
-        Set<Permission> permissions
+        Set<Permission> permissions,
+        /** When true, new users of the organisation inherit this role
+         * automatically on register. */
+        boolean isDefault
 ) {
 }

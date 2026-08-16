@@ -199,7 +199,10 @@ X-Client-Id: cli_...            # when present, its organisation is authoritativ
      is encoded, `passwordChangedAt` stamped, `authType` set to `PASSWORD`. When
      password auth is disabled a password is optional (the user gets no auth
      until a method is enabled).
-   - user saved with **no roles**, audit `ORG_REGISTER`. An optional `metadata`
+   - user saved with **the organisation's default roles** — every role marked
+     `isDefault` on the org is assigned automatically, none when no role is
+     marked default (roles are only ever returned on user objects as id + name;
+     permissions stay server-side). Audit `ORG_REGISTER`. An optional `metadata`
      map is validated and stored (see §15) — keys must be fields the org has
      defined.
 5. **Org tokens issued** — access token signed with the org's **active RSA key**

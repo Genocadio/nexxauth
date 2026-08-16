@@ -147,6 +147,7 @@ const permissionEnum = z.enum([
 export const roleSchema = z.object({
   name: requiredName(100, "Role name"),
   permissions: z.array(permissionEnum),
+  isDefault: z.boolean(),
 });
 
 // ---------------------------------------------------------------------------

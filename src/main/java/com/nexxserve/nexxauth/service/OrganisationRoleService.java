@@ -65,6 +65,7 @@ public class OrganisationRoleService {
         }
         OrganisationRole role = roleMapper.toEntity(request);
         role.setOrganisation(organisation);
+        role.setDefaultRole(Boolean.TRUE.equals(request.isDefault()));
         rejectNullPermissions(request.permissions());
         return roleMapper.toResponse(roleRepository.save(role));
     }
@@ -85,6 +86,9 @@ public class OrganisationRoleService {
         if (request.permissions() != null) {
             rejectNullPermissions(request.permissions());
             role.setPermissions(request.permissions());
+        }
+        if (request.isDefault() != null) {
+            role.setDefaultRole(request.isDefault());
         }
         return roleMapper.toResponse(roleRepository.save(role));
     }

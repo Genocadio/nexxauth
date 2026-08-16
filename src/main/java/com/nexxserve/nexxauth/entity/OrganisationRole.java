@@ -34,6 +34,11 @@ public class OrganisationRole extends BaseEntity {
     @Column(name = "name", nullable = false, length = 100)
     private String name;
 
+    /** When true, new users of the organisation inherit this role automatically
+     * on register (default off; can be turned on per role). */
+    @Column(name = "is_default", nullable = false)
+    private boolean defaultRole;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "organisation_role_permissions",
             joinColumns = @JoinColumn(name = "organisation_role_id"))

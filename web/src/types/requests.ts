@@ -163,11 +163,15 @@ export interface UpdateOrganisationUserRequest {
 export interface CreateOrganisationRoleRequest {
   name: string;
   permissions?: Permission[];
+  /** When true, new users of the org inherit this role automatically on register. */
+  isDefault?: boolean;
 }
 
 export interface UpdateOrganisationRoleRequest {
   name?: string;
   permissions?: Permission[];
+  /** Toggles automatic inheritance of this role by new users. */
+  isDefault?: boolean;
 }
 
 // ---------------------------------------------------------------------------

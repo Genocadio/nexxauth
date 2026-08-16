@@ -7,6 +7,7 @@ import com.nexxserve.nexxauth.entity.AuthType;
 import com.nexxserve.nexxauth.entity.OrgIdentifierType;
 import com.nexxserve.nexxauth.entity.Organisation;
 import com.nexxserve.nexxauth.entity.OrganisationClient;
+import com.nexxserve.nexxauth.entity.OrganisationRole;
 import com.nexxserve.nexxauth.entity.OrganisationSigningKey;
 import com.nexxserve.nexxauth.entity.OrganisationUser;
 import com.nexxserve.nexxauth.entity.OrgUserAction;
@@ -20,6 +21,7 @@ import com.nexxserve.nexxauth.exception.ResourceNotFoundException;
 import com.nexxserve.nexxauth.mapper.OrganisationUserMapper;
 import com.nexxserve.nexxauth.repository.OrganisationClientRepository;
 import com.nexxserve.nexxauth.repository.OrganisationRepository;
+import com.nexxserve.nexxauth.repository.OrganisationRoleRepository;
 import com.nexxserve.nexxauth.repository.OrganisationUserRepository;
 import com.nexxserve.nexxauth.security.AuthTiming;
 import com.nexxserve.nexxauth.security.OrgJwtService;
@@ -46,6 +48,7 @@ public class OrganisationAuthService {
     private final PlatformAccess platformAccess;
     private final OrganisationRepository organisationRepository;
     private final OrganisationClientRepository clientRepository;
+    private final OrganisationRoleRepository roleRepository;
     private final OrganisationUserRepository userRepository;
     private final OrganisationRefreshTokenService refreshTokenService;
     private final OrgJwtService orgJwtService;
@@ -61,6 +64,7 @@ public class OrganisationAuthService {
 
     public OrganisationAuthService(PlatformAccess platformAccess, OrganisationRepository organisationRepository,
                                    OrganisationClientRepository clientRepository,
+                                   OrganisationRoleRepository roleRepository,
                                    OrganisationUserRepository userRepository,
                                    OrganisationRefreshTokenService refreshTokenService, OrgJwtService orgJwtService,
                                    OrgKeyService orgKeyService,
@@ -72,6 +76,7 @@ public class OrganisationAuthService {
         this.platformAccess = platformAccess;
         this.organisationRepository = organisationRepository;
         this.clientRepository = clientRepository;
+        this.roleRepository = roleRepository;
         this.userRepository = userRepository;
         this.refreshTokenService = refreshTokenService;
         this.orgJwtService = orgJwtService;
@@ -134,6 +139,8 @@ public class OrganisationAuthService {
         }
         OrganisationUser saved = userRepository.save(user);
         applyRegisterMetadata(request, saved);
+        // Roles marked as default are inherited automatically on register.
+        assignDefaultRoles(organisation, saved);
         audit.log(AuthAuditService.ORG_REGISTER, identifierOf(saved), organisation.getSlug());
         return issueTokens(saved);
     }
@@ -217,6 +224,18 @@ public class OrganisationAuthService {
                 audit.log(AuthAuditService.ORG_LOGOUT,
                         identifierOf(user), user.getOrganisation().getSlug()));
         refreshTokenService.revoke(rawRefreshToken);
+    }
+
+    /** Assigns every role the organisation marked as default to the newly
+     * registered user. The user stays managed, so the collection change is
+     * flushed with the transaction. */
+    private void assignDefaultRoles(Organisation organisation, OrganisationUser user) {
+        List<OrganisationRole> defaults =
+                roleRepository.findByOrganisationIdAndDefaultRoleTrue(organisation.getId());
+        if (!defaults.isEmpty()) {
+            // Mutable set: Hibernate syncs the join table against it on flush.
+            user.setRoles(new java.util.HashSet<>(defaults));
+        }
     }
 
     private String identifierOf(OrganisationUser user) {

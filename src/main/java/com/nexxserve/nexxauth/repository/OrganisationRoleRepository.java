@@ -17,4 +17,8 @@ public interface OrganisationRoleRepository extends JpaRepository<OrganisationRo
 
     /** Roles that belong to the given organisation (guards against cross-org assignment). */
     Set<OrganisationRole> findByIdInAndOrganisationId(Set<Long> ids, Long organisationId);
+
+    /** Roles marked as default — new users of the organisation inherit them on
+     * register. */
+    List<OrganisationRole> findByOrganisationIdAndDefaultRoleTrue(Long organisationId);
 }

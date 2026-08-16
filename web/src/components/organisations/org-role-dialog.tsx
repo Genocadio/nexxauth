@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { useCreateOrgRole, useUpdateOrgRole } from "@/hooks/mutations";
 import { useForm } from "@/hooks/use-form";
 import { roleSchema } from "@/lib/validation";
@@ -37,20 +38,21 @@ export function OrgRoleDialog({ platformSlug, organisationSlug, open, onOpenChan
   const form = useForm(roleSchema, {
     name: role?.name ?? "",
     permissions: role?.permissions ?? ([] as Permission[]),
+    isDefault: role?.isDefault ?? false,
   });
 
   useEffect(() => {
     if (!open) return;
-    form.setValues({ name: role?.name ?? "", permissions: role?.permissions ?? [] });
+    form.setValues({ name: role?.name ?? "", permissions: role?.permissions ?? [], isDefault: role?.isDefault ?? false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, role]);
 
   const submit = async () => {
     const data = form.values;
     if (isEdit && role) {
-      await update.mutateAsync({ roleId: role.id, body: { name: data.name, permissions: data.permissions } });
+      await update.mutateAsync({ roleId: role.id, body: { name: data.name, permissions: data.permissions, isDefault: data.isDefault } });
     } else {
-      await create.mutateAsync({ name: data.name, permissions: data.permissions });
+      await create.mutateAsync({ name: data.name, permissions: data.permissions, isDefault: data.isDefault });
     }
     onOpenChange(false);
   };
@@ -78,6 +80,12 @@ export function OrgRoleDialog({ platformSlug, organisationSlug, open, onOpenChan
               selected={form.values.permissions}
               onChange={(permissions) => form.setValue("permissions", permissions)}
             />
+          </FormField>
+          <FormField label="Default role" hint="New users of this organisation inherit this role automatically on register.">
+            <label className="flex items-center justify-between gap-4 rounded-lg border p-3">
+              <span className="text-sm">Assign to new users on register</span>
+              <Switch checked={form.values.isDefault} onCheckedChange={(v) => form.setValue("isDefault", v)} />
+            </label>
           </FormField>
           {form.submitError ? (
             <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">

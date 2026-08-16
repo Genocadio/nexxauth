@@ -9,6 +9,9 @@ and how to refresh tokens.
 - [3. Client identity](#3-client-identity)
 - [4. Organisation authentication](#4-organisation-authentication)
 - [5. Accessing the organisation API](#5-accessing-the-organisation-api)
+  - [5.1 Endpoint reference](#51-endpoint-reference)
+  - [5.2 Default-deny without a client](#52-default-deny-without-a-client)
+  - [5.3 CORS for browser apps](#53-cors-for-browser-apps)
 - [6. Verifying organisation tokens (public key)](#6-verifying-organisation-tokens-public-key)
 - [7. Refreshing tokens](#7-refreshing-tokens)
 - [8. Platform (admin) tokens — brief](#8-platform-admin-tokens--brief)
@@ -150,6 +153,10 @@ provide one. `password` must satisfy the organisation's password policy (see
 `auth-config`); when password authentication is disabled for the organisation
 a password is not required.
 
+`metadata` is optional. Its keys must be user fields the organisation has
+defined (`GET .../user-fields`), and each value is validated/normalized per
+that field's type (see §5) — unknown keys or invalid values are a 400.
+
 ### 4.2 Login
 
 ```http
@@ -191,15 +198,12 @@ Content-Type: application/json
     "lastName": "Example",
     "username": "alice",
     "email": null,
+    "phone": "+15551234567",
     "enabled": true,
     "temporaryPassword": false,
     "authType": "PASSWORD",
     "roles": [
-      {
-        "id": 3,
-        "name": "admin",
-        "permissions": ["ORGANISATION_USER_READ", "ORGANISATION_USER_CREATE"]
-      }
+      { "id": 3, "name": "admin" }
     ],
     "createdAt": "2026-01-01T00:00:00Z",
     "metadata": { "department": "engineering" }
@@ -213,13 +217,13 @@ Content-Type: application/json
 | `accessToken` | the **RS256 JWT** to send as `Authorization: Bearer …` (validated in [§6](#6-verifying-organisation-tokens-public-key)) |
 | `refreshToken` | **opaque** (not a JWT); single-use. `null` while a gating action is pending |
 | `expiresInSeconds` | access token lifetime in seconds |
-| `user.roles` | roles with their permissions — safe to render UI from; enforcement is server-side |
+| `user.roles` | roles the user holds — **id + name only, never permissions** (permissions are resolved server-side on every request) |
 | `actions` | pending org-user actions: `CHANGE_PASSWORD` (gating) and `UPDATE_PROFILE` (advisory) |
 
 > **Gating actions.** When `CHANGE_PASSWORD` is pending (the account has a
 > temporary password), `refreshToken` is `null`, the access token is capped at
 > 5 minutes, and the only reachable org endpoint is
-> `PATCH /users/me/change-password` until the user changes the password.
+> `POST /users/me/change-password` until the user changes the password.
 
 ### 4.4 Logout
 
@@ -250,17 +254,78 @@ X-Client-Id: cli_AbCdEfGhIjKlMnOpQrStUvWxYz1234567890_ab
 Authorization: Bearer eyJhbGciOiJSUzI1NiIs...
 ```
 
-Access is controlled server-side: a client with a static token acts with
-`ORG_USER` + every org permission; a user JWT acts under the roles resolved for
-that user at request time. Available sub-resources include `users`, `roles`,
-`user-fields`, `auth-config`, `session-settings`, `clients`, and `keys`.
+Access is controlled server-side. Three actor kinds reach the org API, all
+scoped to the organisation in the path:
 
-### CORS for browser apps
+| Actor | Authenticated as | Authority |
+|---|---|---|
+| **Org user** (browser app) | org-user JWT (`Authorization: Bearer …`) + `X-Client-Id` | their roles' permissions, resolved from the DB on every request |
+| **Client** (server app) | static token (`Authorization: Bearer nx_…`) + `X-Client-Id` | `ORG_USER` + **every** organisation permission |
+| **Platform user** (console) | platform JWT (HS256) | member reads; `SUPER_USER` writes |
+
+### 5.1 Endpoint reference
+
+All paths below are relative to `/{platformSlug}/organisations/{organisationSlug}`.
+Reads marked *read* are open to platform members (`SUPER_USER`/`READ_ONLY`) and
+org users holding the listed permission; writes are `SUPER_USER` (or the listed
+org permission). The `/me` endpoints are self-service — any org user may call
+them regardless of permissions.
+
+**User responses never include permissions.** A user's `roles` come back as
+`{ id, name }` only; a role's full definition (its `permissions`, and whether
+it is `isDefault`) is only visible on the roles endpoints below.
+
+| Method & path | Purpose | Access |
+|---|---|---|
+| `GET /organisations/{organisationSlug}` | read the org itself | org users of the org (no permission) |
+| `PATCH /organisations/{organisationSlug}` | update identifier flags etc. | `SUPER_USER` |
+| `GET /users` | list users | read · `PERM_ORGANISATION_USER_READ` |
+| `POST /users` | create a user (optional `temporaryPassword`, `password`) | `SUPER_USER` · `PERM_ORGANISATION_USER_CREATE` |
+| `GET /users/me` | own profile | any org user |
+| `PATCH /users/me` | update own profile (first/last name, `metadata`) — completes `UPDATE_PROFILE` | any org user |
+| `POST /users/me/change-password` | change own password — completes `CHANGE_PASSWORD` | any org user |
+| `GET /users/{userId}` | read one user | read · `PERM_ORGANISATION_USER_READ` |
+| `PATCH /users/{userId}` | update a user (roles, fields, password reset) | `SUPER_USER` · `PERM_ORGANISATION_USER_UPDATE` |
+| `DELETE /users/{userId}` | delete a user | `SUPER_USER` · `PERM_ORGANISATION_USER_DELETE` |
+| `GET /roles` | list roles (each carries its `permissions` + `isDefault`) | read · `PERM_ORGANISATION_USER_READ` |
+| `POST /roles` | create a role (`name`, `permissions`, optional `isDefault` — default roles are auto-assigned to new users on register) | `SUPER_USER` |
+| `GET /roles/{roleId}` | read one role | read · `PERM_ORGANISATION_USER_READ` |
+| `PATCH /roles/{roleId}` | update a role (rename, replace permissions, toggle `isDefault`) | `SUPER_USER` |
+| `DELETE /roles/{roleId}` | delete a role | `SUPER_USER` |
+| `GET /user-fields` | list custom user fields | read · `PERM_ORGANISATION_USER_FIELD_READ` |
+| `POST /user-fields` | define a field (`key`, `fieldType`, `loginEnabled`, `required`) | `SUPER_USER` · `PERM_ORGANISATION_USER_FIELD_CREATE` |
+| `PATCH /user-fields/{fieldId}` | update a field | `SUPER_USER` · `PERM_ORGANISATION_USER_FIELD_UPDATE` |
+| `DELETE /user-fields/{fieldId}` | delete a field (removes its values) | `SUPER_USER` · `PERM_ORGANISATION_USER_FIELD_DELETE` |
+| `GET /auth-config` | password policy | read · any org user |
+| `PATCH /auth-config` | update password policy | `SUPER_USER` |
+| `GET /session-settings` | token TTLs + max sessions | read · any org user |
+| `PATCH /session-settings` | update TTLs + session limit | `SUPER_USER` |
+| `GET /clients` | list clients | read · `PERM_ORGANISATION_USER_READ` |
+| `POST /clients` | create a client (response carries the `nx_` token once) | `SUPER_USER` |
+| `GET /clients/{clientKey}` | read one client (`token` always `null` here) | read · `PERM_ORGANISATION_USER_READ` |
+| `PATCH /clients/{clientKey}` | update a client (origins, auth, name) | `SUPER_USER` |
+| `DELETE /clients/{clientKey}` | delete a client | `SUPER_USER` |
+| `POST /clients/{clientKey}/rotate-token` | issue a new `nx_` token (shown once) | `SUPER_USER` |
+| `GET /keys` | **public** — verification keys (`kid` + DER SPKI public key) | no auth |
+| `POST /keys/rotate` | retire the active key, provision a new one | `SUPER_USER` |
+
+### 5.2 Default-deny without a client
+
+External browser access to an organisation's API **requires a client**: if a
+request carries an org-user JWT and a foreign `Origin` but **no** `X-Client-Id`,
+it is rejected with `403 Organisation access from a foreign origin requires a
+client id`. The same-origin/server path passes through — the admin console (a
+platform user) and server-side callers (no `Origin` header, e.g. curl) are
+never blocked.
+
+### 5.3 CORS for browser apps
 
 A browser app must send both `Origin` and `X-Client-Id`, and the `Origin` must
 be in that client's configured `allowedOrigins` (see the client in the console).
-Only then are CORS headers echoed. Cross-origin calls **without** a matching
-client are blocked (`403 Invalid CORS request` or no CORS headers).
+Only then are CORS headers echoed. Unknown `X-Client-Id` → `401 Unknown client`;
+disabled client → `403 Client is disabled`; a no-auth client (e.g. `WEB`)
+reaching anything beyond `login`/`register` without a user JWT → `403 This
+client type can only access the organisation login and register endpoints`.
 
 ---
 
@@ -526,8 +591,10 @@ secret) can verify them. They carry a single `role` claim
 | `200` / `201` / `204` | OK / created / no content |
 | `400` | malformed body, wrong credentials, or a validation failure (`fieldErrors`) |
 | `401` | unknown client, invalid/expired token, invalid client token |
-| `403` | disabled client, origin not trusted, client type not allowed here |
+| `403` | disabled client, foreign origin without a client id, client type not allowed here |
 | `404` | unknown platform/org/client/key |
+| `409` | duplicate email/slug/identifier, data-integrity race |
+| `429` | rate limited (auth endpoints) — see [§10](#10-rate-limits) |
 
 Every error carries one body:
 

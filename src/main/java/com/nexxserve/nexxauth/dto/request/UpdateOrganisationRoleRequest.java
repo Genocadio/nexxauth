@@ -14,6 +14,10 @@ public record UpdateOrganisationRoleRequest(
         @Size(min = 1, max = 100, message = "Role name must be between 1 and 100 characters")
         String name,
 
-        Set<Permission> permissions
+        Set<Permission> permissions,
+
+        /** When true, new users of the organisation inherit this role
+         * automatically on register; false turns it off. */
+        Boolean isDefault
 ) {
 }

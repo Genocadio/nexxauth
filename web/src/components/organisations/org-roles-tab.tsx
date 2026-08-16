@@ -32,7 +32,7 @@ export function OrgRolesTab({ platformSlug, organisationSlug }: OrgRolesTabProps
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {roles.data ? `${roles.data.length} role${roles.data.length === 1 ? "" : "s"}` : "Roles"} · permissions are fixed by the app
+          {roles.data ? `${roles.data.length} role${roles.data.length === 1 ? "" : "s"}` : "Roles"} · permissions are fixed by the app · default roles are assigned to new users on register
         </p>
         <Button size="sm" onClick={() => setCreateOpen(true)}>
           <Plus /> New role
@@ -54,7 +54,10 @@ export function OrgRolesTab({ platformSlug, organisationSlug }: OrgRolesTabProps
                       <Shield className="h-4 w-4" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold">{role.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold">{role.name}</p>
+                        {role.isDefault ? <ToneBadge tone="success">Default</ToneBadge> : null}
+                      </div>
                       <p className="text-xs text-muted-foreground">
                         {role.permissions.length} permission{role.permissions.length === 1 ? "" : "s"}
                       </p>
@@ -94,7 +97,7 @@ export function OrgRolesTab({ platformSlug, organisationSlug }: OrgRolesTabProps
         <EmptyState
           icon={Shield}
           title="No roles yet"
-          description="Create roles to group permissions, then assign them to users."
+          description="Create roles to group permissions, then assign them to users. Mark a role as default to auto-assign it to new users."
           action={
             <Button size="sm" onClick={() => setCreateOpen(true)}>
               <Plus /> New role

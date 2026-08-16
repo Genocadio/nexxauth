@@ -16,7 +16,9 @@ public record OrganisationUserResponse(
         boolean enabled,
         boolean temporaryPassword,
         AuthType authType,
-        List<OrganisationRoleResponse> roles,
+        /** The roles the user holds (id + name only — permissions are never
+         * returned on user responses). */
+        List<OrganisationUserRoleResponse> roles,
         Instant createdAt,
         /** Values of the organisation's configured user fields, keyed by field
          * key. Whether a field is used for login is config-level and is not

@@ -16,6 +16,10 @@ public record CreateOrganisationRoleRequest(
         @Size(max = 100, message = "Role name must be at most 100 characters")
         String name,
 
-        Set<Permission> permissions
+        Set<Permission> permissions,
+
+        /** When true, new users of the organisation inherit this role
+         * automatically on register. Defaults to false when omitted. */
+        Boolean isDefault
 ) {
 }
