@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Building2, Check, ChevronsUpDown, Plus } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { OrganisationDialog } from "@/components/organisations/organisation-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,10 +21,18 @@ export function OrgSwitcher() {
   const organisations = useOrganisations();
   const platformSlug = usePlatformSlug() ?? "";
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const segments = pathname.split("/");
-  const currentSlug = segments[2] === "organisations" ? segments[3] : undefined;
+  // On the onboarding wizard the dedicated org comes from the ?org= param;
+  // everywhere else it is the organisation in the URL.
+  const currentSlug =
+    segments[2] === "onboarding"
+      ? (searchParams.get("org") ?? undefined)
+      : segments[2] === "organisations"
+        ? segments[3]
+        : undefined;
   const current = organisations.data?.find((org) => org.slug === currentSlug);
 
   return (

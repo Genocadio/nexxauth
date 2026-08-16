@@ -1,5 +1,5 @@
 import { expect, seedOrganisation, test } from "./fixtures";
-import { uniqueSlug, updateOrganisation } from "./api";
+import { createOrganisation, uniqueSlug, updateOrganisation } from "./api";
 
 test.describe("organisation management", () => {
   test("creates an organisation and launches its onboarding wizard", async ({
@@ -34,6 +34,37 @@ test.describe("organisation management", () => {
     await expect(authedPage).toHaveURL(new RegExp(slug));
     await expect(authedPage.getByRole("heading", { name: `Org ${slug}` })).toBeVisible();
     await expect(authedPage.getByText("Username", { exact: true })).toBeVisible();
+  });
+
+  test("onboarding is dedicated to the working organisation", async ({ authedPage, platform, request }) => {
+    const slug = uniqueSlug("pend");
+    const name = `Pend ${slug}`;
+    await createOrganisation(request, platform.session.accessToken, platform.platformSlug, {
+      name,
+      slug,
+      description: "left unfinished on purpose",
+    });
+
+    // The platform view is never gated, even with an unfinished org present.
+    await authedPage.goto("/console/organisations");
+    await expect(authedPage.getByRole("heading", { name: "Organisations", exact: true })).toBeVisible();
+
+    // Entering the unfinished org forces its own onboarding wizard, which
+    // names the dedicated organisation (heading + header switcher).
+    await authedPage.goto(`/console/organisations/${slug}`);
+    await expect(authedPage).toHaveURL(
+      new RegExp(`/console/onboarding/${platform.platformSlug}\\?org=${slug}`),
+    );
+    await expect(authedPage.getByRole("heading", { name: `Set up ${name}` })).toBeVisible();
+    await expect(authedPage.getByRole("button", { name })).toBeVisible();
+
+    // Once the org is fully set up, the same page opens normally — no wizard,
+    // and completing it never bounces into another org's onboarding.
+    await updateOrganisation(request, platform.session.accessToken, platform.platformSlug, slug, {
+      onboardingStep: 8,
+    });
+    await authedPage.goto(`/console/organisations/${slug}`);
+    await expect(authedPage.getByRole("heading", { name })).toBeVisible();
   });
 
   test("requires a name when creating an organisation", async ({ authedPage }) => {

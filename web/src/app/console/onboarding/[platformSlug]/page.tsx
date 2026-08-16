@@ -104,10 +104,22 @@ export default function OnboardingPage() {
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <ShieldCheck className="h-6 w-6" />
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight">Set up your organisation</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {org ? `Set up ${org.name}` : "Set up your organisation"}
+        </h1>
         <p className="text-sm text-muted-foreground">
-          You&apos;re configuring the identity system for your first organisation. You can
-          change everything later from the console — and pick up right here if you leave.
+          {org ? (
+            <>
+              Configuring{" "}
+              <span className="font-medium text-foreground">{org.slug}</span> — you can change
+              everything later from the console and pick up right here if you leave.
+            </>
+          ) : (
+            <>
+              You&apos;re configuring the identity system for your first organisation. You can
+              change everything later from the console — and pick up right here if you leave.
+            </>
+          )}
         </p>
       </div>
 
