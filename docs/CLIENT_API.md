@@ -39,35 +39,30 @@ Nexxauth again.
 
 ## 2. Base URL & conventions
 
-Each platform lives at its own clean root origin. With platform slug `acme`:
-
-```
-https://auth.example.com/acme
-```
+Your project has a **fixed base URL** — the origin plus the platform segment,
+shown copyable on the console dashboards. There is nothing to configure or
+substitute: every endpoint in this guide is **relative to that base URL**.
 
 All organisation-facing endpoints (auth, org API, keys) are served directly
-under that origin — no `/api/v1` prefix. The platform-wide admin/console
-endpoints (platform auth) are at `https://auth.example.com/auth/*`.
+under the base URL — no `/api/v1` prefix. The platform-wide admin/console
+endpoints (platform auth) live under the same origin at `/auth/*`.
 
 Every request uses JSON (`Content-Type: application/json`).
 
-> **Finding your URL** — the dashboards show the platform URL (your **project
-> base**) copyable, no `/api/v1` in sight (Supabase-style):
+> **Finding your URL** — the dashboards show your project base copyable, no
+> `/api/v1` in sight (Supabase-style): the **platform dashboard** (console →
+> Overview) and the **organisation dashboards** (console → organisation →
+> Overview, and the org portal profile) all show the same base URL.
 >
-> - **Platform dashboard** (console → Overview) and the **organisation
->   dashboards** (console → organisation → Overview, and the org portal
->   profile) all show the same platform base:
->   `https://auth.example.com/acme`
+> That base URL is fixed for your project — every endpoint below is relative to
+> it (org auth at `/auth/*`, the org API at
+> `/organisations/{organisationId}/*`, keys at
+> `/organisations/{organisationId}/keys`). Organisations are addressed by their
+> numeric id — organisation slugs are not used anywhere in the API.
 >
-> That is the project base URL — every other management endpoint lives under it
-> (org auth at `.../acme/auth/*`, the org API at
-> `.../acme/organisations/{organisationSlug}/*`, keys at
-> `.../acme/organisations/{organisationSlug}/keys`).
->
-> The value is derived from `BACKEND_PUBLIC_URL` plus the platform slug (the
-> backend also returns it as `apiBaseUrl` in `GET /{slug}`). When neither the
-> backend nor the web app knows the public origin, the dashboards omit the row —
-> they never show a `/api/v1` URL.
+> The backend returns the value as `apiBaseUrl`; when neither the backend nor
+> the web app knows the public origin, the dashboards omit the row — they never
+> show a `/api/v1` URL.
 
 Common headers:
 
@@ -111,7 +106,7 @@ are rejected (`401 Unknown client` / `403 Client is disabled`).
 
 ## 4. Organisation authentication
 
-Base path: `POST /{platformSlug}/auth/...`
+Base path: `POST /auth/...` (relative to your project base URL)
 
 These endpoints are public — a browser app calls them **with** `X-Client-Id` +
 `Origin`; a server or script can call them without any headers.
@@ -126,7 +121,7 @@ These endpoints are public — a browser app calls them **with** `X-Client-Id` +
 ### 4.1 Register an organisation user
 
 ```http
-POST /{platformSlug}/auth/register
+POST /auth/register
 X-Client-Id: cli_AbCdEfGhIjKlMnOpQrStUvWxYz1234567890_ab
 Content-Type: application/json
 
@@ -147,7 +142,7 @@ Without `X-Client-Id` (server-side/platform-user flow) add
 `username`, `email` and `phone` are optional identifiers, unique per
 organisation. Which ones are **required** on users and which can be used for
 **login** is the organisation's sign-in identifier configuration (see the
-console or `PATCH /{platformSlug}/organisations/{organisationSlug}`) — at
+console or `PATCH /organisations/{organisationId}`) — at
 least one identifier must be usable for login, and a user registering must
 provide one. `firstName` is required; `lastName` is optional — omit it (or
 pass an empty string) for users without a last name. `password` must satisfy
@@ -161,7 +156,7 @@ that field's type (see §5) — unknown keys or invalid values are a 400.
 ### 4.2 Login
 
 ```http
-POST /{platformSlug}/auth/login
+POST /auth/login
 X-Client-Id: cli_AbCdEfGhIjKlMnOpQrStUvWxYz1234567890_ab
 Content-Type: application/json
 
@@ -228,7 +223,7 @@ Content-Type: application/json
 ### 4.4 Logout
 
 ```http
-POST /{platformSlug}/auth/logout
+POST /auth/logout
 Content-Type: application/json
 
 { "refreshToken": "<opaque refresh token>" }
@@ -243,13 +238,13 @@ Content-Type: application/json
 Authenticated org API base path:
 
 ```
-/{platformSlug}/organisations/{organisationSlug}/...
+/organisations/{organisationId}/...
 ```
 
 Call it with the **access token**:
 
 ```http
-GET /{platformSlug}/organisations/{organisationSlug}/users/me
+GET /organisations/{organisationId}/users/me
 X-Client-Id: cli_AbCdEfGhIjKlMnOpQrStUvWxYz1234567890_ab
 Authorization: Bearer eyJhbGciOiJSUzI1NiIs...
 ```
@@ -265,7 +260,7 @@ scoped to the organisation in the path:
 
 ### 5.1 Endpoint reference
 
-All paths below are relative to `/{platformSlug}/organisations/{organisationSlug}`.
+All paths below are relative to `/organisations/{organisationId}`.
 Reads marked *read* are open to platform members (`SUPER_USER`/`READ_ONLY`) and
 org users holding the listed permission; writes are `SUPER_USER` (or the listed
 org permission). The `/me` endpoints are self-service — any org user may call
@@ -278,8 +273,8 @@ endpoints below.
 
 | Method & path | Purpose | Access |
 |---|---|---|
-| `GET /organisations/{organisationSlug}` | read the org itself | org users of the org (no permission) |
-| `PATCH /organisations/{organisationSlug}` | update identifier flags etc. | `SUPER_USER` |
+| `GET /organisations/{organisationId}` | read the org itself | org users of the org (no permission) |
+| `PATCH /organisations/{organisationId}` | update identifier flags etc. | `SUPER_USER` |
 | `GET /users` | list users | read · `PERM_ORGANISATION_USER_READ` |
 | `POST /users` | create a user (optional `temporaryPassword`, `password`) | `SUPER_USER` · `PERM_ORGANISATION_USER_CREATE` |
 | `GET /users/me` | own profile | any org user |
@@ -339,7 +334,7 @@ served openly so any service can verify.
 ### 6.1 Fetch the public keys
 
 ```http
-GET /{platformSlug}/organisations/{organisationSlug}/keys
+GET /organisations/{organisationId}/keys
 ```
 
 Public — no authentication needed. Returns an array ordered oldest → newest:
@@ -399,16 +394,15 @@ Payload claims:
 ### 6.3 Verify (curl + openssl)
 
 ```bash
-BASE=https://auth.example.com
-PLATFORM={platformSlug}
-ORG={organisationSlug}
+BASE="<your project base URL from the console>"
+ORG_ID={organisationId}
 TOKEN="<paste org access token>"
 
 # 1. keys are public
-curl -s "$BASE/$PLATFORM/organisations/$ORG/keys"
+curl -s "$BASE/organisations/$ORG_ID/keys"
 
 # 2. save the active key as a PEM file
-curl -s "$BASE/$PLATFORM/organisations/$ORG/keys" \
+curl -s "$BASE/organisations/$ORG_ID/keys" \
   | jq -r '.[] | select(.active == true) | .publicKey' \
   | base64 -d > /tmp/pub.der
 openssl pkey -inform DER -pubin -in /tmp/pub.der -out /tmp/pub.pem
@@ -442,13 +436,13 @@ function spkiDerToPem(derB64) {
   return `-----BEGIN PUBLIC KEY-----\n${wrapped}\n-----END PUBLIC KEY-----`;
 }
 
-async function verifyOrgToken(token, platformSlug, organisationSlug) {
+async function verifyOrgToken(token, organisationId) {
   const header = JSON.parse(
     Buffer.from(token.split(".")[0], "base64url").toString("utf8")
   );
 
   const keys = await fetch(
-    `https://auth.example.com/${platformSlug}/organisations/${organisationSlug}/keys`
+    `https://your-api-domain.com/organisations/${organisationId}/keys`
   ).then((r) => r.json());
 
   const key = keys.find((k) => k.kid === header.kid);
@@ -477,10 +471,9 @@ def spki_der_to_pem(der_b64: str) -> str:
     body = "\n".join(b64[i:i + 64] for i in range(0, len(b64), 64))
     return f"-----BEGIN PUBLIC KEY-----\n{body}\n-----END PUBLIC KEY-----"
 
-def verify_org_token(token: str, platform_slug: str, organisation_slug: str) -> dict:
+def verify_org_token(token: str, organisation_id: int) -> dict:
     header = json.loads(base64.urlsafe_b64decode(token.split(".")[0] + "=="))
-    url = (f"https://auth.example.com/{platform_slug}/"
-           f"organisations/{organisation_slug}/keys")
+    url = f"https://your-api-domain.com/organisations/{organisation_id}/keys"
     with urllib.request.urlopen(url) as r:
         keys = json.load(r)
     key = next(k for k in keys if k["kid"] == header["kid"])
@@ -519,7 +512,7 @@ cookie or secure storage) and use them to get fresh access tokens.
 ### 7.1 Refresh
 
 ```http
-POST /{platformSlug}/auth/refresh
+POST /auth/refresh
 Content-Type: application/json
 
 { "refreshToken": "<opaque refresh token from login or a previous refresh>" }
@@ -605,7 +598,7 @@ Every error carries one body:
   "status": 401,
   "error": "Unauthorized",
   "message": "Invalid client token",
-  "path": "/acme/auth/login",
+  "path": "/auth/login",
   "requestId": "7f3a…",
   "fieldErrors": null
 }

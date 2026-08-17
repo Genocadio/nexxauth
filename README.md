@@ -54,7 +54,7 @@ row per org) but never to none; org users are never platform users.
 
 | | Platform | Organisation |
 |---|---|---|
-| Endpoints | `/auth/*` | `/{slug}/auth/*` |
+| Endpoints | `/auth/*` (origin root) | `/auth/*` (under the project base) |
 | Identifier | email (unique globally) | username or email (unique per org) |
 | Access token | HS256 (shared secret) | RS256 (per-org keypair, `kid` in header) |
 | Refresh token | rotating + reuse detection | rotating + reuse detection |
@@ -131,12 +131,12 @@ Overridable via environment variables.
 | `app.http.max-body-bytes` | `65536` | max request body size (larger → 413, DoS guard) |
 | `management.server.port` | `8081` | actuator port (health/info/liveness/readiness) |
 | `spring.jpa.hibernate.ddl-auto` | `validate` | schema is owned by Flyway; Hibernate only validates |
-| `BACKEND_PUBLIC_URL` | — | public origin of the API (e.g. `https://auth.example.com`). Drives the copyable platform/project URL shown on the dashboards (`BACKEND_PUBLIC_URL` + platform slug — no `/api/v1`, Supabase-style) and returned as `apiBaseUrl` in `GET /{slug}`. Unset → the row is omitted |
+| `BACKEND_PUBLIC_URL` | — | public origin of the API (e.g. `https://auth.example.com`). Drives the copyable project base URL shown on the dashboards (`BACKEND_PUBLIC_URL` + the platform segment — no `/api/v1`, Supabase-style) and returned as `apiBaseUrl` from the platform details endpoint. Unset → the row is omitted |
 
-**Dashboards API URL.** Each platform's project base is `BACKEND_PUBLIC_URL/{slug}`;
-all org endpoints live under it (`/organisations/{organisationSlug}/...`). The
-console overview and org dashboards show the project base copyable (no `/api/v1`
-prefix) so clients have the exact origin to call. See `docs/CLIENT_API.md`.
+**Dashboards API URL.** Each project's base URL is fixed (`BACKEND_PUBLIC_URL`
+plus the platform segment) and shown copyable on the console overview and org
+dashboards (no `/api/v1` prefix) — every org endpoint lives under it
+(`/organisations/{organisationId}/...`). See `docs/CLIENT_API.md`.
 
 **Rate-limit store & scaling.** The default `in-memory` store (Caffeine) keeps each
 instance's buckets local — correct for a single instance. To share buckets across
@@ -151,9 +151,11 @@ down noisy frameworks. Every log line carries the `requestId` MDC value.
 
 ## API reference
 
-All endpoints are at the clean root origin — platform-wide ones under
-`/auth/*`, `/users/*`, `/slug-suggestions`, and each platform under `/{slug}/...`
-(no `/api/v1`). Errors always use the unified shape:
+All endpoints are at the clean root origin, with no `/api/v1` prefix.
+Platform-wide endpoints (`/auth/*`, `/users/{id}`, `/slug-suggestions`) live at
+the origin root; everything else is under your **project base URL** — the origin
+plus the platform segment, shown copyable on the dashboards. Paths below are
+relative to that base. Errors always use the unified shape:
 
 ```json
 { "timestamp": "...", "status": 401, "error": "Unauthorized",
@@ -172,27 +174,30 @@ All endpoints are at the clean root origin — platform-wide ones under
 | `PATCH /auth/me` | any platform user | update own first/last name, phone |
 | `POST /auth/me/password` | any platform user | change own password; revokes all sessions |
 
-### Platform & users — `/{slug}`, `/users`
+### Platform & users — under the project base URL
+
+Paths are relative to your project base; the `/users/{id}` pair is
+platform-wide and lives at the origin root.
 
 | Method & path | Auth | Description |
 |---|---|---|
-| `GET /{slug}` | member | platform details + user count |
-| `GET /{slug}/users` | member | platform user directory |
-| `POST /{slug}/users` | super user | add a platform user (default role `READ_ONLY`) |
-| `GET /users/{id}` | member | platform user by id |
-| `PATCH /users/{id}` | super user | change role / enable / disable / profile |
+| `GET /` | member | platform details + user count (the project base itself) |
+| `GET /users` | member | platform user directory |
+| `POST /users` | super user | add a platform user (default role `READ_ONLY`) |
+| `GET /users/{id}` | member | platform user by id *(origin root)* |
+| `PATCH /users/{id}` | super user | change role / enable / disable / profile *(origin root)* |
 
-### Organisations — `/{slug}/organisations`
+### Organisations — under the project base URL
 
 | Method & path | Auth | Description |
 |---|---|---|
 | `GET /organisations` | platform member | list organisations of the platform (org users → 403) |
 | `POST /organisations` | platform super user | create an organisation |
-| `GET /organisations/{organisationSlug}` | platform member, or the org user themselves | org details |
-| `PATCH /organisations/{organisationSlug}` | platform super user | update name / description / settings |
-| `DELETE /organisations/{organisationSlug}` | platform super user | delete org (users, roles, keys, tokens cascade) |
+| `GET /organisations/{organisationId}` | platform member, or the org user themselves | org details |
+| `PATCH /organisations/{organisationId}` | platform super user | update name / description / settings |
+| `DELETE /organisations/{organisationId}` | platform super user | delete org (users, roles, keys, tokens cascade) |
 
-### Organisation auth — `/{slug}/auth`
+### Organisation auth — under the project base URL
 
 | Method & path | Auth | Description |
 |---|---|---|
@@ -201,7 +206,7 @@ All endpoints are at the clean root origin — platform-wide ones under
 | `POST /auth/refresh` | public | rotate the org refresh token |
 | `POST /auth/logout` | public | revoke the org refresh token (204) |
 
-### Organisation RBAC — under `/{slug}/organisations/{organisationSlug}`
+### Organisation RBAC — under `/organisations/{organisationId}`
 
 | Method & path | Auth | Description |
 |---|---|---|

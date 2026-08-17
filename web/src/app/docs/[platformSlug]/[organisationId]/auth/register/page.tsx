@@ -60,7 +60,7 @@ export default function RegisterPage() {
 
       <Endpoint
         method="POST"
-        path={`/${docs.organisation.platformSlug}/auth/register`}
+        path="/auth/register"
         description="Register a new user"
         auth="Public (with X-Client-Id header)"
         request={JSON.stringify(

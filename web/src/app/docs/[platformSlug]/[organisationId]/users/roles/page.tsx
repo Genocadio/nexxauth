@@ -57,7 +57,7 @@ export default function RolesPage() {
 
       <Endpoint
         method="GET"
-        path={`/${docs.organisation.platformSlug}/organisations/${docs.organisation.id}/roles`}
+        path={`/organisations/${docs.organisation.id}/roles`}
         description="List all roles"
         auth="SERVER client or platform user with ORGANISATION_USER_READ permission"
         response={JSON.stringify(
@@ -74,7 +74,7 @@ export default function RolesPage() {
 
       <Endpoint
         method="POST"
-        path={`/${docs.organisation.platformSlug}/organisations/${docs.organisation.id}/roles`}
+        path={`/organisations/${docs.organisation.id}/roles`}
         description="Create a new role"
         auth="PLATFORM SUPER_USER only"
         request={JSON.stringify(
@@ -90,7 +90,7 @@ export default function RolesPage() {
 
       <Endpoint
         method="PATCH"
-        path={`/${docs.organisation.platformSlug}/organisations/${docs.organisation.id}/roles/{roleId}`}
+        path={`/organisations/${docs.organisation.id}/roles/{roleId}`}
         description="Update a role"
         auth="PLATFORM SUPER_USER only"
         request={JSON.stringify(
@@ -109,7 +109,7 @@ export default function RolesPage() {
 
       <Endpoint
         method="DELETE"
-        path={`/${docs.organisation.platformSlug}/organisations/${docs.organisation.id}/roles/{roleId}`}
+        path={`/organisations/${docs.organisation.id}/roles/{roleId}`}
         description="Delete a role"
         auth="PLATFORM SUPER_USER only"
       />

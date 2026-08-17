@@ -84,7 +84,7 @@ export default function FieldsPage() {
 
       <Endpoint
         method="GET"
-        path={`/${docs.organisation.platformSlug}/organisations/${docs.organisation.id}/user-fields`}
+        path={`/organisations/${docs.organisation.id}/user-fields`}
         description="List all custom fields"
         auth="SERVER client or platform user with ORGANISATION_USER_FIELD_READ permission"
         response={JSON.stringify(
@@ -103,7 +103,7 @@ export default function FieldsPage() {
 
       <Endpoint
         method="POST"
-        path={`/${docs.organisation.platformSlug}/organisations/${docs.organisation.id}/user-fields`}
+        path={`/organisations/${docs.organisation.id}/user-fields`}
         description="Create a custom field"
         auth="PLATFORM SUPER_USER or ORGANISATION_USER_FIELD_CREATE permission"
         request={JSON.stringify(

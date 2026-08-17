@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 export default function ApiReferencePage() {
   const docs = useDocs();
   const baseUrl = useDocsApiBaseUrl(docs.organisation.platformSlug);
-  const basePath = `/${docs.organisation.platformSlug}/organisations/${docs.organisation.id}`;
+  const basePath = `/organisations/${docs.organisation.id}`;
 
   return (
     <div className="space-y-8">
@@ -36,25 +36,25 @@ export default function ApiReferencePage() {
         <div className="space-y-4">
           <Endpoint
             method="POST"
-            path={`/${docs.organisation.platformSlug}/auth/register`}
+            path="/auth/register"
             description="Register a new user"
             auth="Public (with X-Client-Id header)"
           />
           <Endpoint
             method="POST"
-            path={`/${docs.organisation.platformSlug}/auth/login`}
+            path="/auth/login"
             description="Login with credentials"
             auth="Public (with X-Client-Id header)"
           />
           <Endpoint
             method="POST"
-            path={`/${docs.organisation.platformSlug}/auth/refresh`}
+            path="/auth/refresh"
             description="Refresh access token"
             auth="Public (with X-Client-Id header)"
           />
           <Endpoint
             method="POST"
-            path={`/${docs.organisation.platformSlug}/auth/logout`}
+            path="/auth/logout"
             description="Logout and invalidate refresh token"
             auth="Public (with X-Client-Id header)"
           />

@@ -169,7 +169,7 @@ TTLs come from the same `session-settings` row and are applied at issue time.
 ## 6. Organisation register
 
 ```
-POST /{slug}/auth/register
+POST /auth/register
 X-Client-Id: cli_...            # when present, its organisation is authoritative
 
 { username?, email?, phone?, password?, firstName, lastName?, metadata? }
@@ -212,7 +212,7 @@ X-Client-Id: cli_...            # when present, its organisation is authoritativ
 
 ## 6a. Sign-in identifier configuration
 
-The org row carries six flags (settable via `PATCH .../organisations/{orgSlug}`
+The org row carries six flags (settable via `PATCH .../organisations/{organisationId}`
 and in the onboarding wizard): `emailRequired`, `usernameRequired`,
 `phoneRequired`, `emailCanLogin`, `usernameCanLogin`, `phoneCanLogin`. At least
 one `*CanLogin` must be true (else 400). The legacy `useEmailAsUsername` switch
@@ -223,7 +223,7 @@ phone) then login-enabled user fields.
 ## 7. Organisation login
 
 ```
-POST /{slug}/auth/login
+POST /auth/login
 X-Client-Id: cli_...            # when present, its organisation is authoritative
 
 { identifier, identifierType?, authType?, password }   # authType defaults to PASSWORD
@@ -362,7 +362,7 @@ a label; the DB is the source of truth), so permission changes are immediate.
 
 ## 13. Password policy (org auth-config)
 
-`GET/PATCH .../organisations/{organisationSlug}/auth-config` — one row per org,
+`GET/PATCH .../organisations/{organisationId}/auth-config` — one row per org,
 **created lazily with defaults** on first access (the row is persisted; the GET is a
 write transaction on purpose — Postgres rejects inserts in read-only transactions).
 
@@ -399,7 +399,7 @@ This config **never applies to platform auth** — the platform keeps its own fi
 
 ## 14. Session settings (org session-settings)
 
-`GET/PATCH .../organisations/{organisationSlug}/session-settings` — one row per
+`GET/PATCH .../organisations/{organisationId}/session-settings` — one row per
 org, **created lazily with defaults** (same write-transaction caveat as the
 auth-config: the GET persists the row). Defaults match the platform's `app.jwt.*`.
 
@@ -430,7 +430,7 @@ Never applies to platform auth (platform TTLs stay `app.jwt.*`).
 
 ## 15. User fields (org user-fields)
 
-`GET/POST .../organisations/{organisationSlug}/user-fields`,
+`GET/POST .../organisations/{organisationId}/user-fields`,
 `PATCH/DELETE .../user-fields/{fieldId}` — org-defined extra attributes stored on
 every user and returned under `metadata` on all user objects.
 

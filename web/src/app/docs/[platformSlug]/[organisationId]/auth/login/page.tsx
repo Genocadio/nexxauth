@@ -54,7 +54,7 @@ export default function LoginPage() {
 
       <Endpoint
         method="POST"
-        path={`/${docs.organisation.platformSlug}/auth/login`}
+        path="/auth/login"
         description="Login with credentials"
         auth="Public (with X-Client-Id header)"
         request={JSON.stringify(

@@ -36,12 +36,12 @@ export default function AnatomyPage() {
 // Payload
 {
   "sub": "1",                    // User ID (string)
-  "iss": "${docs.organisation.platformSlug}/${docs.organisation.id}",  // Issuer
+  "iss": "nexxauth",             // Issuer
   "iat": 1704067200,             // Issued at (Unix timestamp)
   "exp": 1704068100,             // Expires at (Unix timestamp)
   "kid": "key-1",               // Key ID for verification
   "roles": ["User", "Admin"],   // Role names (NOT permissions)
-  "org": ${docs.organisation.id}                    // Organisation ID
+  "orgId": ${docs.organisation.id}                  // Organisation ID
 }`}
             language="json"
           />
@@ -70,7 +70,7 @@ export default function AnatomyPage() {
                 <span className="text-xs text-muted-foreground">— string</span>
               </div>
               <p className="text-sm text-muted-foreground">
-                Issuer. Format: <code>{docs.organisation.platformSlug}/{docs.organisation.id}</code>
+                Issuer. Always <code>nexxauth</code>.
               </p>
             </div>
 
@@ -118,7 +118,7 @@ export default function AnatomyPage() {
 
             <div className="border rounded-lg p-3">
               <div className="flex items-center gap-2 mb-1">
-                <code className="text-sm font-mono">org</code>
+                <code className="text-sm font-mono">orgId</code>
                 <span className="text-xs text-muted-foreground">— number</span>
               </div>
               <p className="text-sm text-muted-foreground">

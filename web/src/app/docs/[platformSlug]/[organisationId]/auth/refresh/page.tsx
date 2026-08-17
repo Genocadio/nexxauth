@@ -29,7 +29,7 @@ export default function RefreshPage() {
 
       <Endpoint
         method="POST"
-        path={`/${docs.organisation.platformSlug}/auth/refresh`}
+        path="/auth/refresh"
         description="Refresh access token"
         auth="Public (with X-Client-Id header)"
         request={JSON.stringify(

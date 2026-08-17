@@ -48,7 +48,7 @@ export default function ServerClientPage() {
 
       <Endpoint
         method="GET"
-        path={`/${docs.organisation.platformSlug}/organisations/${docs.organisation.id}/users`}
+        path={`/organisations/${docs.organisation.id}/users`}
         description="List users (SERVER client)"
         auth="X-Client-Id + Authorization: Bearer <static_token>"
         response={JSON.stringify(

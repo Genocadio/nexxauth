@@ -1,12 +1,9 @@
 "use client";
 
-import { useDocs } from "@/components/docs/docs-provider";
 import { Endpoint } from "@/components/docs/endpoint";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function LogoutPage() {
-  const docs = useDocs();
-
   return (
     <div className="space-y-8">
       <div>
@@ -18,7 +15,7 @@ export default function LogoutPage() {
 
       <Endpoint
         method="POST"
-        path={`/${docs.organisation.platformSlug}/auth/logout`}
+        path="/auth/logout"
         description="Logout and invalidate refresh token"
         auth="Public (with X-Client-Id header)"
         request={JSON.stringify(

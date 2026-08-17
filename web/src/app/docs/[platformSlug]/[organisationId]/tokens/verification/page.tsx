@@ -70,12 +70,12 @@ export default function VerificationPage() {
           <CodeBlock
             code={`{
   "sub": "1",                    // User ID
-  "iss": "${docs.organisation.platformSlug}/${docs.organisation.id}",  // Issuer
+  "iss": "nexxauth",             // Issuer
   "iat": 1704067200,             // Issued at
   "exp": 1704068100,             // Expires at
   "kid": "key-1",               // Key ID for verification
   "roles": ["User"],            // Role names (not permissions)
-  "org": ${docs.organisation.id}                    // Organisation ID
+  "orgId": ${docs.organisation.id}                  // Organisation ID
 }`}
             language="json"
           />
@@ -119,7 +119,7 @@ const publicKey = \`-----BEGIN PUBLIC KEY-----
 try {
   const decoded = jwt.verify(token, publicKey, {
     algorithms: ['RS256'],
-    issuer: '${docs.organisation.platformSlug}/${docs.organisation.id}',
+    issuer: 'nexxauth',
   });
   console.log('User ID:', decoded.sub);
   console.log('Roles:', decoded.roles);
@@ -150,7 +150,7 @@ try:
         token,
         public_key,
         algorithms=["RS256"],
-        issuer="${docs.organisation.platformSlug}/${docs.organisation.id}",
+        issuer="nexxauth",
     )
     print("User ID:", decoded["sub"])
     print("Roles:", decoded["roles"])

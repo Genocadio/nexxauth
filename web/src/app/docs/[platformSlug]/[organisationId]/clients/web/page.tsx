@@ -46,7 +46,7 @@ export default function WebClientPage() {
 
       <Endpoint
         method="POST"
-        path={`/${docs.organisation.platformSlug}/auth/login`}
+        path="/auth/login"
         description="Login (WEB client)"
         auth="X-Client-Id header only (no static token)"
         request={JSON.stringify(
