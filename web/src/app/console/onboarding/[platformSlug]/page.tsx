@@ -980,7 +980,7 @@ function StepKeys({
   const base =
     platformQuery.data?.apiBaseUrl ??
     (typeof window !== "undefined" ? window.location.origin : "https://auth.example.com");
-  const keysUrl = `${base}/organisations/${org.slug}/keys`;
+  const keysUrl = `${base}/organisations/${org.id}/keys`;
   const client = clientsQuery.data?.[0];
   const activeKey = keysQuery.data?.find((k) => k.active);
 

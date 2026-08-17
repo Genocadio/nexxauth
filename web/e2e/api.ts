@@ -140,10 +140,10 @@ export async function updateOrganisation(
   api: APIRequestContext,
   token: string,
   platformSlug: string,
-  organisationSlug: string,
+  organisationId: number,
   body: { onboardingStep?: number },
 ): Promise<OrgBody> {
-  const res = await api.patch(`${API_BASE}/${platformSlug}/organisations/${organisationSlug}`, {
+  const res = await api.patch(`${API_BASE}/${platformSlug}/organisations/${organisationId}`, {
     headers: { Authorization: `Bearer ${token}` },
     data: body,
   });
@@ -158,6 +158,26 @@ export async function updateOrganisation(
   return json as unknown as OrgBody;
 }
 
+/**
+ * Find an organisation by slug from the platform's org list. Used when an
+ * organisation is created through the UI and only its slug is known.
+ */
+export async function findOrganisationBySlug(
+  api: APIRequestContext,
+  token: string,
+  platformSlug: string,
+  slug: string,
+): Promise<OrgBody | undefined> {
+  const res = await api.get(`${API_BASE}/${platformSlug}/organisations`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (res.status() !== 200) {
+    throw new Error(`list organisations failed (${res.status()}): ${await res.text()}`);
+  }
+  const orgs = (await res.json()) as OrgBody[];
+  return orgs.find((org) => org.slug === slug);
+}
+
 interface RoleBody {
   id: number;
   name: string;
@@ -168,12 +188,12 @@ export async function createRole(
   api: APIRequestContext,
   token: string,
   platformSlug: string,
-  organisationSlug: string,
+  organisationId: number,
   body: { name: string; permissions: string[] },
 ): Promise<RoleBody> {
   const res = await postJson(
     api,
-    `/${platformSlug}/organisations/${organisationSlug}/roles`,
+    `/${platformSlug}/organisations/${organisationId}/roles`,
     body,
     token,
   );
@@ -185,12 +205,12 @@ export async function createUserField(
   api: APIRequestContext,
   token: string,
   platformSlug: string,
-  organisationSlug: string,
+  organisationId: number,
   body: { key: string; fieldType: string; loginEnabled?: boolean },
 ): Promise<{ id: number; key: string }> {
   const res = await postJson(
     api,
-    `/${platformSlug}/organisations/${organisationSlug}/user-fields`,
+    `/${platformSlug}/organisations/${organisationId}/user-fields`,
     body,
     token,
   );
@@ -211,7 +231,7 @@ export async function createOrgUser(
   api: APIRequestContext,
   token: string,
   platformSlug: string,
-  organisationSlug: string,
+  organisationId: number,
   body: {
     firstName: string;
     lastName: string;
@@ -224,7 +244,7 @@ export async function createOrgUser(
 ): Promise<OrgUserBody> {
   const res = await postJson(
     api,
-    `/${platformSlug}/organisations/${organisationSlug}/users`,
+    `/${platformSlug}/organisations/${organisationId}/users`,
     body,
     token,
   );

@@ -3,7 +3,6 @@
 import { useDocs } from "@/components/docs/docs-provider";
 import { Endpoint } from "@/components/docs/endpoint";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
 export default function ApiReferencePage() {

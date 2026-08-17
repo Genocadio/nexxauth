@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { FormField } from "@/components/shared/form-field";
 import { ToneBadge } from "@/components/shared/status-badge";
@@ -77,22 +77,10 @@ export function OrgClientDialog({
     enabled: client?.enabled ?? true,
   });
 
-  useEffect(() => {
-    if (!open) return;
-    form.setValues({
-      name: client?.name ?? "",
-      type: client?.type ?? "WEB",
-      requireAuthentication: client?.requireAuthentication ?? false,
-      allowedOrigins: client?.allowedOrigins.join("\n") ?? "",
-      enabled: client?.enabled ?? true,
-    });
-    const hasOverrides = !!(client?.accessTokenTtlSeconds || client?.refreshTokenTtlSeconds || client?.maxSessionsPerUser);
-    setUseSessionOverrides(hasOverrides);
-    setAccessTokenTtl(client?.accessTokenTtlSeconds ?? DEFAULT_SESSION_SETTINGS.accessTokenTtlSeconds);
-    setRefreshTokenTtl(client?.refreshTokenTtlSeconds ?? DEFAULT_SESSION_SETTINGS.refreshTokenTtlSeconds);
-    setMaxSessions(client?.maxSessionsPerUser ?? DEFAULT_SESSION_SETTINGS.maxSessionsPerUser);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, client]);
+  // Reset all local state when the dialog opens with a different client.
+  // Using key forces a remount so every useState re-initialises from the
+  // current props, eliminating the need for a useEffect that calls setState.
+  const dialogKey = open ? String(client?.clientKey ?? "new") : undefined;
 
   const authMode = CLIENT_TYPE_AUTH_MODE[form.values.type];
   const authLocked = authMode !== "optional";
@@ -142,7 +130,7 @@ export function OrgClientDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => !pending && onOpenChange(next)}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent key={dialogKey} className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit client" : "New client"}</DialogTitle>
           <DialogDescription>

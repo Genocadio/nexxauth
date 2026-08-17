@@ -62,7 +62,7 @@ export async function seedOrganisation(
     // Mark the org as fully onboarded — the console forces incomplete
     // organisations through their onboarding wizard, which would block tests
     // that exercise an already-configured organisation.
-    await updateOrganisation(api, platform.session.accessToken, platform.platformSlug, slug, {
+    await updateOrganisation(api, platform.session.accessToken, platform.platformSlug, created.id, {
       onboardingStep: 8,
     });
     return { id: created.id, slug, name };
@@ -88,7 +88,7 @@ export async function seedPreparedOrganisation(platform: PlatformSetup): Promise
       api,
       platform.session.accessToken,
       platform.platformSlug,
-      org.slug,
+      org.id,
       {
         name: "manager",
         permissions: [
@@ -103,7 +103,7 @@ export async function seedPreparedOrganisation(platform: PlatformSetup): Promise
       api,
       platform.session.accessToken,
       platform.platformSlug,
-      org.slug,
+      org.id,
       { key: "employee-id", fieldType: "STRING", loginEnabled: true },
     );
     return { id: org.id, slug: org.slug, name: org.name, roleId: role.id, fieldKey: field.key };
@@ -115,7 +115,7 @@ export async function seedPreparedOrganisation(platform: PlatformSetup): Promise
 /** A user seeded directly via the API (used by the edit/delete tests). */
 export async function seedOrgUser(
   platform: PlatformSetup,
-  organisationSlug: string,
+  organisationId: number,
   roleId: number,
   options: { username?: string; firstName?: string; lastName?: string } = {},
 ): Promise<{ id: number; username: string }> {
@@ -126,7 +126,7 @@ export async function seedOrgUser(
       api,
       platform.session.accessToken,
       platform.platformSlug,
-      organisationSlug,
+      organisationId,
       {
         firstName: options.firstName ?? "Test",
         lastName: options.lastName ?? "User",

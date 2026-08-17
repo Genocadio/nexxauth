@@ -6,7 +6,7 @@ test.describe("org portal (server-rendered, middleware auth)", () => {
 
   test("signs in and views the server-rendered profile", async ({ page, platform }) => {
     const org = await seedPreparedOrganisation(platform);
-    const user = await seedOrgUser(platform, org.slug, org.roleId, {
+    const user = await seedOrgUser(platform, org.id, org.roleId, {
       username: uniqueSlug("portal"),
       firstName: "Portal",
       lastName: "User",
@@ -25,7 +25,7 @@ test.describe("org portal (server-rendered, middleware auth)", () => {
 
   test("signs in with a login-enabled user field value (case-insensitive)", async ({ page, platform }) => {
     const org = await seedPreparedOrganisation(platform);
-    await seedOrgUser(platform, org.slug, org.roleId, {
+    await seedOrgUser(platform, org.id, org.roleId, {
       username: uniqueSlug("portal"),
       firstName: "Portal",
       lastName: "User",
@@ -44,7 +44,7 @@ test.describe("org portal (server-rendered, middleware auth)", () => {
 
   test("shows an inline error for invalid credentials", async ({ page, platform }) => {
     const org = await seedPreparedOrganisation(platform);
-    const user = await seedOrgUser(platform, org.slug, org.roleId, {
+    const user = await seedOrgUser(platform, org.id, org.roleId, {
       username: uniqueSlug("portal"),
     });
 
@@ -68,7 +68,7 @@ test.describe("org portal (server-rendered, middleware auth)", () => {
 
   test("a signed-in visitor on the login URL is sent to the profile, then can sign out", async ({ page, platform }) => {
     const org = await seedPreparedOrganisation(platform);
-    const user = await seedOrgUser(platform, org.slug, org.roleId, {
+    const user = await seedOrgUser(platform, org.id, org.roleId, {
       username: uniqueSlug("portal"),
       firstName: "Portal",
       lastName: "User",

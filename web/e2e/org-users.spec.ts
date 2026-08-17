@@ -37,7 +37,7 @@ test.describe("organisation user management", () => {
 
   test("edits a user's profile and disables the account", async ({ authedPage, platform }) => {
     const org = await seedPreparedOrganisation(platform);
-    const seeded = await seedOrgUser(platform, org.slug, org.roleId);
+    const seeded = await seedOrgUser(platform, org.id, org.roleId);
 
     await authedPage.goto(`/console/organisations/${org.slug}?tab=users`);
     const row = authedPage.locator("tr", { hasText: seeded.username });
@@ -55,7 +55,7 @@ test.describe("organisation user management", () => {
 
   test("deletes a user", async ({ authedPage, platform }) => {
     const org = await seedPreparedOrganisation(platform);
-    const seeded = await seedOrgUser(platform, org.slug, org.roleId);
+    const seeded = await seedOrgUser(platform, org.id, org.roleId);
 
     await authedPage.goto(`/console/organisations/${org.slug}?tab=users`);
     const row = authedPage.locator("tr", { hasText: seeded.username });

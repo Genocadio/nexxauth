@@ -1,5 +1,10 @@
 import { expect, seedOrganisation, test } from "./fixtures";
-import { createOrganisation, uniqueSlug, updateOrganisation } from "./api";
+import {
+  createOrganisation,
+  findOrganisationBySlug,
+  uniqueSlug,
+  updateOrganisation,
+} from "./api";
 
 test.describe("organisation management", () => {
   test("creates an organisation and launches its onboarding wizard", async ({
@@ -24,7 +29,15 @@ test.describe("organisation management", () => {
 
     // Mark the org as fully set up via the API so the shared platform stays
     // onboarded for the rest of the suite, then verify the list + detail page.
-    await updateOrganisation(request, platform.session.accessToken, platform.platformSlug, slug, {
+    // The org was created through the UI, so resolve its numeric id from the slug.
+    const created = await findOrganisationBySlug(
+      request,
+      platform.session.accessToken,
+      platform.platformSlug,
+      slug,
+    );
+    expect(created).toBeDefined();
+    await updateOrganisation(request, platform.session.accessToken, platform.platformSlug, created!.id, {
       onboardingStep: 8,
     });
 
@@ -39,7 +52,7 @@ test.describe("organisation management", () => {
   test("onboarding is dedicated to the working organisation", async ({ authedPage, platform, request }) => {
     const slug = uniqueSlug("pend");
     const name = `Pend ${slug}`;
-    await createOrganisation(request, platform.session.accessToken, platform.platformSlug, {
+    const created = await createOrganisation(request, platform.session.accessToken, platform.platformSlug, {
       name,
       slug,
       description: "left unfinished on purpose",
@@ -60,7 +73,7 @@ test.describe("organisation management", () => {
 
     // Once the org is fully set up, the same page opens normally — no wizard,
     // and completing it never bounces into another org's onboarding.
-    await updateOrganisation(request, platform.session.accessToken, platform.platformSlug, slug, {
+    await updateOrganisation(request, platform.session.accessToken, platform.platformSlug, created.id, {
       onboardingStep: 8,
     });
     await authedPage.goto(`/console/organisations/${slug}`);

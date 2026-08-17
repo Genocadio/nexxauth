@@ -33,7 +33,7 @@ test.describe("organisation user fields", () => {
         api,
         platform.session.accessToken,
         platform.platformSlug,
-        org.slug,
+        org.id,
         { key: "badge", fieldType: "STRING" },
       );
     } finally {

@@ -12,7 +12,6 @@ import {
   Zap,
   Settings,
   ArrowLeft,
-  ExternalLink,
 } from "lucide-react";
 
 interface DocsLayoutProps {

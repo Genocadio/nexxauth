@@ -1,5 +1,6 @@
 "use client";
 
+import { use } from "react";
 import { useDocumentationContext } from "@/hooks/use-docs";
 import { DocumentationProvider } from "@/components/docs/docs-provider";
 import { CodeBlock } from "@/components/docs/code-block";
@@ -11,11 +12,12 @@ import { BookOpen, Zap, Shield, Users, Key, Settings } from "lucide-react";
 export default function DocsPage({
   params,
 }: {
-  params: { platformSlug: string; organisationId: string };
+  params: Promise<{ platformSlug: string; organisationId: string }>;
 }) {
+  const { platformSlug, organisationId } = use(params);
   const { data: context, isLoading, error } = useDocumentationContext(
-    params.platformSlug,
-    Number(params.organisationId)
+    platformSlug,
+    Number(organisationId)
   );
 
   if (isLoading) {
@@ -211,7 +213,7 @@ export default function DocsPage({
         <div>
           <h2 className="text-xl font-semibold mb-4">Base URL</h2>
           <CodeBlock
-            code={`https://your-api-domain.com/${params.platformSlug}`}
+            code={`https://your-api-domain.com/${platformSlug}`}
             language="text"
           />
         </div>

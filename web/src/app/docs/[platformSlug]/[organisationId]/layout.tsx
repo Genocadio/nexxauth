@@ -1,14 +1,15 @@
 import { DocsLayout } from "@/components/docs/docs-layout";
 
-export default function DocsPageLayout({
+export default async function DocsPageLayout({
   children,
   params,
 }: {
   children: React.ReactNode;
-  params: { platformSlug: string; organisationId: string };
+  params: Promise<{ platformSlug: string; organisationId: string }>;
 }) {
+  const { platformSlug, organisationId } = await params;
   return (
-    <DocsLayout platformSlug={params.platformSlug} organisationId={params.organisationId}>
+    <DocsLayout platformSlug={platformSlug} organisationId={organisationId}>
       {children}
     </DocsLayout>
   );

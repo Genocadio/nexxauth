@@ -2,7 +2,6 @@
 
 import { useDocs } from "@/components/docs/docs-provider";
 import { Endpoint } from "@/components/docs/endpoint";
-import { CodeBlock } from "@/components/docs/code-block";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Info } from "lucide-react";
