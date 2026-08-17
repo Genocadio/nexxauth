@@ -45,7 +45,7 @@ export function UserFieldTypeBadge({ fieldType }: { fieldType: UserFieldType }) 
 }
 
 /** Comma-joined names of a user's roles. */
-export function UserRoles({ roles }: { roles: { name: string }[] }) {
+export function UserRoles({ roles }: { roles: string[] }) {
   if (roles.length === 0) return <span className="text-muted-foreground">No roles</span>;
-  return <span>{roles.map((r) => r.name).join(", ")}</span>;
+  return <span>{roles.join(", ")}</span>;
 }

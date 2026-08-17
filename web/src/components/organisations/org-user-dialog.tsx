@@ -83,12 +83,14 @@ function OrgUserDialogInner({
     user
       ? {
           firstName: user.firstName,
-          lastName: user.lastName,
+          lastName: user.lastName ?? "",
           username: user.username ?? "",
           email: user.email ?? "",
           phone: user.phone ?? "",
           enabled: user.enabled,
-          roleIds: user.roles.map((r) => r.id),
+          // The user response carries role names only; map them back to ids
+          // via the org's current role list.
+          roleIds: roles.filter((r) => user.roles.includes(r.name)).map((r) => r.id),
           password: "",
         }
       : EMPTY_VALUES,
@@ -148,7 +150,7 @@ function OrgUserDialogInner({
               onChange={(e) => form.setValue("firstName", e.target.value)}
             />
           </FormField>
-          <FormField label="Last name" htmlFor="ou-lastName" error={form.errors.lastName}>
+          <FormField label="Last name" htmlFor="ou-lastName" error={form.errors.lastName} hint="Optional">
             <Input
               id="ou-lastName"
               value={form.values.lastName}
@@ -245,7 +247,7 @@ function OrgUserDialogInner({
                 <Checkbox
                   checked={clearPassword}
                   onCheckedChange={(checked) => setClearPassword(!!checked)}
-                  disabled={!user?.authType}
+                  disabled={!user?.authTypes?.length}
                 />
                 Remove password (can&apos;t log in)
               </label>

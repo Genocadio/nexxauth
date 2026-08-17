@@ -1,6 +1,7 @@
 "use client";
 
 import { useDocs } from "@/components/docs/docs-provider";
+import { useDocsApiBaseUrl } from "@/hooks/use-docs-api-url";
 import { Endpoint } from "@/components/docs/endpoint";
 import { CodeBlock } from "@/components/docs/code-block";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +10,7 @@ import { Info } from "lucide-react";
 
 export default function RegisterPage() {
   const docs = useDocs();
+  const baseUrl = useDocsApiBaseUrl(docs.organisation.platformSlug);
 
   const requiredFields = [];
   if (docs.identifiers.emailRequired) requiredFields.push("email");
@@ -93,16 +95,14 @@ export default function RegisterPage() {
               email: docs.identifiers.emailRequired ? "john@example.com" : null,
               phone: docs.identifiers.phoneRequired ? "+1234567890" : null,
               enabled: true,
-              authType: "PASSWORD",
-              roles: docs.roles
-                .filter((r) => r.isDefault)
-                .map((r) => ({ id: r.id, name: r.name })),
+              authTypes: ["PASSWORD"],
+              roles: docs.roles.filter((r) => r.isDefault).map((r) => r.name),
               createdAt: "2024-01-01T00:00:00Z",
               metadata: docs.customFields.length > 0
                 ? Object.fromEntries(
                     docs.customFields.map((field) => [field.key, "value"])
                   )
-                : null,
+                : {},
             },
           },
           null,
@@ -119,7 +119,7 @@ export default function RegisterPage() {
             Include the <code>X-Client-Id</code> header with your client key:
           </p>
           <CodeBlock
-            code={`curl -X POST https://your-api-domain.com/${docs.organisation.platformSlug}/auth/register \\
+            code={`curl -X POST ${baseUrl}/auth/register \\
   -H "Content-Type: application/json" \\
   -H "X-Client-Id: cli_your_client_key" \\
   -d '${JSON.stringify(

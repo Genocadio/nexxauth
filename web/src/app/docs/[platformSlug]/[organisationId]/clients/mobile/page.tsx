@@ -1,6 +1,7 @@
 "use client";
 
 import { useDocs } from "@/components/docs/docs-provider";
+import { useDocsApiBaseUrl } from "@/hooks/use-docs-api-url";
 import { CodeBlock } from "@/components/docs/code-block";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -8,6 +9,7 @@ import { Info } from "lucide-react";
 
 export default function MobileClientPage() {
   const docs = useDocs();
+  const baseUrl = useDocsApiBaseUrl(docs.organisation.platformSlug);
 
   return (
     <div className="space-y-8">
@@ -52,7 +54,7 @@ export default function MobileClientPage() {
             Only login and register endpoints are accessible:
           </p>
           <CodeBlock
-            code={`curl -X POST https://your-api-domain.com/${docs.organisation.platformSlug}/auth/login \\
+            code={`curl -X POST ${baseUrl}/auth/login \\
   -H "Content-Type: application/json" \\
   -H "X-Client-Id: cli_your_client_key" \\
   -d '${JSON.stringify(
@@ -79,7 +81,7 @@ export default function MobileClientPage() {
             Full API access with both headers:
           </p>
           <CodeBlock
-            code={`curl -X GET https://your-api-domain.com/${docs.organisation.platformSlug}/organisations/${docs.organisation.id}/users \\
+            code={`curl -X GET ${baseUrl}/organisations/${docs.organisation.id}/users \\
   -H "X-Client-Id: cli_your_client_key" \\
   -H "Authorization: Bearer nx_your_static_token"`}
             language="bash"

@@ -105,7 +105,8 @@ export interface OrgRegisterRequest {
   phone?: string;
   password?: string;
   firstName: string;
-  lastName: string;
+  /** Optional; omit or pass "" for users without a last name. */
+  lastName?: string;
   metadata?: Record<string, string>;
 }
 
@@ -129,7 +130,8 @@ export interface OrgLoginRequest {
 
 export interface CreateOrganisationUserRequest {
   firstName: string;
-  lastName: string;
+  /** Optional; omit or pass "" for users without a last name. */
+  lastName?: string;
   username?: string;
   email?: string;
   phone?: string;

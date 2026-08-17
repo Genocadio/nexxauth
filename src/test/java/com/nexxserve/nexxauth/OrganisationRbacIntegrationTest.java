@@ -139,9 +139,8 @@ class OrganisationRbacIntegrationTest {
                 .andExpect(jsonPath("$.username").value("jane"))
                 .andExpect(jsonPath("$.email").value("jane@acme.io"))
                 .andExpect(jsonPath("$.roles.length()").value(1))
-                .andExpect(jsonPath("$.roles[0].name").value("Admin"))
-                // user responses carry roles only - never permissions
-                .andExpect(jsonPath("$.roles[0].permissions").doesNotExist())
+                // user responses carry role names only - never permissions
+                .andExpect(jsonPath("$.roles[0]").value("Admin"))
                 .andReturn();
         long userId = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
 
@@ -157,24 +156,28 @@ class OrganisationRbacIntegrationTest {
                         .content(json(Map.of("firstName", "J", "lastName", "R", "username", "jane"))))
                 .andExpect(status().isConflict());
 
-        // both identifiers optional when useEmailAsUsername is off
+        // both identifiers optional when useEmailAsUsername is off; last name
+        // is optional too (first name stays required)
         mockMvc.perform(post(USER_PLATFORM + "/users")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("firstName", "No", "lastName", "Id"))))
-                .andExpect(status().isCreated());
+                        .content(json(Map.of("firstName", "No"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.lastName").value(org.hamcrest.Matchers.nullValue()));
 
-        // update: rename, swap roles, disable, clear email with ""
+        // update: rename, clear last name with "", swap roles, disable, clear email
         mockMvc.perform(patch(USER_PLATFORM + "/users/" + userId)
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "firstName", "Janet",
+                                "lastName", "",
                                 "email", "",
                                 "roleIds", java.util.List.of(),
                                 "enabled", false))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.firstName").value("Janet"))
+                .andExpect(jsonPath("$.lastName").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.email").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.roles.length()").value(0))
                 .andExpect(jsonPath("$.enabled").value(false));

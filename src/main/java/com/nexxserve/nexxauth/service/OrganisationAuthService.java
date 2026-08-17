@@ -124,7 +124,7 @@ public class OrganisationAuthService {
         OrganisationUser user = new OrganisationUser();
         user.setOrganisation(organisation);
         user.setFirstName(request.firstName());
-        user.setLastName(request.lastName());
+        user.setLastName(cleanedName(request.lastName()));
         user.setEmail(email);
         user.setUsername(username);
         user.setPhone(phone);
@@ -262,6 +262,15 @@ public class OrganisationAuthService {
             throw new ConflictException("An organisation user with phone " + phone
                     + " already exists in this organisation");
         }
+    }
+
+    /** null/blank -> null; otherwise trimmed. */
+    private String cleanedName(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     /** null/blank -> null; otherwise trimmed + normalized email. */

@@ -19,7 +19,7 @@ public record CreateOrganisationUserRequest(
         @Size(max = 100, message = "First name must be at most 100 characters")
         String firstName,
 
-        @NotBlank(message = "Last name is required")
+        /** Optional; null or blank is stored as null. */
         @Size(max = 100, message = "Last name must be at most 100 characters")
         String lastName,
 

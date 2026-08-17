@@ -1,6 +1,7 @@
 "use client";
 
 import { useDocs } from "@/components/docs/docs-provider";
+import { useDocsApiBaseUrl } from "@/hooks/use-docs-api-url";
 import { CodeBlock } from "@/components/docs/code-block";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -8,6 +9,7 @@ import { Info } from "lucide-react";
 
 export default function VerificationPage() {
   const docs = useDocs();
+  const baseUrl = useDocsApiBaseUrl(docs.organisation.platformSlug);
 
   return (
     <div className="space-y-8">
@@ -36,7 +38,7 @@ export default function VerificationPage() {
             Get the public keys for your organisation:
           </p>
           <CodeBlock
-            code={`curl https://your-api-domain.com/${docs.organisation.platformSlug}/organisations/${docs.organisation.id}/keys`}
+            code={`curl ${baseUrl}/organisations/${docs.organisation.id}/keys`}
             language="bash"
           />
           <p className="text-sm text-muted-foreground">Response:</p>
@@ -93,7 +95,7 @@ echo $TOKEN | cut -d'.' -f2 | base64 -d 2>/dev/null | jq .
 # Verify with public key
 echo $TOKEN | cut -d'.' -f1-2 > /tmp/token.txt
 echo "-----BEGIN PUBLIC KEY-----" > /tmp/pubkey.pem
-curl -s https://your-api-domain.com/${docs.organisation.platformSlug}/organisations/${docs.organisation.id}/keys | jq -r '.[0].publicKey' >> /tmp/pubkey.pem
+curl -s ${baseUrl}/organisations/${docs.organisation.id}/keys | jq -r '.[0].publicKey' >> /tmp/pubkey.pem
 echo "-----END PUBLIC KEY-----" >> /tmp/pubkey.pem
 openssl dgst -sha256 -verify /tmp/pubkey.pem -signature <(echo -n "$TOKEN" | cut -d'.' -f3 | base64 -d) /tmp/token.txt`}
             language="bash"

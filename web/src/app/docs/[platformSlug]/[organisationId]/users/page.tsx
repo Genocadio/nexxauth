@@ -50,14 +50,14 @@ export default function UsersPage() {
               email: "john@example.com",
               phone: null,
               enabled: true,
-              authType: "PASSWORD",
-              roles: [{ id: 1, name: "User" }],
+              authTypes: ["PASSWORD"],
+              roles: ["User"],
               createdAt: "2024-01-01T00:00:00Z",
               metadata: docs.customFields.length > 0
                 ? Object.fromEntries(
                     docs.customFields.map((f) => [f.key, "value"])
                   )
-                : null,
+                : {},
             },
           ],
           null,
@@ -79,10 +79,10 @@ export default function UsersPage() {
             email: "john@example.com",
             phone: null,
             enabled: true,
-            authType: "PASSWORD",
-            roles: [{ id: 1, name: "User" }],
+            authTypes: ["PASSWORD"],
+            roles: ["User"],
             createdAt: "2024-01-01T00:00:00Z",
-            metadata: null,
+            metadata: {},
           },
           null,
           2

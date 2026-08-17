@@ -18,7 +18,8 @@ public record UpdateOrganisationUserRequest(
         @Size(min = 1, max = 100, message = "First name must be between 1 and 100 characters")
         String firstName,
 
-        @Size(min = 1, max = 100, message = "Last name must be between 1 and 100 characters")
+        /** Optional; pass "" to clear, omit to keep. */
+        @Size(max = 100, message = "Last name must be at most 100 characters")
         String lastName,
 
         @Size(max = 100, message = "Username must be at most 100 characters")

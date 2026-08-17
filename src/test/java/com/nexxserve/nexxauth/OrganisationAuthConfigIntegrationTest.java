@@ -92,7 +92,7 @@ class OrganisationAuthConfigIntegrationTest {
                                 "organisationId", orgId, "username", "longer",
                                 "password", "alongerpass", "firstName", "L", "lastName", "G"))))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.user.authType").value("PASSWORD"))
+                .andExpect(jsonPath("$.user.authTypes[0]").value("PASSWORD"))
                 .andReturn();
         String token = objectMapper.readTree(reg.getResponse().getContentAsString()).get("accessToken").asText();
         mockMvc.perform(get(platform + "/organisations/" + orgId + "/users/me").header("Authorization", bearer(token)))
@@ -107,13 +107,13 @@ class OrganisationAuthConfigIntegrationTest {
         String org = platform + "/organisations/" + orgId;
         String orgAuth = platform + "/auth";
 
-        // create a user WITHOUT a password: no auth configured, authType null
+        // create a user WITHOUT a password: no auth configured, authTypes empty
         MvcResult created = mockMvc.perform(post(org + "/users")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("firstName", "N", "lastName", "O", "username", "nobody"))))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.authType").doesNotExist())
+                .andExpect(jsonPath("$.authTypes").isEmpty())
                 .andReturn();
         long userId = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
 
@@ -129,7 +129,7 @@ class OrganisationAuthConfigIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("password", "newpass123"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.authType").value("PASSWORD"));
+                .andExpect(jsonPath("$.authTypes[0]").value("PASSWORD"));
         mockMvc.perform(post(orgAuth + "/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "nobody", "password", "newpass123"))))
@@ -141,7 +141,7 @@ class OrganisationAuthConfigIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("password", ""))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.authType").doesNotExist());
+                .andExpect(jsonPath("$.authTypes").isEmpty());
         mockMvc.perform(post(orgAuth + "/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "nobody", "password", "newpass123"))))

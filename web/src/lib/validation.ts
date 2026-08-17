@@ -20,6 +20,10 @@ const optionalPhone = z.union([z.string().trim().max(30, "At most 30 characters"
 const requiredName = (max: number, label = "This field") =>
   z.string().trim().min(1, `${label} is required`).max(max, `At most ${max} characters`);
 
+/** Optional name field: empty string is accepted and treated as "absent". */
+const optionalName = (max: number) =>
+  z.union([z.string().trim().max(max, `At most ${max} characters`), z.literal("")]);
+
 // ---------------------------------------------------------------------------
 // Platform auth
 // ---------------------------------------------------------------------------
@@ -120,7 +124,7 @@ export const orgLoginSchema = z.object({
  */
 export const orgUserFormSchema = z.object({
   firstName: requiredName(100, "First name"),
-  lastName: requiredName(100, "Last name"),
+  lastName: optionalName(100),
   username: z.union([z.string().trim().max(100), z.literal("")]),
   email: optionalEmail,
   phone: z.union([z.string().trim().max(30, "At most 30 characters"), z.literal("")]),

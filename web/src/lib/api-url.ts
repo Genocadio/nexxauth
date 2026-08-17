@@ -28,3 +28,16 @@ export function resolvePlatformApiUrl(
   if (backendApiBase) return trimTrailingSlash(backendApiBase);
   return platformApiUrl(envOrigin, platformSlug);
 }
+
+/**
+ * Base URL used in the docs code snippets. Logged-in viewers get the same
+ * project base the dashboards show; otherwise the docs fall back to the
+ * `your-api-domain.com` placeholder (docs are public).
+ */
+export function docsApiUrl(
+  backendApiBase: string | null | undefined,
+  platformSlug: string,
+  envOrigin: string,
+): string {
+  return resolvePlatformApiUrl(backendApiBase, platformSlug, envOrigin) ?? `https://your-api-domain.com/${platformSlug}`;
+}

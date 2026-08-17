@@ -38,7 +38,7 @@ class OrganisationAuthIntegrationTest {
 
     // Each test registers its own platform (unique slug) because all tests
     // share one database; a shared slug would 409 on the second registration.
-    private static final String[] SLUGS = {"orgauth1", "orgauth2", "orgauth3", "orgauth4", "orgauth5", "orgauth6", "orgauth7", "orgauth8", "orgauth9", "orgauth10", "orgauth11", "orgauth12", "orgauth13", "orgauth14", "orgauth15", "orgauth16", "orgauth17"};
+    private static final String[] SLUGS = {"orgauth1", "orgauth2", "orgauth3", "orgauth4", "orgauth5", "orgauth6", "orgauth7", "orgauth8", "orgauth9", "orgauth10", "orgauth11", "orgauth12", "orgauth13", "orgauth14", "orgauth15", "orgauth16", "orgauth17", "orgauth18"};
     private static final String ORG_SLUG = "oa-org";
 
     @Autowired
@@ -430,7 +430,7 @@ class OrganisationAuthIntegrationTest {
         String org = platform + "/organisations/" + orgId;
 
         // boss marks "Member" as default (with READ) and leaves "Support" unmarked
-        long memberRole = createRole(boss, org, "Member", true,
+        createRole(boss, org, "Member", true,
                 "ORGANISATION_USER_READ");
         createRole(boss, org, "Support", false);
 
@@ -451,10 +451,8 @@ class OrganisationAuthIntegrationTest {
                                 "firstName", "N", "lastName", "B"))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.user.roles.length()").value(1))
-                .andExpect(jsonPath("$.user.roles[0].id").value(memberRole))
-                .andExpect(jsonPath("$.user.roles[0].name").value("Member"))
-                // user responses carry roles only - never permissions
-                .andExpect(jsonPath("$.user.roles[0].permissions").doesNotExist())
+                // user responses carry role names only - never permissions
+                .andExpect(jsonPath("$.user.roles[0]").value("Member"))
                 .andReturn();
 
         // the access token carries the inherited role name too
@@ -471,8 +469,7 @@ class OrganisationAuthIntegrationTest {
         // the user response from the users endpoint is equally permission-free
         mockMvc.perform(get(org + "/users/me").header("Authorization", bearer(token)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.roles[0].name").value("Member"))
-                .andExpect(jsonPath("$.roles[0].permissions").doesNotExist());
+                .andExpect(jsonPath("$.roles[0]").value("Member"));
     }
 
     @Test
@@ -707,7 +704,7 @@ class OrganisationAuthIntegrationTest {
                                 "username", "nopw",
                                 "firstName", "N", "lastName", "W"))))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.user.authType").isEmpty())
+                .andExpect(jsonPath("$.user.authTypes").isEmpty())
                 .andReturn();
         long userId = objectMapper.readTree(reg.getResponse().getContentAsString()).get("user").get("id").asLong();
 
@@ -823,6 +820,46 @@ class OrganisationAuthIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "pam", "password", "newpass123"))))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void lastNameIsOptionalOnRegister() throws Exception {
+        String platform = "/" + SLUGS[17];
+
+        String orgAuth = platform + "/auth";
+        String boss = registerPlatform("orgauth-lastname-boss@nexx.io", SLUGS[17]);
+        long orgId = createOrganisation(boss, platform);
+
+        // register without a last name succeeds; the response carries lastName null
+        mockMvc.perform(post(orgAuth + "/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "organisationId", orgId,
+                                "username", "nolast",
+                                "password", "orgpass1",
+                                "firstName", "Only"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.user.firstName").value("Only"))
+                .andExpect(jsonPath("$.user.lastName").value(org.hamcrest.Matchers.nullValue()));
+
+        // the user can log in and still reports lastName null
+        mockMvc.perform(post(orgAuth + "/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("organisationId", orgId,
+                                "identifier", "nolast", "password", "orgpass1"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.lastName").value(org.hamcrest.Matchers.nullValue()));
+
+        // first name is still required: a blank first name is a 400
+        mockMvc.perform(post(orgAuth + "/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "organisationId", orgId,
+                                "username", "nofirst",
+                                "password", "orgpass1",
+                                "firstName", "",
+                                "lastName", "X"))))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

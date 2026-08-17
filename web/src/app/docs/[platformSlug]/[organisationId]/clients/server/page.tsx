@@ -1,6 +1,7 @@
 "use client";
 
 import { useDocs } from "@/components/docs/docs-provider";
+import { useDocsApiBaseUrl } from "@/hooks/use-docs-api-url";
 import { Endpoint } from "@/components/docs/endpoint";
 import { CodeBlock } from "@/components/docs/code-block";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +10,7 @@ import { Info } from "lucide-react";
 
 export default function ServerClientPage() {
   const docs = useDocs();
+  const baseUrl = useDocsApiBaseUrl(docs.organisation.platformSlug);
 
   return (
     <div className="space-y-8">
@@ -59,10 +61,10 @@ export default function ServerClientPage() {
               email: "john@example.com",
               phone: null,
               enabled: true,
-              authType: "PASSWORD",
-              roles: [{ id: 1, name: "User" }],
+              authTypes: ["PASSWORD"],
+              roles: ["User"],
               createdAt: "2024-01-01T00:00:00Z",
-              metadata: null,
+              metadata: {},
             },
           ],
           null,
@@ -92,7 +94,7 @@ Authorization: Bearer nx_your_static_token`}
         </CardHeader>
         <CardContent>
           <CodeBlock
-            code={`curl -X PATCH https://your-api-domain.com/${docs.organisation.platformSlug}/organisations/${docs.organisation.id}/users/1 \\
+            code={`curl -X PATCH ${baseUrl}/organisations/${docs.organisation.id}/users/1 \\
   -H "Content-Type: application/json" \\
   -H "X-Client-Id: cli_your_client_key" \\
   -H "Authorization: Bearer nx_your_static_token" \\

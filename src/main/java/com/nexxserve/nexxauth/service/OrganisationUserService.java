@@ -127,6 +127,7 @@ public class OrganisationUserService {
         user.setEmail(email);
         user.setUsername(username);
         user.setPhone(phone);
+        user.setLastName(cleanedName(request.lastName()));
         if (request.roleIds() != null) {
             user.setRoles(resolveRoles(organisation, request.roleIds()));
         }
@@ -155,7 +156,8 @@ public class OrganisationUserService {
             user.setFirstName(request.firstName());
         }
         if (request.lastName() != null) {
-            user.setLastName(request.lastName());
+            // Blank clears the (now optional) last name.
+            user.setLastName(cleanedName(request.lastName()));
         }
         if (request.email() != null) {
             String email = normalizedEmail(request.email());
@@ -259,7 +261,8 @@ public class OrganisationUserService {
             user.setFirstName(request.firstName());
         }
         if (request.lastName() != null) {
-            user.setLastName(request.lastName());
+            // Blank clears the (now optional) last name.
+            user.setLastName(cleanedName(request.lastName()));
         }
         if (request.metadata() != null) {
             userFieldService.setMetadata(user, request.metadata());
@@ -343,6 +346,15 @@ public class OrganisationUserService {
             organisationAccess.requireRead(platform, organisation, requester);
         }
         return organisation;
+    }
+
+    /** null/blank -> null; otherwise trimmed. */
+    private String cleanedName(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     /** null/blank -> null (clears the identifier); otherwise trimmed + normalized. */

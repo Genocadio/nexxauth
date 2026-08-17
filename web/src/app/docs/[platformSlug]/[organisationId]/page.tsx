@@ -1,6 +1,7 @@
 "use client";
 
 import { useDocs } from "@/components/docs/docs-provider";
+import { useDocsApiBaseUrl } from "@/hooks/use-docs-api-url";
 import { CodeBlock } from "@/components/docs/code-block";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +10,7 @@ import { BookOpen, Zap, Shield, Users, Key, Settings } from "lucide-react";
 
 export default function DocsPage() {
   const docs = useDocs();
+  const baseUrl = useDocsApiBaseUrl(docs.organisation.platformSlug);
 
   return (
     <div className="space-y-8">
@@ -186,7 +188,7 @@ export default function DocsPage() {
       <div>
         <h2 className="text-xl font-semibold mb-4">Base URL</h2>
         <CodeBlock
-          code={`https://your-api-domain.com/${docs.organisation.platformSlug}`}
+          code={baseUrl}
           language="text"
         />
       </div>

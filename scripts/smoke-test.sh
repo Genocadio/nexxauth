@@ -134,7 +134,7 @@ req POST /analytical-engines/organisations/rbac-corp/users -H "Authorization: Be
   -d "{\"firstName\":\"Org\",\"lastName\":\"User\",\"username\":\"orguser\",\"email\":\"org@acme.io\",\"roleIds\":[$RID]}"
 check "create org user" 201 "$(status)"
 check "org user username" orguser "$(field '["username"]')"
-check "org user role" Admin "$(field '["roles"][0]["name"]')"
+check "org user role" Admin "$(field '["roles"][0]')"
 OUID=$(field '["id"]')
 req POST /analytical-engines/organisations/rbac-corp/users -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d '{"firstName":"No","lastName":"Id"}'
@@ -302,14 +302,14 @@ req POST /analytical-engines/organisations/auth-corp/users -H "Authorization: Be
   -d '{"firstName":"Pam","lastName":"NoAuth","username":"pam"}'
 check "create user without password" 201 "$(status)"
 PAMID=$(field '["id"]')
-check "no auth type yet" None "$(field '["authType"]')"
+check "no auth types yet" 0 "$(nlen '["authTypes"]')"
 req POST /analytical-engines/auth/login -H 'Content-Type: application/json' \
   -d "{\"organisationId\":$AORGID,\"identifier\":\"pam\",\"password\":\"whatever1\"}"
 check "user without auth cannot login" 401 "$(status)"
 req PATCH /analytical-engines/organisations/auth-corp/users/$PAMID -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d "{\"password\":\"longenoughpass\"}"
 check "set password via patch" 200 "$(status)"
-check "auth type set" PASSWORD "$(field '["authType"]')"
+check "auth type set" PASSWORD "$(field '["authTypes"][0]')"
 req POST /analytical-engines/auth/login -H 'Content-Type: application/json' \
   -d "{\"organisationId\":$AORGID,\"identifier\":\"pam\",\"password\":\"longenoughpass\"}"
 check "user can login after password set" 200 "$(status)"

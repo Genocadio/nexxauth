@@ -83,23 +83,20 @@ export interface OrganisationRoleResponse {
   isDefault: boolean;
 }
 
-/** A role as it appears on a user object: id + name only — permissions are
- * never exposed on user responses (they are resolved server-side). */
-export interface OrganisationUserRoleResponse {
-  id: number;
-  name: string;
-}
-
 export interface OrganisationUserResponse {
   id: number;
   firstName: string;
-  lastName: string;
+  /** Optional: null when the user was created without a last name. */
+  lastName: string | null;
   username: string | null;
   email: string | null;
   phone: string | null;
   enabled: boolean;
-  authType: AuthType | null;
-  roles: OrganisationUserRoleResponse[];
+  /** The user's enabled auth methods (only PASSWORD exists today). Empty when
+   * the user has no auth configured and cannot log in. */
+  authTypes: AuthType[];
+  /** The names of the roles the user holds — never ids, never permissions. */
+  roles: string[];
   createdAt: IsoDate;
   /** Values of the org's configured user fields, keyed by field key. */
   metadata: Record<string, string> | null;

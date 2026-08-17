@@ -1,12 +1,14 @@
 "use client";
 
 import { useDocs } from "@/components/docs/docs-provider";
+import { useDocsApiBaseUrl } from "@/hooks/use-docs-api-url";
 import { Endpoint } from "@/components/docs/endpoint";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
 export default function ApiReferencePage() {
   const docs = useDocs();
+  const baseUrl = useDocsApiBaseUrl(docs.organisation.platformSlug);
   const basePath = `/${docs.organisation.platformSlug}/organisations/${docs.organisation.id}`;
 
   return (
@@ -23,7 +25,7 @@ export default function ApiReferencePage() {
           <CardTitle>Base URL</CardTitle>
         </CardHeader>
         <CardContent>
-          <code className="text-sm">https://your-api-domain.com/{docs.organisation.platformSlug}</code>
+          <code className="text-sm">{baseUrl}</code>
         </CardContent>
       </Card>
 

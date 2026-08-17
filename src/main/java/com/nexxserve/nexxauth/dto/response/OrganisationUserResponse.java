@@ -15,10 +15,14 @@ public record OrganisationUserResponse(
         String phone,
         boolean enabled,
         boolean temporaryPassword,
-        AuthType authType,
-        /** The roles the user holds (id + name only — permissions are never
-         * returned on user responses). */
-        List<OrganisationUserRoleResponse> roles,
+        /** The user's enabled auth methods (only PASSWORD exists today; the
+         * list is the extension point for future modes such as OTP or SSO).
+         * Empty when the user has no auth configured and cannot log in. */
+        List<AuthType> authTypes,
+        /** The names of the roles the user holds — never ids, and never
+         * permissions (permissions are an internal concept, resolved
+         * server-side on every request). */
+        List<String> roles,
         Instant createdAt,
         /** Values of the organisation's configured user fields, keyed by field
          * key. Whether a field is used for login is config-level and is not

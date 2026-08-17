@@ -172,13 +172,15 @@ TTLs come from the same `session-settings` row and are applied at issue time.
 POST /{slug}/auth/register
 X-Client-Id: cli_...            # when present, its organisation is authoritative
 
-{ username?, email?, phone?, password?, firstName, lastName, metadata? }
+{ username?, email?, phone?, password?, firstName, lastName?, metadata? }
 # without X-Client-Id the body must carry: { organisationId, ... } (server-side)
 ```
 
 1. **Rate limit** — `org-register` bucket (separate from the platform bucket).
 2. **Bean validation** — username ≤ 100, email ≤ 255 (must be valid), phone ≤ 30,
-   password ≤ 72 (the detailed rules come from the org's auth-config).
+   password ≤ 72 (the detailed rules come from the org's auth-config). `firstName`
+   is required (≤ 100); `lastName` is optional — omit it or pass an empty string
+   for users without one (stored as null).
 3. **Organisation identified** — from the `X-Client-Id` client when present (the
    client's organisation is authoritative; a body `organisationId` is ignored,
    even a mismatched one); without a client header the body's `organisationId`
@@ -201,8 +203,8 @@ X-Client-Id: cli_...            # when present, its organisation is authoritativ
      until a method is enabled).
    - user saved with **the organisation's default roles** — every role marked
      `isDefault` on the org is assigned automatically, none when no role is
-     marked default (roles are only ever returned on user objects as id + name;
-     permissions stay server-side). Audit `ORG_REGISTER`. An optional `metadata`
+     marked default (roles are only ever returned on user objects as role
+     names; permissions stay server-side). Audit `ORG_REGISTER`. An optional `metadata`
      map is validated and stored (see §15) — keys must be fields the org has
      defined.
 5. **Org tokens issued** — access token signed with the org's **active RSA key**

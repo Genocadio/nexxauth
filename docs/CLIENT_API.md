@@ -149,9 +149,10 @@ organisation. Which ones are **required** on users and which can be used for
 **login** is the organisation's sign-in identifier configuration (see the
 console or `PATCH /{platformSlug}/organisations/{organisationSlug}`) — at
 least one identifier must be usable for login, and a user registering must
-provide one. `password` must satisfy the organisation's password policy (see
-`auth-config`); when password authentication is disabled for the organisation
-a password is not required.
+provide one. `firstName` is required; `lastName` is optional — omit it (or
+pass an empty string) for users without a last name. `password` must satisfy
+the organisation's password policy (see `auth-config`); when password
+authentication is disabled for the organisation a password is not required.
 
 `metadata` is optional. Its keys must be user fields the organisation has
 defined (`GET .../user-fields`), and each value is validated/normalized per
@@ -201,10 +202,8 @@ Content-Type: application/json
     "phone": "+15551234567",
     "enabled": true,
     "temporaryPassword": false,
-    "authType": "PASSWORD",
-    "roles": [
-      { "id": 3, "name": "admin" }
-    ],
+    "authTypes": ["PASSWORD"],
+    "roles": ["admin"],
     "createdAt": "2026-01-01T00:00:00Z",
     "metadata": { "department": "engineering" }
   },
@@ -217,7 +216,8 @@ Content-Type: application/json
 | `accessToken` | the **RS256 JWT** to send as `Authorization: Bearer …` (validated in [§6](#6-verifying-organisation-tokens-public-key)) |
 | `refreshToken` | **opaque** (not a JWT); single-use. `null` while a gating action is pending |
 | `expiresInSeconds` | access token lifetime in seconds |
-| `user.roles` | roles the user holds — **id + name only, never permissions** (permissions are resolved server-side on every request) |
+| `user.authTypes` | the user's enabled auth methods, e.g. `["PASSWORD"]` — empty when the user has no auth configured |
+| `user.roles` | the role **names** the user holds — never ids, never permissions (permissions are resolved server-side on every request) |
 | `actions` | pending org-user actions: `CHANGE_PASSWORD` (gating) and `UPDATE_PROFILE` (advisory) |
 
 > **Gating actions.** When `CHANGE_PASSWORD` is pending (the account has a
@@ -272,8 +272,9 @@ org permission). The `/me` endpoints are self-service — any org user may call
 them regardless of permissions.
 
 **User responses never include permissions.** A user's `roles` come back as
-`{ id, name }` only; a role's full definition (its `permissions`, and whether
-it is `isDefault`) is only visible on the roles endpoints below.
+**role names only** (never role ids); a role's full definition (its
+`permissions`, and whether it is `isDefault`) is only visible on the roles
+endpoints below.
 
 | Method & path | Purpose | Access |
 |---|---|---|
