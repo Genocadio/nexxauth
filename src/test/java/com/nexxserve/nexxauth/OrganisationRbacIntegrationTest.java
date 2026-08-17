@@ -26,10 +26,11 @@ class OrganisationRbacIntegrationTest {
     // Each test registers its own platform (unique name -> unique slug) because
     // all tests share one database; a shared platform name would slug-dedup the
     // later tests (rbac-platform-2, ...) and break their org paths.
-    private static final String ROLE_PLATFORM = "/rbac-roles/organisations/rbac-org";
-    private static final String USER_PLATFORM = "/rbac-users/organisations/rbac-org";
-    private static final String EMAIL_PLATFORM = "/rbac-email-setting/organisations/rbac-org";
-    private static final String SCOPE_PLATFORM = "/rbac-scope/organisations/rbac-org";
+    // The org path segment is now the numeric ID, set dynamically after create.
+    private static String ROLE_PLATFORM;
+    private static String USER_PLATFORM;
+    private static String EMAIL_PLATFORM;
+    private static String SCOPE_PLATFORM;
 
     @Autowired
     private MockMvc mockMvc;
@@ -40,7 +41,8 @@ class OrganisationRbacIntegrationTest {
     @Test
     void roleLifecycleWithPermissions() throws Exception {
         String boss = register("rbac-boss@nexx.io", "RBAC Roles Platform", "rbac-roles");
-        createOrganisation(boss, ROLE_PLATFORM);
+        long orgId = createOrganisation(boss, "/rbac-roles");
+        ROLE_PLATFORM = "/rbac-roles/organisations/" + orgId;
 
         // create a role with permissions; default is off unless asked
         MvcResult created = mockMvc.perform(post(ROLE_PLATFORM + "/roles")
@@ -118,7 +120,8 @@ class OrganisationRbacIntegrationTest {
     @Test
     void organisationUserLifecycleWithRoles() throws Exception {
         String boss = register("rbac-user-boss@nexx.io", "RBAC Users Platform", "rbac-users");
-        createOrganisation(boss, USER_PLATFORM);
+        long orgId = createOrganisation(boss, "/rbac-users");
+        USER_PLATFORM = "/rbac-users/organisations/" + orgId;
 
         long adminRoleId = createRole(boss, USER_PLATFORM, "Admin", "ORGANISATION_USER_READ", "ORGANISATION_USER_UPDATE");
 
@@ -186,7 +189,8 @@ class OrganisationRbacIntegrationTest {
     @Test
     void useEmailAsUsernameSettingRequiresEmail() throws Exception {
         String boss = register("rbac-email-boss@nexx.io", "RBAC Email Platform", "rbac-email-setting");
-        createOrganisation(boss, EMAIL_PLATFORM);
+        long orgId = createOrganisation(boss, "/rbac-email-setting");
+        EMAIL_PLATFORM = "/rbac-email-setting/organisations/" + orgId;
 
         // without the setting, a user without email is fine
         mockMvc.perform(post(EMAIL_PLATFORM + "/users")
@@ -235,17 +239,19 @@ class OrganisationRbacIntegrationTest {
     @Test
     void rolesAreOrganisationScopedAndReadOnlyMembersCannotWrite() throws Exception {
         String boss = register("rbac-scope-boss@nexx.io", "RBAC Scope Platform", "rbac-scope");
-        createOrganisation(boss, SCOPE_PLATFORM);
+        long scopeOrgId = createOrganisation(boss, "/rbac-scope");
+        SCOPE_PLATFORM = "/rbac-scope/organisations/" + scopeOrgId;
         String boss2 = register("rbac-scope-boss2@nexx.io", "RBAC Other Platform", "rbac-other");
-        createOrganisationIn(boss2, "rbac-other", "Other Org");
+        long otherOrgId = createOrganisationIn(boss2, "rbac-other", "Other Org");
+        String otherOrgPath = "/rbac-other/organisations/" + otherOrgId;
 
         long roleA = createRole(boss, SCOPE_PLATFORM, "Shared", "ORGANISATION_USER_READ");
-        long roleB = createRole(boss2, "/rbac-other/organisations/rbac-other", "Shared", "ORGANISATION_USER_DELETE");
+        long roleB = createRole(boss2, otherOrgPath, "Shared", "ORGANISATION_USER_DELETE");
 
         // same role name in different organisations is fine
         mockMvc.perform(get(SCOPE_PLATFORM + "/roles").header("Authorization", bearer(boss)))
                 .andExpect(jsonPath("$.length()").value(1));
-        mockMvc.perform(get("/rbac-other/organisations/rbac-other/roles")
+        mockMvc.perform(get(otherOrgPath + "/roles")
                         .header("Authorization", bearer(boss2)))
                 .andExpect(jsonPath("$.length()").value(1));
 
@@ -312,21 +318,25 @@ class OrganisationRbacIntegrationTest {
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("accessToken").asText();
     }
 
-    private void createOrganisation(String boss, String orgPath) throws Exception {
+    private long createOrganisation(String boss, String orgPath) throws Exception {
         String platformSlug = orgPath.split("/")[1];
-        mockMvc.perform(post("/" + platformSlug + "/organisations")
+        MvcResult result = mockMvc.perform(post("/" + platformSlug + "/organisations")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "RBAC Org", "slug", "rbac-org"))))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
     }
 
-    private void createOrganisationIn(String boss, String slug, String name) throws Exception {
-        mockMvc.perform(post("/rbac-other/organisations")
+    private long createOrganisationIn(String boss, String slug, String name) throws Exception {
+        MvcResult result = mockMvc.perform(post("/rbac-other/organisations")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", name, "slug", slug))))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
     }
 
     private long createRole(String boss, String orgPath, String name, String... permissions) throws Exception {

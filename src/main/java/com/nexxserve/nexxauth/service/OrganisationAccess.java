@@ -32,6 +32,11 @@ public class OrganisationAccess {
                 .orElseThrow(() -> ResourceNotFoundException.of("Organisation", slug));
     }
 
+    public Organisation findOrganisationById(Long id) {
+        return organisationRepository.findById(id)
+                .orElseThrow(() -> ResourceNotFoundException.of("Organisation", id));
+    }
+
     /** Read access: platform members, or org users of this organisation with the
      * read permission. */
     public void requireRead(Platform platform, Organisation organisation, OrgActor actor) {

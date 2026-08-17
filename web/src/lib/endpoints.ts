@@ -26,34 +26,34 @@ export const endpoints = {
 
   organisations: (platformSlug: string) => ({
     list: `${API_BASE_URL}/${platformSlug}/organisations`,
-    one: (organisationSlug: string) =>
-      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}`,
-    users: (organisationSlug: string) =>
-      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}/users`,
-    user: (organisationSlug: string, userId: number) =>
-      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}/users/${userId}`,
-    roles: (organisationSlug: string) =>
-      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}/roles`,
-    role: (organisationSlug: string, roleId: number) =>
-      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}/roles/${roleId}`,
-    authConfig: (organisationSlug: string) =>
-      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}/auth-config`,
-    sessionSettings: (organisationSlug: string) =>
-      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}/session-settings`,
-    userFields: (organisationSlug: string) =>
-      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}/user-fields`,
-    userField: (organisationSlug: string, fieldId: number) =>
-      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}/user-fields/${fieldId}`,
-    keys: (organisationSlug: string) =>
-      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}/keys`,
-    rotateKey: (organisationSlug: string) =>
-      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}/keys/rotate`,
-    clients: (organisationSlug: string) =>
-      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}/clients`,
-    client: (organisationSlug: string, clientKey: string) =>
-      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}/clients/${clientKey}`,
-    rotateClientToken: (organisationSlug: string, clientKey: string) =>
-      `${API_BASE_URL}/${platformSlug}/organisations/${organisationSlug}/clients/${clientKey}/rotate-token`,
+    one: (organisationId: number) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}`,
+    users: (organisationId: number) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/users`,
+    user: (organisationId: number, userId: number) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/users/${userId}`,
+    roles: (organisationId: number) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/roles`,
+    role: (organisationId: number, roleId: number) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/roles/${roleId}`,
+    authConfig: (organisationId: number) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/auth-config`,
+    sessionSettings: (organisationId: number) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/session-settings`,
+    userFields: (organisationId: number) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/user-fields`,
+    userField: (organisationId: number, fieldId: number) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/user-fields/${fieldId}`,
+    keys: (organisationId: number) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/keys`,
+    rotateKey: (organisationId: number) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/keys/rotate`,
+    clients: (organisationId: number) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/clients`,
+    client: (organisationId: number, clientKey: string) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/clients/${clientKey}`,
+    rotateClientToken: (organisationId: number, clientKey: string) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/clients/${clientKey}/rotate-token`,
   }),
 
   orgAuth: (platformSlug: string) => ({
@@ -61,5 +61,10 @@ export const endpoints = {
     login: `${API_BASE_URL}/${platformSlug}/auth/login`,
     refresh: `${API_BASE_URL}/${platformSlug}/auth/refresh`,
     logout: `${API_BASE_URL}/${platformSlug}/auth/logout`,
+  }),
+
+  docs: (platformSlug: string) => ({
+    context: (organisationId: number) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/docs/context`,
   }),
 };

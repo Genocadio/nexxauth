@@ -26,19 +26,19 @@ import { fullName, type OrganisationUserResponse } from "@/types/api";
 
 interface OrgUsersTabProps {
   platformSlug: string;
-  organisationSlug: string;
+  organisationId: number;
   useEmailAsUsername: boolean;
 }
 
-export function OrgUsersTab({ platformSlug, organisationSlug, useEmailAsUsername }: OrgUsersTabProps) {
-  const users = useOrgUsers(organisationSlug);
-  const roles = useOrgRoles(organisationSlug);
-  const fields = useOrgUserFields(organisationSlug);
+export function OrgUsersTab({ platformSlug, organisationId, useEmailAsUsername }: OrgUsersTabProps) {
+  const users = useOrgUsers(organisationId);
+  const roles = useOrgRoles(organisationId);
+  const fields = useOrgUserFields(organisationId);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<OrganisationUserResponse | null>(null);
   const [deleting, setDeleting] = useState<OrganisationUserResponse | null>(null);
-  const deleteMutation = useDeleteOrgUser(platformSlug, organisationSlug);
+  const deleteMutation = useDeleteOrgUser(platformSlug, organisationId);
 
   const loading = users.isLoading;
   const error = users.error;
@@ -153,7 +153,7 @@ export function OrgUsersTab({ platformSlug, organisationSlug, useEmailAsUsername
 
       <OrgUserDialog
         platformSlug={platformSlug}
-        organisationSlug={organisationSlug}
+        organisationId={organisationId}
         open={createOpen}
         onOpenChange={setCreateOpen}
         roles={roles.data ?? []}
@@ -162,7 +162,7 @@ export function OrgUsersTab({ platformSlug, organisationSlug, useEmailAsUsername
       />
       <OrgUserDialog
         platformSlug={platformSlug}
-        organisationSlug={organisationSlug}
+        organisationId={organisationId}
         open={!!editing}
         onOpenChange={(open) => !open && setEditing(null)}
         roles={roles.data ?? []}

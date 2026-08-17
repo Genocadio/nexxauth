@@ -28,7 +28,7 @@ import java.util.List;
  * role permission, mirroring the user management endpoints.
  */
 @RestController
-@RequestMapping("/{slug}/organisations/{organisationSlug}/user-fields")
+@RequestMapping("/{slug}/organisations/{organisationId}/user-fields")
 public class OrganisationUserFieldController {
 
     private final OrganisationUserFieldService fieldService;
@@ -40,39 +40,39 @@ public class OrganisationUserFieldController {
     @GetMapping
     @PreAuthorize("hasAnyRole('SUPER_USER','READ_ONLY') or hasAuthority('PERM_ORGANISATION_USER_FIELD_READ')")
     public List<OrganisationUserFieldResponse> list(@PathVariable String slug,
-                                                    @PathVariable String organisationSlug,
+                                                    @PathVariable Long organisationId,
                                                     @AuthenticationPrincipal OrgActor requester) {
-        return fieldService.listFields(slug, organisationSlug, requester);
+        return fieldService.listFields(slug, organisationId, requester);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('SUPER_USER') or hasAuthority('PERM_ORGANISATION_USER_FIELD_CREATE')")
     public OrganisationUserFieldResponse create(@PathVariable String slug,
-                                                @PathVariable String organisationSlug,
+                                                @PathVariable Long organisationId,
                                                 @AuthenticationPrincipal OrgActor requester,
                                                 @Valid @RequestBody CreateOrganisationUserFieldRequest request) {
-        return fieldService.createField(slug, organisationSlug, requester, request);
+        return fieldService.createField(slug, organisationId, requester, request);
     }
 
     @PatchMapping("/{fieldId}")
     @PreAuthorize("hasRole('SUPER_USER') or hasAuthority('PERM_ORGANISATION_USER_FIELD_UPDATE')")
     public OrganisationUserFieldResponse update(@PathVariable String slug,
-                                                @PathVariable String organisationSlug,
+                                                @PathVariable Long organisationId,
                                                 @PathVariable Long fieldId,
                                                 @AuthenticationPrincipal OrgActor requester,
                                                 @Valid @RequestBody UpdateOrganisationUserFieldRequest request) {
-        return fieldService.updateField(slug, organisationSlug, fieldId, requester, request);
+        return fieldService.updateField(slug, organisationId, fieldId, requester, request);
     }
 
     @DeleteMapping("/{fieldId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('SUPER_USER') or hasAuthority('PERM_ORGANISATION_USER_FIELD_DELETE')")
     public ResponseEntity<Void> delete(@PathVariable String slug,
-                                       @PathVariable String organisationSlug,
+                                       @PathVariable Long organisationId,
                                        @PathVariable Long fieldId,
                                        @AuthenticationPrincipal OrgActor requester) {
-        fieldService.deleteField(slug, organisationSlug, fieldId, requester);
+        fieldService.deleteField(slug, organisationId, fieldId, requester);
         return ResponseEntity.noContent().build();
     }
 }

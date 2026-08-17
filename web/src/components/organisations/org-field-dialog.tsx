@@ -26,16 +26,16 @@ const FIELD_TYPE_OPTIONS: UserFieldType[] = ["STRING", "NUMBER", "BOOLEAN", "DAT
 
 interface OrgFieldDialogProps {
   platformSlug: string;
-  organisationSlug: string;
+  organisationId: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   field?: OrganisationUserFieldResponse;
 }
 
-export function OrgFieldDialog({ platformSlug, organisationSlug, open, onOpenChange, field }: OrgFieldDialogProps) {
+export function OrgFieldDialog({ platformSlug, organisationId, open, onOpenChange, field }: OrgFieldDialogProps) {
   const isEdit = !!field;
-  const create = useCreateUserField(platformSlug, organisationSlug);
-  const update = useUpdateUserField(platformSlug, organisationSlug);
+  const create = useCreateUserField(platformSlug, organisationId);
+  const update = useUpdateUserField(platformSlug, organisationId);
   const pending = create.isPending || update.isPending;
 
   const form = useForm(userFieldSchema, {

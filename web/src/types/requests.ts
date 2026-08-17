@@ -223,6 +223,9 @@ export interface CreateOrganisationClientRequest {
   allowedOrigins?: string[];
   enabled?: boolean;
   settings?: Record<string, string>;
+  accessTokenTtlSeconds?: number | null;
+  refreshTokenTtlSeconds?: number | null;
+  maxSessionsPerUser?: number | null;
 }
 
 export interface UpdateOrganisationClientRequest {
@@ -231,4 +234,8 @@ export interface UpdateOrganisationClientRequest {
   allowedOrigins?: string[];
   enabled?: boolean;
   settings?: Record<string, string>;
+  /** Pass a positive value to set, or -1 to clear back to org default. */
+  accessTokenTtlSeconds?: number | null;
+  refreshTokenTtlSeconds?: number | null;
+  maxSessionsPerUser?: number | null;
 }

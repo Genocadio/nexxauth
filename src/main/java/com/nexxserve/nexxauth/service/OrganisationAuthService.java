@@ -97,8 +97,8 @@ public class OrganisationAuthService {
     @Transactional
     public OrgAuthResponse register(String platformSlug, OrgRegisterRequest request,
                                     String clientId) {
-        Organisation organisation = resolveOrganisation(platformSlug, request.organisationId(),
-                resolveClient(clientId));
+        OrganisationClient client = resolveClient(clientId);
+        Organisation organisation = resolveOrganisation(platformSlug, request.organisationId(), client);
         String email = normalizedEmail(request.email());
         String username = cleanedUsername(request.username());
         String phone = cleanedPhone(request.phone());
@@ -142,24 +142,25 @@ public class OrganisationAuthService {
         // Roles marked as default are inherited automatically on register.
         assignDefaultRoles(organisation, saved);
         audit.log(AuthAuditService.ORG_REGISTER, identifierOf(saved), organisation.getSlug());
-        return issueTokens(saved);
+        return issueTokens(saved, client);
     }
 
     @Transactional
     public OrgAuthResponse login(String platformSlug, OrgLoginRequest request,
                                  String clientId) {
-        Organisation organisation = resolveOrganisation(platformSlug, request.organisationId(),
-                resolveClient(clientId));
+        OrganisationClient client = resolveClient(clientId);
+        Organisation organisation = resolveOrganisation(platformSlug, request.organisationId(), client);
         // The requested authentication method. PASSWORD is the default; the
         // enum is the extension point for future methods (passkey, OTP, ...)
         // and the switch forces a case for each one.
         AuthType method = request.authType() != null ? request.authType() : AuthType.PASSWORD;
         return switch (method) {
-            case PASSWORD -> passwordLogin(organisation, request);
+            case PASSWORD -> passwordLogin(organisation, request, client);
         };
     }
 
-    private OrgAuthResponse passwordLogin(Organisation organisation, OrgLoginRequest request) {
+    private OrgAuthResponse passwordLogin(Organisation organisation, OrgLoginRequest request,
+                                          OrganisationClient client) {
         if (request.password() == null || request.password().isBlank()) {
             throw new BadRequestException("Password is required for the PASSWORD auth method");
         }
@@ -197,7 +198,7 @@ public class OrganisationAuthService {
             throw new PasswordExpiredException();
         }
         audit.log(AuthAuditService.ORG_LOGIN_SUCCESS, identifier, organisation.getSlug());
-        return issueTokens(user);
+        return issueTokens(user, client);
     }
 
     @Transactional
@@ -208,11 +209,14 @@ public class OrganisationAuthService {
         if (orgUserActions.hasPendingGatingAction(resolved)) {
             throw new RefreshTokenException("Pending action required: change password");
         }
+        // Resolve the client that originally issued this token so per-client
+        // session settings apply on rotation.
+        OrganisationClient client = refreshTokenService.clientOf(rawRefreshToken);
         var rotation = refreshTokenService.rotateWithSubject(rawRefreshToken,
-                subject -> sessionSettingsService.refreshTokenTtl(subject.getOrganisation()));
+                subject -> sessionSettingsService.refreshTokenTtl(subject.getOrganisation(), client));
         audit.log(AuthAuditService.ORG_REFRESH,
                 identifierOf(rotation.subject()), rotation.subject().getOrganisation().getSlug());
-        return issueTokens(rotation.subject(), rotation.newToken());
+        return issueTokens(rotation.subject(), rotation.newToken(), client);
     }
 
     @Transactional
@@ -391,7 +395,7 @@ public class OrganisationAuthService {
                 .orElseThrow(() -> ResourceNotFoundException.of("Organisation", organisationId));
     }
 
-    private OrgAuthResponse issueTokens(OrganisationUser user) {
+    private OrgAuthResponse issueTokens(OrganisationUser user, OrganisationClient client) {
         Organisation organisation = user.getOrganisation();
         if (orgUserActions.hasPendingGatingAction(user)) {
             // A gating action (CHANGE_PASSWORD) is pending: the session is
@@ -401,13 +405,15 @@ public class OrganisationAuthService {
         }
         // A new session is about to be issued: evict the oldest sessions if the
         // user is at the org's concurrent-session limit.
-        refreshTokenService.enforceSessionLimit(organisation, user.getId());
+        refreshTokenService.enforceSessionLimit(organisation, user.getId(), client);
         return issueTokens(user,
-                refreshTokenService.issue(user, sessionSettingsService.refreshTokenTtl(organisation)));
+                refreshTokenService.issueWithClient(user, sessionSettingsService.refreshTokenTtl(organisation, client),
+                        client != null ? client.getClientKey() : null),
+                client);
     }
 
-    private OrgAuthResponse issueTokens(OrganisationUser user, String refreshToken) {
-        return issueTokens(user, refreshToken, sessionSettingsService.accessTokenTtl(user.getOrganisation()));
+    private OrgAuthResponse issueTokens(OrganisationUser user, String refreshToken, OrganisationClient client) {
+        return issueTokens(user, refreshToken, sessionSettingsService.accessTokenTtl(user.getOrganisation(), client));
     }
 
     private OrgAuthResponse issueTokens(OrganisationUser user, String refreshToken, Duration accessTtl) {

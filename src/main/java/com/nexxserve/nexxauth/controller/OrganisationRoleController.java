@@ -28,7 +28,7 @@ import java.util.List;
  * super user role.
  */
 @RestController
-@RequestMapping("/{slug}/organisations/{organisationSlug}/roles")
+@RequestMapping("/{slug}/organisations/{organisationId}/roles")
 public class OrganisationRoleController {
 
     private final OrganisationRoleService roleService;
@@ -40,48 +40,48 @@ public class OrganisationRoleController {
     @GetMapping
     @PreAuthorize("hasAnyRole('SUPER_USER','READ_ONLY') or hasAuthority('PERM_ORGANISATION_USER_READ')")
     public List<OrganisationRoleResponse> list(@PathVariable String slug,
-                                               @PathVariable String organisationSlug,
+                                               @PathVariable Long organisationId,
                                                @AuthenticationPrincipal OrgActor requester) {
-        return roleService.list(slug, organisationSlug, requester);
+        return roleService.list(slug, organisationId, requester);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('SUPER_USER')")
     public OrganisationRoleResponse create(@PathVariable String slug,
-                                           @PathVariable String organisationSlug,
+                                           @PathVariable Long organisationId,
                                            @AuthenticationPrincipal OrgActor requester,
                                            @Valid @RequestBody CreateOrganisationRoleRequest request) {
-        return roleService.create(slug, organisationSlug, requester, request);
+        return roleService.create(slug, organisationId, requester, request);
     }
 
     @GetMapping("/{roleId}")
     @PreAuthorize("hasAnyRole('SUPER_USER','READ_ONLY') or hasAuthority('PERM_ORGANISATION_USER_READ')")
     public OrganisationRoleResponse get(@PathVariable String slug,
-                                        @PathVariable String organisationSlug,
+                                        @PathVariable Long organisationId,
                                         @PathVariable Long roleId,
                                         @AuthenticationPrincipal OrgActor requester) {
-        return roleService.get(slug, organisationSlug, roleId, requester);
+        return roleService.get(slug, organisationId, roleId, requester);
     }
 
     @PatchMapping("/{roleId}")
     @PreAuthorize("hasRole('SUPER_USER')")
     public OrganisationRoleResponse update(@PathVariable String slug,
-                                           @PathVariable String organisationSlug,
+                                           @PathVariable Long organisationId,
                                            @PathVariable Long roleId,
                                            @AuthenticationPrincipal OrgActor requester,
                                            @Valid @RequestBody UpdateOrganisationRoleRequest request) {
-        return roleService.update(slug, organisationSlug, roleId, requester, request);
+        return roleService.update(slug, organisationId, roleId, requester, request);
     }
 
     @DeleteMapping("/{roleId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('SUPER_USER')")
     public ResponseEntity<Void> delete(@PathVariable String slug,
-                                       @PathVariable String organisationSlug,
+                                       @PathVariable Long organisationId,
                                        @PathVariable Long roleId,
                                        @AuthenticationPrincipal OrgActor requester) {
-        roleService.delete(slug, organisationSlug, roleId, requester);
+        roleService.delete(slug, organisationId, roleId, requester);
         return ResponseEntity.noContent().build();
     }
 }

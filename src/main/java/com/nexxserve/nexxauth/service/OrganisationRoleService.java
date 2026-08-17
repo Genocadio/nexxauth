@@ -40,25 +40,25 @@ public class OrganisationRoleService {
     }
 
     @Transactional(readOnly = true)
-    public List<OrganisationRoleResponse> list(String platformSlug, String organisationSlug,
+    public List<OrganisationRoleResponse> list(String platformSlug, Long organisationId,
                                                OrgActor requester) {
-        Organisation organisation = resolve(platformSlug, organisationSlug, requester, false);
+        Organisation organisation = resolve(platformSlug, organisationId, requester, false);
         return roleRepository.findByOrganisationIdOrderByCreatedAtAsc(organisation.getId()).stream()
                 .map(roleMapper::toResponse)
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public OrganisationRoleResponse get(String platformSlug, String organisationSlug, Long roleId,
+    public OrganisationRoleResponse get(String platformSlug, Long organisationId, Long roleId,
                                         OrgActor requester) {
-        Organisation organisation = resolve(platformSlug, organisationSlug, requester, false);
+        Organisation organisation = resolve(platformSlug, organisationId, requester, false);
         return roleMapper.toResponse(findRole(organisation, roleId));
     }
 
     @Transactional
-    public OrganisationRoleResponse create(String platformSlug, String organisationSlug, OrgActor requester,
+    public OrganisationRoleResponse create(String platformSlug, Long organisationId, OrgActor requester,
                                            CreateOrganisationRoleRequest request) {
-        Organisation organisation = resolve(platformSlug, organisationSlug, requester, true);
+        Organisation organisation = resolve(platformSlug, organisationId, requester, true);
         if (roleRepository.existsByOrganisationIdAndName(organisation.getId(), request.name())) {
             throw new ConflictException("A role named " + request.name()
                     + " already exists in this organisation");
@@ -71,9 +71,9 @@ public class OrganisationRoleService {
     }
 
     @Transactional
-    public OrganisationRoleResponse update(String platformSlug, String organisationSlug, Long roleId,
+    public OrganisationRoleResponse update(String platformSlug, Long organisationId, Long roleId,
                                            OrgActor requester, UpdateOrganisationRoleRequest request) {
-        Organisation organisation = resolve(platformSlug, organisationSlug, requester, true);
+        Organisation organisation = resolve(platformSlug, organisationId, requester, true);
         OrganisationRole role = findRole(organisation, roleId);
 
         if (request.name() != null && !request.name().equals(role.getName())) {
@@ -94,8 +94,8 @@ public class OrganisationRoleService {
     }
 
     @Transactional
-    public void delete(String platformSlug, String organisationSlug, Long roleId, OrgActor requester) {
-        Organisation organisation = resolve(platformSlug, organisationSlug, requester, true);
+    public void delete(String platformSlug, Long organisationId, Long roleId, OrgActor requester) {
+        Organisation organisation = resolve(platformSlug, organisationId, requester, true);
         roleRepository.delete(findRole(organisation, roleId));
     }
 
@@ -112,17 +112,15 @@ public class OrganisationRoleService {
                 .orElseThrow(() -> ResourceNotFoundException.of("Organisation role", roleId));
     }
 
-    private Organisation resolve(String platformSlug, String organisationSlug, OrgActor requester,
+    private Organisation resolve(String platformSlug, Long organisationId, OrgActor requester,
                                  boolean write) {
         Platform platform = platformAccess.findPlatform(platformSlug);
+        Organisation organisation = organisationAccess.findOrganisationById(organisationId);
         if (write) {
-            // Role management stays a platform super-user action (there is no
-            // role-management permission in the app-fixed set).
             platformAccess.requireSuperUser(platform, requester);
         } else {
-            organisationAccess.requireRead(platform, organisationAccess.findOrganisation(platform, organisationSlug),
-                    requester);
+            organisationAccess.requireRead(platform, organisation, requester);
         }
-        return organisationAccess.findOrganisation(platform, organisationSlug);
+        return organisation;
     }
 }

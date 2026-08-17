@@ -3,6 +3,7 @@ package com.nexxserve.nexxauth.service;
 import com.nexxserve.nexxauth.dto.request.UpdateOrganisationSessionSettingsRequest;
 import com.nexxserve.nexxauth.dto.response.OrganisationSessionSettingsResponse;
 import com.nexxserve.nexxauth.entity.Organisation;
+import com.nexxserve.nexxauth.entity.OrganisationClient;
 import com.nexxserve.nexxauth.entity.OrganisationSessionSettings;
 import com.nexxserve.nexxauth.exception.BadRequestException;
 import com.nexxserve.nexxauth.repository.OrganisationSessionSettingsRepository;
@@ -83,18 +84,45 @@ public class OrganisationSessionSettingsService {
     /** Access-token lifetime applied when issuing org access tokens. */
     @Transactional
     public Duration accessTokenTtl(Organisation organisation) {
+        return accessTokenTtl(organisation, null);
+    }
+
+    /** Access-token lifetime: client override when set, otherwise org default. */
+    @Transactional
+    public Duration accessTokenTtl(Organisation organisation, OrganisationClient client) {
+        if (client != null && client.getAccessTokenTtlSeconds() != null) {
+            return Duration.ofSeconds(client.getAccessTokenTtlSeconds());
+        }
         return Duration.ofSeconds(settingsOf(organisation).getAccessTokenTtlSeconds());
     }
 
     /** Refresh-token lifetime applied when issuing/rotating org refresh tokens. */
     @Transactional
     public Duration refreshTokenTtl(Organisation organisation) {
+        return refreshTokenTtl(organisation, null);
+    }
+
+    /** Refresh-token lifetime: client override when set, otherwise org default. */
+    @Transactional
+    public Duration refreshTokenTtl(Organisation organisation, OrganisationClient client) {
+        if (client != null && client.getRefreshTokenTtlSeconds() != null) {
+            return Duration.ofSeconds(client.getRefreshTokenTtlSeconds());
+        }
         return Duration.ofSeconds(settingsOf(organisation).getRefreshTokenTtlSeconds());
     }
 
     /** Concurrent-session limit for an org user ({@code >= 1}). */
     @Transactional
     public int maxSessionsPerUser(Organisation organisation) {
+        return maxSessionsPerUser(organisation, null);
+    }
+
+    /** Concurrent-session limit: client override when set, otherwise org default. */
+    @Transactional
+    public int maxSessionsPerUser(Organisation organisation, OrganisationClient client) {
+        if (client != null && client.getMaxSessionsPerUser() != null) {
+            return client.getMaxSessionsPerUser();
+        }
         return settingsOf(organisation).getMaxSessionsPerUser();
     }
 

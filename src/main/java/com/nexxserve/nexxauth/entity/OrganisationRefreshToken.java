@@ -41,6 +41,10 @@ public class OrganisationRefreshToken extends BaseEntity {
     @Column(name = "evicted_at")
     private Instant evictedAt;
 
+    /** The client key that issued this token (for per-client session settings). */
+    @Column(name = "client_key", length = 64)
+    private String clientKey;
+
     public boolean isExpired() {
         return expiresAt.isBefore(Instant.now());
     }

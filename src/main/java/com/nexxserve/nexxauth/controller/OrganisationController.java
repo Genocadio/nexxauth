@@ -40,9 +40,6 @@ public class OrganisationController {
     @PreAuthorize("hasAnyRole('SUPER_USER','READ_ONLY')")
     public List<OrganisationResponse> list(@PathVariable String slug,
                                            @AuthenticationPrincipal OrgActor requester) {
-        // Listing is platform-level: org users only ever see their own org
-        // via GET /organisations/{orgSlug} (or /users/me), never the platform's
-        // full directory.
         return organisationService.list(slug, requester);
     }
 
@@ -55,30 +52,30 @@ public class OrganisationController {
         return organisationService.create(slug, requester, request);
     }
 
-    @GetMapping("/{organisationSlug}")
+    @GetMapping("/{organisationId}")
     @PreAuthorize("hasAnyRole('SUPER_USER','READ_ONLY') or hasAuthority('ORG_USER')")
     public OrganisationResponse get(@PathVariable String slug,
-                                    @PathVariable String organisationSlug,
+                                    @PathVariable Long organisationId,
                                     @AuthenticationPrincipal OrgActor requester) {
-        return organisationService.get(slug, organisationSlug, requester);
+        return organisationService.get(slug, organisationId, requester);
     }
 
-    @PatchMapping("/{organisationSlug}")
+    @PatchMapping("/{organisationId}")
     @PreAuthorize("hasRole('SUPER_USER')")
     public OrganisationResponse update(@PathVariable String slug,
-                                       @PathVariable String organisationSlug,
+                                       @PathVariable Long organisationId,
                                        @AuthenticationPrincipal OrgActor requester,
                                        @Valid @RequestBody UpdateOrganisationRequest request) {
-        return organisationService.update(slug, organisationSlug, requester, request);
+        return organisationService.update(slug, organisationId, requester, request);
     }
 
-    @DeleteMapping("/{organisationSlug}")
+    @DeleteMapping("/{organisationId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('SUPER_USER')")
     public ResponseEntity<Void> delete(@PathVariable String slug,
-                                       @PathVariable String organisationSlug,
+                                       @PathVariable Long organisationId,
                                        @AuthenticationPrincipal OrgActor requester) {
-        organisationService.delete(slug, organisationSlug, requester);
+        organisationService.delete(slug, organisationId, requester);
         return ResponseEntity.noContent().build();
     }
 }

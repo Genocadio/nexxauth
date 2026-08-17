@@ -49,8 +49,9 @@ class OrganisationClientIntegrationTest {
     @Test
     void clientLifecycle() throws Exception {
         String boss = register("client-boss@nexx.io", "Client Platform");
-        String platform = createOrg(boss, ORG_SLUG);
-        String clients = clientsPath(platform);
+        long orgId = createOrg(boss, ORG_SLUG);
+        String platform = getPlatformSlug(boss);
+        String clients = clientsPath(platform, orgId);
 
         // web client: never authenticated, no token, CORS origins stored as list
         MvcResult web = mockMvc.perform(post(clients)
@@ -115,7 +116,7 @@ class OrganisationClientIntegrationTest {
         String rotatedToken = objectMapper.readTree(rotated.getResponse().getContentAsString()).get("token").asText();
 
         // rotating changes the accepted token
-        String users = usersPath(platform);
+        String users = usersPath(platform, orgId);
         mockMvc.perform(get(users)
                         .header("X-Client-Id", serverKey)
                         .header("Authorization", bearer(serverToken)))
@@ -135,8 +136,9 @@ class OrganisationClientIntegrationTest {
     @Test
     void typeRulesAreEnforced() throws Exception {
         String boss = register("client-type@nexx.io", "Client Type Platform");
-        String platform = createOrg(boss, ORG_SLUG);
-        String clients = clientsPath(platform);
+        long orgId = createOrg(boss, ORG_SLUG);
+        String platform = getPlatformSlug(boss);
+        String clients = clientsPath(platform, orgId);
 
         // forced rules cannot be contradicted
         mockMvc.perform(post(clients)
@@ -194,9 +196,10 @@ class OrganisationClientIntegrationTest {
     @Test
     void accessRulesFollowClientTypeAndToken() throws Exception {
         String boss = register("client-access@nexx.io", "Client Access Platform");
-        String platform = createOrg(boss, ORG_SLUG);
-        String clients = clientsPath(platform);
-        String users = usersPath(platform);
+        long orgId = createOrg(boss, ORG_SLUG);
+        String platform = getPlatformSlug(boss);
+        String clients = clientsPath(platform, orgId);
+        String users = usersPath(platform, orgId);
         String orgLogin = "/" + platform + "/auth/login";
         String orgRegister = "/" + platform + "/auth/register";
         String orgRefresh = "/" + platform + "/auth/refresh";
@@ -266,8 +269,8 @@ class OrganisationClientIntegrationTest {
                 .andExpect(status().isBadRequest());
 
         // clients are scoped to their own organisation
-        createOrg(boss, "other-co");
-        mockMvc.perform(get("/" + platform + "/organisations/other-co/users")
+        long otherOrgId = createOrg(boss, "other-co");
+        mockMvc.perform(get("/" + platform + "/organisations/" + otherOrgId + "/users")
                         .header("X-Client-Id", server.clientKey)
                         .header("Authorization", bearer(server.token)))
                 .andExpect(status().isForbidden());
@@ -276,17 +279,14 @@ class OrganisationClientIntegrationTest {
     @Test
     void webClientLetsAuthenticatedOrgUserThrough() throws Exception {
         String boss = register("client-webuser@nexx.io", "Client Web User Platform");
-        String platform = createOrg(boss, ORG_SLUG);
-        String clients = clientsPath(platform);
-        String users = usersPath(platform);
+        long orgId = createOrg(boss, ORG_SLUG);
+        String platform = getPlatformSlug(boss);
+        String clients = clientsPath(platform, orgId);
+        String users = usersPath(platform, orgId);
         String orgAuth = "/" + platform + "/auth";
 
         String webKey = createClient(boss, clients, "Web", "WEB", null);
-        String orgPath = "/" + platform + "/organisations/" + ORG_SLUG;
-        long orgId = objectMapper.readTree(mockMvc.perform(get(orgPath)
-                        .header("Authorization", bearer(boss)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString()).get("id").asLong();
+        String orgPath = "/" + platform + "/organisations/" + orgId;
 
         // an org user holding READ permission
         long roleId = objectMapper.readTree(mockMvc.perform(post(orgPath + "/roles")
@@ -333,16 +333,13 @@ class OrganisationClientIntegrationTest {
     @Test
     void orgUserFromForeignOriginWithoutClientIsBlocked() throws Exception {
         String boss = register("client-foreign@nexx.io", "Client Foreign Platform");
-        String platform = createOrg(boss, ORG_SLUG);
-        String clients = clientsPath(platform);
-        String users = usersPath(platform);
+        long orgId = createOrg(boss, ORG_SLUG);
+        String platform = getPlatformSlug(boss);
+        String clients = clientsPath(platform, orgId);
+        String users = usersPath(platform, orgId);
         String orgAuth = "/" + platform + "/auth";
 
-        String orgPath = "/" + platform + "/organisations/" + ORG_SLUG;
-        long orgId = objectMapper.readTree(mockMvc.perform(get(orgPath)
-                        .header("Authorization", bearer(boss)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString()).get("id").asLong();
+        String orgPath = "/" + platform + "/organisations/" + orgId;
 
         // an org user with READ, no client at all
         long roleId = objectMapper.readTree(mockMvc.perform(post(orgPath + "/roles")
@@ -400,8 +397,9 @@ class OrganisationClientIntegrationTest {
     @Test
     void corsAppliesPerClient() throws Exception {
         String boss = register("client-cors@nexx.io", "Client Cors Platform");
-        String platform = createOrg(boss, ORG_SLUG);
-        String clients = clientsPath(platform);
+        long orgId = createOrg(boss, ORG_SLUG);
+        String platform = getPlatformSlug(boss);
+        String clients = clientsPath(platform, orgId);
 
         String webKey = createClient(boss, clients, "Web", "WEB",
                 Map.of("allowedOrigins", List.of("https://app.example.com")));
@@ -435,7 +433,7 @@ class OrganisationClientIntegrationTest {
                 .andExpect(header().string("Access-Control-Allow-Origin", "https://app.example.com"));
 
         // CORS applies to server clients too (trusted origins)
-        mockMvc.perform(options("/" + platform + "/organisations/" + ORG_SLUG + "/users")
+        mockMvc.perform(options("/" + platform + "/organisations/" + orgId + "/users")
                         .header("X-Client-Id", serverKey)
                         .header("Origin", "https://svc.example.com")
                         .header("Access-Control-Request-Method", "GET"))
@@ -459,21 +457,26 @@ class OrganisationClientIntegrationTest {
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("accessToken").asText();
     }
 
-    /** Creates the org and returns the boss's platform slug. */
-    private String createOrg(String boss, String slug) throws Exception {
-        String platformSlug = objectMapper.readTree(
+    /** Creates the org and returns the org ID. */
+    private long createOrg(String boss, String slug) throws Exception {
+        String platformSlug = getPlatformSlug(boss);
+        MvcResult result = mockMvc.perform(post("/" + platformSlug + "/organisations")
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("name", slug, "slug", slug))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
+    }
+
+    private String getPlatformSlug(String boss) throws Exception {
+        return objectMapper.readTree(
                         mockMvc.perform(get("/auth/me")
                                         .header("Authorization", bearer(boss)))
                                 .andExpect(status().isOk())
                                 .andReturn()
                                 .getResponse().getContentAsString())
                 .get("platform").get("slug").asText();
-        mockMvc.perform(post("/" + platformSlug + "/organisations")
-                        .header("Authorization", bearer(boss))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("name", slug, "slug", slug))))
-                .andExpect(status().isCreated());
-        return platformSlug;
     }
 
     private String createClient(String boss, String clients, String name, String type,
@@ -506,12 +509,12 @@ class OrganisationClientIntegrationTest {
     private record Client(String clientKey, String token) {
     }
 
-    private String clientsPath(String platformSlug) {
-        return "/" + platformSlug + "/organisations/" + ORG_SLUG + "/clients";
+    private String clientsPath(String platformSlug, long orgId) {
+        return "/" + platformSlug + "/organisations/" + orgId + "/clients";
     }
 
-    private String usersPath(String platformSlug) {
-        return "/" + platformSlug + "/organisations/" + ORG_SLUG + "/users";
+    private String usersPath(String platformSlug, long orgId) {
+        return "/" + platformSlug + "/organisations/" + orgId + "/users";
     }
 
     private String clientKey(MvcResult result) throws Exception {

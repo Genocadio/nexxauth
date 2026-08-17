@@ -57,24 +57,24 @@ public class OrganisationClientService {
     }
 
     @Transactional(readOnly = true)
-    public List<OrganisationClientResponse> list(String platformSlug, String organisationSlug, OrgActor requester) {
-        Organisation organisation = resolve(platformSlug, organisationSlug, requester, false);
+    public List<OrganisationClientResponse> list(String platformSlug, Long organisationId, OrgActor requester) {
+        Organisation organisation = resolve(platformSlug, organisationId, requester, false);
         return clientRepository.findByOrganisationIdOrderByNameAsc(organisation.getId()).stream()
                 .map(client -> toResponse(client, null))
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public OrganisationClientResponse get(String platformSlug, String organisationSlug, String clientKey,
+    public OrganisationClientResponse get(String platformSlug, Long organisationId, String clientKey,
                                           OrgActor requester) {
-        Organisation organisation = resolve(platformSlug, organisationSlug, requester, false);
+        Organisation organisation = resolve(platformSlug, organisationId, requester, false);
         return toResponse(findClientEntity(organisation, clientKey), null);
     }
 
     @Transactional
-    public OrganisationClientResponse create(String platformSlug, String organisationSlug, OrgActor requester,
+    public OrganisationClientResponse create(String platformSlug, Long organisationId, OrgActor requester,
                                              CreateOrganisationClientRequest request) {
-        Organisation organisation = resolve(platformSlug, organisationSlug, requester, true);
+        Organisation organisation = resolve(platformSlug, organisationId, requester, true);
         if (clientRepository.existsByOrganisationIdAndName(organisation.getId(), request.name())) {
             throw new ConflictException("A client named " + request.name()
                     + " already exists in this organisation");
@@ -90,6 +90,9 @@ public class OrganisationClientService {
         client.setEnabled(request.enabled() == null || request.enabled());
         client.setAllowedOrigins(clientMapper.joinOrigins(parseOrigins(request.allowedOrigins())));
         client.setSettings(serializeSettings(request.settings()));
+        client.setAccessTokenTtlSeconds(request.accessTokenTtlSeconds());
+        client.setRefreshTokenTtlSeconds(request.refreshTokenTtlSeconds());
+        client.setMaxSessionsPerUser(request.maxSessionsPerUser());
 
         String token = null;
         if (requireAuth) {
@@ -100,9 +103,9 @@ public class OrganisationClientService {
     }
 
     @Transactional
-    public OrganisationClientResponse update(String platformSlug, String organisationSlug, String clientKey,
+    public OrganisationClientResponse update(String platformSlug, Long organisationId, String clientKey,
                                              OrgActor requester, UpdateOrganisationClientRequest request) {
-        Organisation organisation = resolve(platformSlug, organisationSlug, requester, true);
+        Organisation organisation = resolve(platformSlug, organisationId, requester, true);
         OrganisationClient client = findClientEntity(organisation, clientKey);
 
         if (request.name() != null && !request.name().equals(client.getName())) {
@@ -137,19 +140,29 @@ public class OrganisationClientService {
         if (request.settings() != null) {
             client.setSettings(serializeSettings(request.settings()));
         }
+        // Session overrides: negative value clears back to org default.
+        if (request.accessTokenTtlSeconds() != null) {
+            client.setAccessTokenTtlSeconds(request.accessTokenTtlSeconds() > 0 ? request.accessTokenTtlSeconds() : null);
+        }
+        if (request.refreshTokenTtlSeconds() != null) {
+            client.setRefreshTokenTtlSeconds(request.refreshTokenTtlSeconds() > 0 ? request.refreshTokenTtlSeconds() : null);
+        }
+        if (request.maxSessionsPerUser() != null) {
+            client.setMaxSessionsPerUser(request.maxSessionsPerUser() > 0 ? request.maxSessionsPerUser() : null);
+        }
         return toResponse(clientRepository.save(client), newToken);
     }
 
     @Transactional
-    public void delete(String platformSlug, String organisationSlug, String clientKey, OrgActor requester) {
-        Organisation organisation = resolve(platformSlug, organisationSlug, requester, true);
+    public void delete(String platformSlug, Long organisationId, String clientKey, OrgActor requester) {
+        Organisation organisation = resolve(platformSlug, organisationId, requester, true);
         clientRepository.delete(findClientEntity(organisation, clientKey));
     }
 
     @Transactional
-    public OrganisationClientResponse rotateToken(String platformSlug, String organisationSlug, String clientKey,
+    public OrganisationClientResponse rotateToken(String platformSlug, Long organisationId, String clientKey,
                                                   OrgActor requester) {
-        Organisation organisation = resolve(platformSlug, organisationSlug, requester, true);
+        Organisation organisation = resolve(platformSlug, organisationId, requester, true);
         OrganisationClient client = findClientEntity(organisation, clientKey);
         if (!client.isRequireAuthentication()) {
             throw new BadRequestException("This client does not require authentication, so it has no token");
@@ -190,10 +203,10 @@ public class OrganisationClientService {
                 .orElseThrow(() -> ResourceNotFoundException.of("Organisation client", clientKey));
     }
 
-    private Organisation resolve(String platformSlug, String organisationSlug, OrgActor requester,
+    private Organisation resolve(String platformSlug, Long organisationId, OrgActor requester,
                                  boolean write) {
         Platform platform = platformAccess.findPlatform(platformSlug);
-        Organisation organisation = organisationAccess.findOrganisation(platform, organisationSlug);
+        Organisation organisation = organisationAccess.findOrganisationById(organisationId);
         if (write) {
             platformAccess.requireSuperUser(platform, requester);
         } else {
@@ -248,6 +261,8 @@ public class OrganisationClientService {
         return new OrganisationClientResponse(
                 base.clientKey(), base.name(), base.type(), base.requireAuthentication(),
                 base.allowedOrigins(), base.enabled(), deserializeSettings(client.getSettings()),
-                base.createdAt(), token);
+                base.createdAt(), token,
+                client.getAccessTokenTtlSeconds(), client.getRefreshTokenTtlSeconds(),
+                client.getMaxSessionsPerUser());
     }
 }

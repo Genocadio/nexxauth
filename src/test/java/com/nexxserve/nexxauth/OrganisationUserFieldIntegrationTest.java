@@ -40,11 +40,10 @@ class OrganisationUserFieldIntegrationTest {
     @Test
     void fieldCrudMetadataRoundTripAndValidation() throws Exception {
         String platform = "/" + SLUGS[0];
-        String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("ouf-roundtrip@nexx.io", SLUGS[0]);
-        createOrganisation(boss, platform);
-        long orgId = getOrgId(boss, org);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
 
         createField(boss, org, "employee-id", "STRING", true);
         createField(boss, org, "active", "BOOLEAN", false);
@@ -122,11 +121,10 @@ class OrganisationUserFieldIntegrationTest {
     @Test
     void loginByLoginEnabledFieldsWithNormalizedValuesAndUniqueness() throws Exception {
         String platform = "/" + SLUGS[1];
-        String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("ouf-login@nexx.io", SLUGS[1]);
-        createOrganisation(boss, platform);
-        long orgId = getOrgId(boss, org);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
 
         createField(boss, org, "employee-id", "STRING", true);
         createField(boss, org, "score", "NUMBER", true);
@@ -208,11 +206,10 @@ class OrganisationUserFieldIntegrationTest {
     @Test
     void fieldManagementIsGatedByOrgRolePermissions() throws Exception {
         String platform = "/" + SLUGS[2];
-        String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("ouf-rbac@nexx.io", SLUGS[2]);
-        createOrganisation(boss, platform);
-        long orgId = getOrgId(boss, org);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
 
         long adminRole = createRole(boss, org, "FieldAdmin",
                 "ORGANISATION_USER_FIELD_READ",
@@ -282,11 +279,10 @@ class OrganisationUserFieldIntegrationTest {
     @Test
     void registerAcceptsValidatedMetadata() throws Exception {
         String platform = "/" + SLUGS[3];
-        String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("ouf-reg@nexx.io", SLUGS[3]);
-        createOrganisation(boss, platform);
-        long orgId = getOrgId(boss, org);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
 
         createField(boss, org, "badge", "STRING", false);
 
@@ -316,11 +312,10 @@ class OrganisationUserFieldIntegrationTest {
     @Test
     void typeChangeBlockedAndLoginEnableRejectsDuplicateValues() throws Exception {
         String platform = "/" + SLUGS[4];
-        String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("ouf-guard@nexx.io", SLUGS[4]);
-        createOrganisation(boss, platform);
-        long orgId = getOrgId(boss, org);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
 
         long tag = getId(mockMvc.perform(post(org + "/user-fields")
                         .header("Authorization", bearer(boss))
@@ -366,11 +361,10 @@ class OrganisationUserFieldIntegrationTest {
     @Test
     void deletingFieldRemovesValuesAndBreaksLogin() throws Exception {
         String platform = "/" + SLUGS[5];
-        String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("ouf-del@nexx.io", SLUGS[5]);
-        createOrganisation(boss, platform);
-        long orgId = getOrgId(boss, org);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
 
         long fieldId = createField(boss, org, "emp", "STRING", true);
         long carol = createUserWithPassword(boss, org, "carol", Map.of("emp", "E1"));
@@ -413,18 +407,14 @@ class OrganisationUserFieldIntegrationTest {
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("accessToken").asText();
     }
 
-    private void createOrganisation(String boss, String platform) throws Exception {
-        mockMvc.perform(post(platform + "/organisations")
+    private long createOrganisation(String boss, String platform) throws Exception {
+        MvcResult result = mockMvc.perform(post(platform + "/organisations")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "OUF Org", "slug", ORG_SLUG))))
-                .andExpect(status().isCreated());
-    }
-
-    private long getOrgId(String boss, String org) throws Exception {
-        return getId(mockMvc.perform(get(org).header("Authorization", bearer(boss)))
-                .andExpect(status().isOk())
-                .andReturn(), "/id");
+                .andExpect(status().isCreated())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
     }
 
     private long createField(String boss, String org, String key, String type, boolean loginEnabled)

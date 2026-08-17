@@ -8,13 +8,15 @@ export const queryKeys = {
   platformUsers: ["platform-users"] as const,
 
   organisations: ["organisations"] as const,
-  organisation: (organisationSlug: string) => ["organisation", organisationSlug] as const,
-  orgUsers: (organisationSlug: string) => [...queryKeys.organisation(organisationSlug), "users"] as const,
-  orgRoles: (organisationSlug: string) => [...queryKeys.organisation(organisationSlug), "roles"] as const,
-  orgAuthConfig: (organisationSlug: string) => [...queryKeys.organisation(organisationSlug), "auth-config"] as const,
-  orgSessionSettings: (organisationSlug: string) =>
-    [...queryKeys.organisation(organisationSlug), "session-settings"] as const,
-  orgUserFields: (organisationSlug: string) => [...queryKeys.organisation(organisationSlug), "user-fields"] as const,
-  orgKeys: (organisationSlug: string) => [...queryKeys.organisation(organisationSlug), "keys"] as const,
-  orgClients: (organisationSlug: string) => [...queryKeys.organisation(organisationSlug), "clients"] as const,
+  organisation: (organisationId: number) => ["organisation", organisationId] as const,
+  orgUsers: (organisationId: number) => [...queryKeys.organisation(organisationId), "users"] as const,
+  orgRoles: (organisationId: number) => [...queryKeys.organisation(organisationId), "roles"] as const,
+  orgAuthConfig: (organisationId: number) => [...queryKeys.organisation(organisationId), "auth-config"] as const,
+  orgSessionSettings: (organisationId: number) =>
+    [...queryKeys.organisation(organisationId), "session-settings"] as const,
+  orgUserFields: (organisationId: number) => [...queryKeys.organisation(organisationId), "user-fields"] as const,
+  orgKeys: (organisationId: number) => [...queryKeys.organisation(organisationId), "keys"] as const,
+  orgClients: (organisationId: number) => [...queryKeys.organisation(organisationId), "clients"] as const,
+  docsContext: (platformSlug: string, organisationId: number) =>
+    ["docs", platformSlug, organisationId] as const,
 } as const;

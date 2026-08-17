@@ -109,24 +109,24 @@ export function useCreateOrganisation(platformSlug: string) {
   });
 }
 
-export function useUpdateOrganisation(platformSlug: string, organisationSlug: string) {
+export function useUpdateOrganisation(platformSlug: string, organisationId: number) {
   return useApiMutation<OrganisationResponse, UpdateOrganisationRequest>({
-    mutationFn: (body) => organisationsApi.update(platformSlug, organisationSlug, body),
+    mutationFn: (body) => organisationsApi.update(platformSlug, organisationId, body),
     invalidate: [
       (qc) => qc.invalidateQueries({ queryKey: queryKeys.organisations }),
-      (qc) => qc.invalidateQueries({ queryKey: queryKeys.organisation(organisationSlug) }),
+      (qc) => qc.invalidateQueries({ queryKey: queryKeys.organisation(organisationId) }),
     ],
     successMessage: "Organisation updated",
   });
 }
 
-export function useDeleteOrganisation(platformSlug: string, organisationSlug: string) {
+export function useDeleteOrganisation(platformSlug: string, organisationId: number) {
   return useApiMutation<void, void>({
-    mutationFn: () => organisationsApi.remove(platformSlug, organisationSlug),
+    mutationFn: () => organisationsApi.remove(platformSlug, organisationId),
     invalidate: [
       (qc) => qc.invalidateQueries({ queryKey: queryKeys.organisations }),
       (qc) => qc.invalidateQueries({ queryKey: queryKeys.platform }),
-      (qc) => qc.removeQueries({ queryKey: queryKeys.organisation(organisationSlug) }),
+      (qc) => qc.removeQueries({ queryKey: queryKeys.organisation(organisationId) }),
     ],
     successMessage: "Organisation deleted",
   });
@@ -136,29 +136,29 @@ export function useDeleteOrganisation(platformSlug: string, organisationSlug: st
 // Organisation users
 // ---------------------------------------------------------------------------
 
-export function useCreateOrgUser(platformSlug: string, organisationSlug: string) {
+export function useCreateOrgUser(platformSlug: string, organisationId: number) {
   return useApiMutation<OrganisationUserResponse, CreateOrganisationUserRequest>({
-    mutationFn: (body) => organisationsApi.createUser(platformSlug, organisationSlug, body),
-    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgUsers(organisationSlug) })],
+    mutationFn: (body) => organisationsApi.createUser(platformSlug, organisationId, body),
+    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgUsers(organisationId) })],
     successMessage: "User created",
   });
 }
 
-export function useUpdateOrgUser(platformSlug: string, organisationSlug: string) {
+export function useUpdateOrgUser(platformSlug: string, organisationId: number) {
   return useApiMutation<OrganisationUserResponse, { userId: number; body: UpdateOrganisationUserRequest }>({
-    mutationFn: ({ userId, body }) => organisationsApi.updateUser(platformSlug, organisationSlug, userId, body),
+    mutationFn: ({ userId, body }) => organisationsApi.updateUser(platformSlug, organisationId, userId, body),
     invalidate: [
-      (qc) => qc.invalidateQueries({ queryKey: queryKeys.orgUsers(organisationSlug) }),
-      (qc) => qc.invalidateQueries({ queryKey: queryKeys.orgRoles(organisationSlug) }),
+      (qc) => qc.invalidateQueries({ queryKey: queryKeys.orgUsers(organisationId) }),
+      (qc) => qc.invalidateQueries({ queryKey: queryKeys.orgRoles(organisationId) }),
     ],
     successMessage: "User updated",
   });
 }
 
-export function useDeleteOrgUser(platformSlug: string, organisationSlug: string) {
+export function useDeleteOrgUser(platformSlug: string, organisationId: number) {
   return useApiMutation<void, number>({
-    mutationFn: (userId) => organisationsApi.deleteUser(platformSlug, organisationSlug, userId),
-    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgUsers(organisationSlug) })],
+    mutationFn: (userId) => organisationsApi.deleteUser(platformSlug, organisationId, userId),
+    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgUsers(organisationId) })],
     successMessage: "User deleted",
   });
 }
@@ -167,29 +167,29 @@ export function useDeleteOrgUser(platformSlug: string, organisationSlug: string)
 // Organisation roles
 // ---------------------------------------------------------------------------
 
-export function useCreateOrgRole(platformSlug: string, organisationSlug: string) {
+export function useCreateOrgRole(platformSlug: string, organisationId: number) {
   return useApiMutation<OrganisationRoleResponse, CreateOrganisationRoleRequest>({
-    mutationFn: (body) => organisationsApi.createRole(platformSlug, organisationSlug, body),
-    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgRoles(organisationSlug) })],
+    mutationFn: (body) => organisationsApi.createRole(platformSlug, organisationId, body),
+    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgRoles(organisationId) })],
     successMessage: "Role created",
   });
 }
 
-export function useUpdateOrgRole(platformSlug: string, organisationSlug: string) {
+export function useUpdateOrgRole(platformSlug: string, organisationId: number) {
   return useApiMutation<OrganisationRoleResponse, { roleId: number; body: UpdateOrganisationRoleRequest }>({
-    mutationFn: ({ roleId, body }) => organisationsApi.updateRole(platformSlug, organisationSlug, roleId, body),
+    mutationFn: ({ roleId, body }) => organisationsApi.updateRole(platformSlug, organisationId, roleId, body),
     invalidate: [
-      (qc) => qc.invalidateQueries({ queryKey: queryKeys.orgRoles(organisationSlug) }),
-      (qc) => qc.invalidateQueries({ queryKey: queryKeys.orgUsers(organisationSlug) }),
+      (qc) => qc.invalidateQueries({ queryKey: queryKeys.orgRoles(organisationId) }),
+      (qc) => qc.invalidateQueries({ queryKey: queryKeys.orgUsers(organisationId) }),
     ],
     successMessage: "Role updated",
   });
 }
 
-export function useDeleteOrgRole(platformSlug: string, organisationSlug: string) {
+export function useDeleteOrgRole(platformSlug: string, organisationId: number) {
   return useApiMutation<void, number>({
-    mutationFn: (roleId) => organisationsApi.deleteRole(platformSlug, organisationSlug, roleId),
-    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgRoles(organisationSlug) })],
+    mutationFn: (roleId) => organisationsApi.deleteRole(platformSlug, organisationId, roleId),
+    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgRoles(organisationId) })],
     successMessage: "Role deleted",
   });
 }
@@ -198,18 +198,18 @@ export function useDeleteOrgRole(platformSlug: string, organisationSlug: string)
 // Org auth config & session settings
 // ---------------------------------------------------------------------------
 
-export function useUpdateOrgAuthConfig(platformSlug: string, organisationSlug: string) {
+export function useUpdateOrgAuthConfig(platformSlug: string, organisationId: number) {
   return useApiMutation<OrganisationAuthConfigResponse, UpdateOrganisationAuthConfigRequest>({
-    mutationFn: (body) => organisationsApi.updateAuthConfig(platformSlug, organisationSlug, body),
-    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgAuthConfig(organisationSlug) })],
+    mutationFn: (body) => organisationsApi.updateAuthConfig(platformSlug, organisationId, body),
+    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgAuthConfig(organisationId) })],
     successMessage: "Authentication settings saved",
   });
 }
 
-export function useUpdateOrgSessionSettings(platformSlug: string, organisationSlug: string) {
+export function useUpdateOrgSessionSettings(platformSlug: string, organisationId: number) {
   return useApiMutation<OrganisationSessionSettingsResponse, UpdateOrganisationSessionSettingsRequest>({
-    mutationFn: (body) => organisationsApi.updateSessionSettings(platformSlug, organisationSlug, body),
-    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgSessionSettings(organisationSlug) })],
+    mutationFn: (body) => organisationsApi.updateSessionSettings(platformSlug, organisationId, body),
+    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgSessionSettings(organisationId) })],
     successMessage: "Session settings saved",
   });
 }
@@ -218,26 +218,26 @@ export function useUpdateOrgSessionSettings(platformSlug: string, organisationSl
 // Organisation user fields
 // ---------------------------------------------------------------------------
 
-export function useCreateUserField(platformSlug: string, organisationSlug: string) {
+export function useCreateUserField(platformSlug: string, organisationId: number) {
   return useApiMutation<OrganisationUserFieldResponse, CreateOrganisationUserFieldRequest>({
-    mutationFn: (body) => organisationsApi.createUserField(platformSlug, organisationSlug, body),
-    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgUserFields(organisationSlug) })],
+    mutationFn: (body) => organisationsApi.createUserField(platformSlug, organisationId, body),
+    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgUserFields(organisationId) })],
     successMessage: "User field created",
   });
 }
 
-export function useUpdateUserField(platformSlug: string, organisationSlug: string) {
+export function useUpdateUserField(platformSlug: string, organisationId: number) {
   return useApiMutation<OrganisationUserFieldResponse, { fieldId: number; body: UpdateOrganisationUserFieldRequest }>({
-    mutationFn: ({ fieldId, body }) => organisationsApi.updateUserField(platformSlug, organisationSlug, fieldId, body),
-    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgUserFields(organisationSlug) })],
+    mutationFn: ({ fieldId, body }) => organisationsApi.updateUserField(platformSlug, organisationId, fieldId, body),
+    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgUserFields(organisationId) })],
     successMessage: "User field updated",
   });
 }
 
-export function useDeleteUserField(platformSlug: string, organisationSlug: string) {
+export function useDeleteUserField(platformSlug: string, organisationId: number) {
   return useApiMutation<void, number>({
-    mutationFn: (fieldId) => organisationsApi.deleteUserField(platformSlug, organisationSlug, fieldId),
-    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgUserFields(organisationSlug) })],
+    mutationFn: (fieldId) => organisationsApi.deleteUserField(platformSlug, organisationId, fieldId),
+    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgUserFields(organisationId) })],
     successMessage: "User field deleted",
   });
 }
@@ -246,10 +246,10 @@ export function useDeleteUserField(platformSlug: string, organisationSlug: strin
 // Signing keys
 // ---------------------------------------------------------------------------
 
-export function useRotateOrgKey(platformSlug: string, organisationSlug: string) {
+export function useRotateOrgKey(platformSlug: string, organisationId: number) {
   return useApiMutation<OrganisationKeyResponse, void>({
-    mutationFn: () => organisationsApi.rotateKey(platformSlug, organisationSlug),
-    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgKeys(organisationSlug) })],
+    mutationFn: () => organisationsApi.rotateKey(platformSlug, organisationId),
+    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgKeys(organisationId) })],
     successMessage: "Signing key rotated",
   });
 }
@@ -258,35 +258,35 @@ export function useRotateOrgKey(platformSlug: string, organisationSlug: string) 
 // Organisation clients
 // ---------------------------------------------------------------------------
 
-export function useCreateOrgClient(platformSlug: string, organisationSlug: string) {
+export function useCreateOrgClient(platformSlug: string, organisationId: number) {
   return useApiMutation<OrganisationClientResponse, CreateOrganisationClientRequest>({
-    mutationFn: (body) => organisationsApi.createClient(platformSlug, organisationSlug, body),
-    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgClients(organisationSlug) })],
+    mutationFn: (body) => organisationsApi.createClient(platformSlug, organisationId, body),
+    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgClients(organisationId) })],
     successMessage: "Client created",
   });
 }
 
-export function useUpdateOrgClient(platformSlug: string, organisationSlug: string) {
+export function useUpdateOrgClient(platformSlug: string, organisationId: number) {
   return useApiMutation<OrganisationClientResponse, { clientKey: string; body: UpdateOrganisationClientRequest }>({
     mutationFn: ({ clientKey, body }) =>
-      organisationsApi.updateClient(platformSlug, organisationSlug, clientKey, body),
-    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgClients(organisationSlug) })],
+      organisationsApi.updateClient(platformSlug, organisationId, clientKey, body),
+    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgClients(organisationId) })],
     successMessage: "Client updated",
   });
 }
 
-export function useDeleteOrgClient(platformSlug: string, organisationSlug: string) {
+export function useDeleteOrgClient(platformSlug: string, organisationId: number) {
   return useApiMutation<void, string>({
-    mutationFn: (clientKey) => organisationsApi.deleteClient(platformSlug, organisationSlug, clientKey),
-    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgClients(organisationSlug) })],
+    mutationFn: (clientKey) => organisationsApi.deleteClient(platformSlug, organisationId, clientKey),
+    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgClients(organisationId) })],
     successMessage: "Client deleted",
   });
 }
 
-export function useRotateOrgClientToken(platformSlug: string, organisationSlug: string) {
+export function useRotateOrgClientToken(platformSlug: string, organisationId: number) {
   return useApiMutation<OrganisationClientResponse, string>({
-    mutationFn: (clientKey) => organisationsApi.rotateClientToken(platformSlug, organisationSlug, clientKey),
-    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgClients(organisationSlug) })],
+    mutationFn: (clientKey) => organisationsApi.rotateClientToken(platformSlug, organisationId, clientKey),
+    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgClients(organisationId) })],
     successMessage: "Client token rotated",
   });
 }

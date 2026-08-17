@@ -86,14 +86,14 @@ class HardeningIntegrationTest {
                 .andExpect(status().isBadRequest());
         // object where list of ids expected
         String boss = registerPlatform("hd-types@nexx.io", SLUGS[0]);
-        createOrganisation(boss, SLUGS[0], "Types Org", "types-org");
-        mockMvc.perform(post("/" + SLUGS[0] + "/organisations/types-org/users")
+        long typesOrgId = createOrganisation(boss, SLUGS[0], "Types Org", "types-org");
+        mockMvc.perform(post("/" + SLUGS[0] + "/organisations/" + typesOrgId + "/users")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("firstName", "F", "lastName", "L", "roleIds", "not-a-list"))))
                 .andExpect(status().isBadRequest());
         // session-settings with wrong type
-        mockMvc.perform(patch("/" + SLUGS[0] + "/organisations/types-org/session-settings")
+        mockMvc.perform(patch("/" + SLUGS[0] + "/organisations/" + typesOrgId + "/session-settings")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"maxSessionsPerUser\":\"many\"}"))
@@ -103,22 +103,22 @@ class HardeningIntegrationTest {
     @Test
     void invalidEnumValuesAre400Never500() throws Exception {
         String boss = registerPlatform("hd-enum@nexx.io", SLUGS[1]);
-        createOrganisation(boss, SLUGS[1], "Enum Org", "enum-org");
+        long enumOrgId = createOrganisation(boss, SLUGS[1], "Enum Org", "enum-org");
         // invalid permission enum in role create
-        mockMvc.perform(post("/" + SLUGS[1] + "/organisations/enum-org/roles")
+        mockMvc.perform(post("/" + SLUGS[1] + "/organisations/" + enumOrgId + "/roles")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"Bad\",\"permissions\":[\"NOT_A_REAL_PERMISSION\"]}"))
                 .andExpect(status().isBadRequest());
         // null element inside the permission set (would otherwise fail the
         // NOT NULL join-table constraint with a confusing 409)
-        mockMvc.perform(post("/" + SLUGS[1] + "/organisations/enum-org/roles")
+        mockMvc.perform(post("/" + SLUGS[1] + "/organisations/" + enumOrgId + "/roles")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"NullPerm\",\"permissions\":[null]}"))
                 .andExpect(status().isBadRequest());
         // invalid auth type enum
-        mockMvc.perform(patch("/" + SLUGS[1] + "/organisations/enum-org/auth-config")
+        mockMvc.perform(patch("/" + SLUGS[1] + "/organisations/" + enumOrgId + "/auth-config")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"authType\":\"OTP\"}"))
@@ -134,9 +134,9 @@ class HardeningIntegrationTest {
     @Test
     void outOfRangeValuesAre400Never500() throws Exception {
         String boss = registerPlatform("hd-range@nexx.io", SLUGS[2]);
-        createOrganisation(boss, SLUGS[2], "Range Org", "range-org");
-        String orgUsers = "/" + SLUGS[2] + "/organisations/range-org/users";
-        String org = "/" + SLUGS[2] + "/organisations/range-org";
+        long rangeOrgId = createOrganisation(boss, SLUGS[2], "Range Org", "range-org");
+        String orgUsers = "/" + SLUGS[2] + "/organisations/" + rangeOrgId + "/users";
+        String org = "/" + SLUGS[2] + "/organisations/" + rangeOrgId;
 
         // invalid email format
         mockMvc.perform(post(orgUsers)
@@ -207,8 +207,8 @@ class HardeningIntegrationTest {
     @Test
     void pathAndMethodErrorsNever500() throws Exception {
         String boss = registerPlatform("hd-path@nexx.io", SLUGS[3]);
-        createOrganisation(boss, SLUGS[3], "Path Org", "path-org");
-        String org = "/" + SLUGS[3] + "/organisations/path-org";
+        long pathOrgId = createOrganisation(boss, SLUGS[3], "Path Org", "path-org");
+        String org = "/" + SLUGS[3] + "/organisations/" + pathOrgId;
 
         // path variable of wrong type
         mockMvc.perform(get(org + "/users/abc").header("Authorization", bearer(boss)))
@@ -242,10 +242,10 @@ class HardeningIntegrationTest {
     @Test
     void roleEdgeCasesNever500() throws Exception {
         String boss = registerPlatform("hd-role@nexx.io", SLUGS[4]);
-        createOrganisation(boss, SLUGS[4], "Role Org", "role-org");
-        createOrganisation(boss, SLUGS[4], "Other Org", "other-org");
-        String org = "/" + SLUGS[4] + "/organisations/role-org";
-        String other = "/" + SLUGS[4] + "/organisations/other-org";
+        long roleOrgId = createOrganisation(boss, SLUGS[4], "Role Org", "role-org");
+        long otherOrgId = createOrganisation(boss, SLUGS[4], "Other Org", "other-org");
+        String org = "/" + SLUGS[4] + "/organisations/" + roleOrgId;
+        String other = "/" + SLUGS[4] + "/organisations/" + otherOrgId;
 
         long otherRoleId = createRole(boss, other, "Foreign Role");
 
@@ -346,12 +346,14 @@ class HardeningIntegrationTest {
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("accessToken").asText();
     }
 
-    private void createOrganisation(String boss, String slug, String name, String orgSlug) throws Exception {
-        mockMvc.perform(post("/" + slug + "/organisations")
+    private long createOrganisation(String boss, String slug, String name, String orgSlug) throws Exception {
+        MvcResult result = mockMvc.perform(post("/" + slug + "/organisations")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", name, "slug", orgSlug))))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
     }
 
     private long createRole(String boss, String org, String name) throws Exception {

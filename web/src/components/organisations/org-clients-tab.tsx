@@ -28,7 +28,7 @@ import { CLIENT_TYPE_META, CLIENT_TYPE_TONE, type BadgeTone } from "@/types/enum
 
 interface OrgClientsTabProps {
   platformSlug: string;
-  organisationSlug: string;
+  organisationId: number;
 }
 
 function authLabel(client: OrganisationClientResponse): { label: string; tone: BadgeTone } {
@@ -37,10 +37,10 @@ function authLabel(client: OrganisationClientResponse): { label: string; tone: B
     : { label: "Sign-in only", tone: "secondary" };
 }
 
-export function OrgClientsTab({ platformSlug, organisationSlug }: OrgClientsTabProps) {
-  const clients = useOrgClients(organisationSlug);
-  const deleteMutation = useDeleteOrgClient(platformSlug, organisationSlug);
-  const rotateMutation = useRotateOrgClientToken(platformSlug, organisationSlug);
+export function OrgClientsTab({ platformSlug, organisationId }: OrgClientsTabProps) {
+  const clients = useOrgClients(organisationId);
+  const deleteMutation = useDeleteOrgClient(platformSlug, organisationId);
+  const rotateMutation = useRotateOrgClientToken(platformSlug, organisationId);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<OrganisationClientResponse | null>(null);
@@ -171,7 +171,7 @@ export function OrgClientsTab({ platformSlug, organisationSlug }: OrgClientsTabP
 
       <OrgClientDialog
         platformSlug={platformSlug}
-        organisationSlug={organisationSlug}
+        organisationId={organisationId}
         open={createOpen}
         onOpenChange={setCreateOpen}
         onCreated={(created) => {
@@ -181,7 +181,7 @@ export function OrgClientsTab({ platformSlug, organisationSlug }: OrgClientsTabP
 
       <OrgClientDialog
         platformSlug={platformSlug}
-        organisationSlug={organisationSlug}
+        organisationId={organisationId}
         open={!!editing}
         onOpenChange={(open) => !open && setEditing(null)}
         client={editing ?? undefined}

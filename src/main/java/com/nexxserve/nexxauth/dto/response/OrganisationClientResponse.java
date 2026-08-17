@@ -21,6 +21,10 @@ public record OrganisationClientResponse(
         boolean enabled,
         Map<String, String> settings,
         Instant createdAt,
-        String token
+        String token,
+        // --- session overrides (null = using org defaults) ---
+        Long accessTokenTtlSeconds,
+        Long refreshTokenTtlSeconds,
+        Integer maxSessionsPerUser
 ) {
 }

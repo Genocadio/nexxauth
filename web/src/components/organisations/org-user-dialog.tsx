@@ -26,7 +26,7 @@ import type { OrganisationRoleResponse, OrganisationUserFieldResponse, Organisat
 
 interface OrgUserDialogProps {
   platformSlug: string;
-  organisationSlug: string;
+  organisationId: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   roles: OrganisationRoleResponse[];
@@ -63,7 +63,7 @@ export function OrgUserDialog(props: OrgUserDialogProps) {
 
 function OrgUserDialogInner({
   platformSlug,
-  organisationSlug,
+  organisationId,
   onOpenChange,
   roles,
   fields,
@@ -71,8 +71,8 @@ function OrgUserDialogInner({
   user,
 }: OrgUserDialogProps) {
   const isEdit = !!user;
-  const create = useCreateOrgUser(platformSlug, organisationSlug);
-  const update = useUpdateOrgUser(platformSlug, organisationSlug);
+  const create = useCreateOrgUser(platformSlug, organisationId);
+  const update = useUpdateOrgUser(platformSlug, organisationId);
   const pending = create.isPending || update.isPending;
 
   const [metadata, setMetadata] = useState<Record<string, string>>(user?.metadata ?? {});

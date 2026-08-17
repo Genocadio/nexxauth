@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { FormField } from "@/components/shared/form-field";
 import { ToneBadge } from "@/components/shared/status-badge";
@@ -25,13 +25,14 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateOrgClient, useUpdateOrgClient } from "@/hooks/mutations";
 import { useForm } from "@/hooks/use-form";
+import { DEFAULT_SESSION_SETTINGS, formatDuration } from "@/lib/constants";
 import { orgClientFormSchema } from "@/lib/validation";
 import type { OrganisationClientResponse } from "@/types/api";
 import { CLIENT_TYPE_AUTH_MODE, CLIENT_TYPE_META, CLIENT_TYPE_TONE, type ClientType } from "@/types/enums";
 
 interface OrgClientDialogProps {
   platformSlug: string;
-  organisationSlug: string;
+  organisationId: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   client?: OrganisationClientResponse;
@@ -50,16 +51,23 @@ const AUTH_HINTS: Record<ClientType, string> = {
 
 export function OrgClientDialog({
   platformSlug,
-  organisationSlug,
+  organisationId,
   open,
   onOpenChange,
   client,
   onCreated,
 }: OrgClientDialogProps) {
   const isEdit = !!client;
-  const create = useCreateOrgClient(platformSlug, organisationSlug);
-  const update = useUpdateOrgClient(platformSlug, organisationSlug);
+  const create = useCreateOrgClient(platformSlug, organisationId);
+  const update = useUpdateOrgClient(platformSlug, organisationId);
   const pending = create.isPending || update.isPending;
+
+  const [useSessionOverrides, setUseSessionOverrides] = useState(
+    !!(client?.accessTokenTtlSeconds || client?.refreshTokenTtlSeconds || client?.maxSessionsPerUser),
+  );
+  const [accessTokenTtl, setAccessTokenTtl] = useState(client?.accessTokenTtlSeconds ?? DEFAULT_SESSION_SETTINGS.accessTokenTtlSeconds);
+  const [refreshTokenTtl, setRefreshTokenTtl] = useState(client?.refreshTokenTtlSeconds ?? DEFAULT_SESSION_SETTINGS.refreshTokenTtlSeconds);
+  const [maxSessions, setMaxSessions] = useState(client?.maxSessionsPerUser ?? DEFAULT_SESSION_SETTINGS.maxSessionsPerUser);
 
   const form = useForm(orgClientFormSchema, {
     name: client?.name ?? "",
@@ -78,6 +86,11 @@ export function OrgClientDialog({
       allowedOrigins: client?.allowedOrigins.join("\n") ?? "",
       enabled: client?.enabled ?? true,
     });
+    const hasOverrides = !!(client?.accessTokenTtlSeconds || client?.refreshTokenTtlSeconds || client?.maxSessionsPerUser);
+    setUseSessionOverrides(hasOverrides);
+    setAccessTokenTtl(client?.accessTokenTtlSeconds ?? DEFAULT_SESSION_SETTINGS.accessTokenTtlSeconds);
+    setRefreshTokenTtl(client?.refreshTokenTtlSeconds ?? DEFAULT_SESSION_SETTINGS.refreshTokenTtlSeconds);
+    setMaxSessions(client?.maxSessionsPerUser ?? DEFAULT_SESSION_SETTINGS.maxSessionsPerUser);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, client]);
 
@@ -96,6 +109,9 @@ export function OrgClientDialog({
       .map((origin) => origin.trim())
       .filter(Boolean);
     const authOptional = CLIENT_TYPE_AUTH_MODE[data.type] === "optional";
+    const sessionPayload = useSessionOverrides
+      ? { accessTokenTtlSeconds: accessTokenTtl, refreshTokenTtlSeconds: refreshTokenTtl, maxSessionsPerUser: maxSessions }
+      : {};
 
     if (isEdit && client) {
       await update.mutateAsync({
@@ -105,6 +121,8 @@ export function OrgClientDialog({
           enabled: data.enabled,
           allowedOrigins,
           ...(authOptional ? { requireAuthentication: data.requireAuthentication } : {}),
+          // When overrides disabled, send -1 to clear back to org defaults.
+          ...(useSessionOverrides ? sessionPayload : { accessTokenTtlSeconds: -1, refreshTokenTtlSeconds: -1, maxSessionsPerUser: -1 }),
         },
       });
       onOpenChange(false);
@@ -115,6 +133,7 @@ export function OrgClientDialog({
         enabled: data.enabled,
         allowedOrigins,
         ...(authOptional ? { requireAuthentication: data.requireAuthentication } : {}),
+        ...(useSessionOverrides ? sessionPayload : {}),
       });
       onCreated?.(created);
       onOpenChange(false);
@@ -205,6 +224,52 @@ export function OrgClientDialog({
               />
             </div>
           </FormField>
+
+          <div className="rounded-lg border p-3 space-y-3">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium">Session overrides</p>
+                <p className="text-xs text-muted-foreground">
+                  Override the organisation&apos;s default session settings for this client.
+                </p>
+              </div>
+              <Switch
+                checked={useSessionOverrides}
+                onCheckedChange={setUseSessionOverrides}
+              />
+            </div>
+            {useSessionOverrides ? (
+              <div className="grid gap-3 sm:grid-cols-3">
+                <FormField label="Access token TTL" hint={`Org default: ${formatDuration(DEFAULT_SESSION_SETTINGS.accessTokenTtlSeconds)}`}>
+                  <Input
+                    type="number"
+                    min={60}
+                    max={86400}
+                    value={accessTokenTtl}
+                    onChange={(e) => setAccessTokenTtl(Number(e.target.value))}
+                  />
+                </FormField>
+                <FormField label="Refresh token TTL" hint={`Org default: ${formatDuration(DEFAULT_SESSION_SETTINGS.refreshTokenTtlSeconds)}`}>
+                  <Input
+                    type="number"
+                    min={300}
+                    max={31536000}
+                    value={refreshTokenTtl}
+                    onChange={(e) => setRefreshTokenTtl(Number(e.target.value))}
+                  />
+                </FormField>
+                <FormField label="Max sessions" hint={`Org default: ${DEFAULT_SESSION_SETTINGS.maxSessionsPerUser}`}>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={maxSessions}
+                    onChange={(e) => setMaxSessions(Number(e.target.value))}
+                  />
+                </FormField>
+              </div>
+            ) : null}
+          </div>
 
           {form.submitError ? (
             <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">

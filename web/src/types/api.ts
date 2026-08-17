@@ -154,6 +154,10 @@ export interface OrganisationClientResponse {
   createdAt: IsoDate;
   /** Only present on create/rotate responses — the static token is shown once. */
   token?: string;
+  /** Session overrides (null = using org defaults). */
+  accessTokenTtlSeconds: number | null;
+  refreshTokenTtlSeconds: number | null;
+  maxSessionsPerUser: number | null;
 }
 
 /** Full display name of a person. */

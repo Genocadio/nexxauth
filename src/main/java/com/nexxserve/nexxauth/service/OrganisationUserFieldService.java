@@ -80,9 +80,9 @@ public class OrganisationUserFieldService {
     // ------------------------------------------------------------------
 
     @Transactional(readOnly = true)
-    public List<OrganisationUserFieldResponse> listFields(String platformSlug, String organisationSlug,
+    public List<OrganisationUserFieldResponse> listFields(String platformSlug, Long organisationId,
                                                           OrgActor requester) {
-        Organisation organisation = resolve(platformSlug, organisationSlug, requester, false,
+        Organisation organisation = resolve(platformSlug, organisationId, requester, false,
                 Permission.ORGANISATION_USER_FIELD_READ);
         return fieldRepository.findByOrganisationIdOrderByKeyAsc(organisation.getId()).stream()
                 .map(this::toResponse)
@@ -90,9 +90,9 @@ public class OrganisationUserFieldService {
     }
 
     @Transactional
-    public OrganisationUserFieldResponse createField(String platformSlug, String organisationSlug,
+    public OrganisationUserFieldResponse createField(String platformSlug, Long organisationId,
                                                      OrgActor requester, CreateOrganisationUserFieldRequest request) {
-        Organisation organisation = resolve(platformSlug, organisationSlug, requester, true,
+        Organisation organisation = resolve(platformSlug, organisationId, requester, true,
                 Permission.ORGANISATION_USER_FIELD_CREATE);
         lockOrganisation(organisation);
         String key = request.key().trim();
@@ -111,9 +111,9 @@ public class OrganisationUserFieldService {
     }
 
     @Transactional
-    public OrganisationUserFieldResponse updateField(String platformSlug, String organisationSlug, Long fieldId,
+    public OrganisationUserFieldResponse updateField(String platformSlug, Long organisationId, Long fieldId,
                                                      OrgActor requester, UpdateOrganisationUserFieldRequest request) {
-        Organisation organisation = resolve(platformSlug, organisationSlug, requester, true,
+        Organisation organisation = resolve(platformSlug, organisationId, requester, true,
                 Permission.ORGANISATION_USER_FIELD_UPDATE);
         lockOrganisation(organisation);
         OrganisationUserField field = fieldRepository.findByIdAndOrganisationId(fieldId, organisation.getId())
@@ -140,8 +140,8 @@ public class OrganisationUserFieldService {
     }
 
     @Transactional
-    public void deleteField(String platformSlug, String organisationSlug, Long fieldId, OrgActor requester) {
-        Organisation organisation = resolve(platformSlug, organisationSlug, requester, true,
+    public void deleteField(String platformSlug, Long organisationId, Long fieldId, OrgActor requester) {
+        Organisation organisation = resolve(platformSlug, organisationId, requester, true,
                 Permission.ORGANISATION_USER_FIELD_DELETE);
         lockOrganisation(organisation);
         OrganisationUserField field = fieldRepository.findByIdAndOrganisationId(fieldId, organisation.getId())
@@ -369,14 +369,14 @@ public class OrganisationUserFieldService {
                 field.getFieldType(), field.isLoginEnabled(), field.isRequired(), field.getCreatedAt());
     }
 
-    private Organisation resolve(String platformSlug, String organisationSlug, OrgActor requester, boolean write) {
-        return resolve(platformSlug, organisationSlug, requester, write, null);
+    private Organisation resolve(String platformSlug, Long organisationId, OrgActor requester, boolean write) {
+        return resolve(platformSlug, organisationId, requester, write, null);
     }
 
-    private Organisation resolve(String platformSlug, String organisationSlug, OrgActor requester,
+    private Organisation resolve(String platformSlug, Long organisationId, OrgActor requester,
                                  boolean write, Permission permission) {
         Platform platform = platformAccess.findPlatform(platformSlug);
-        Organisation organisation = organisationAccess.findOrganisation(platform, organisationSlug);
+        Organisation organisation = organisationAccess.findOrganisationById(organisationId);
         if (write) {
             if (permission == null) {
                 platformAccess.requireSuperUser(platform, requester);

@@ -36,7 +36,11 @@ function useOrgView() {
   const pathname = usePathname();
   const segments = pathname.split("/");
   const organisationSlug = segments[2] === "organisations" ? segments[3] : undefined;
-  return { isOrgView: !!organisationSlug, organisationSlug };
+  const organisations = useOrganisations();
+  const org = organisationSlug
+    ? organisations.data?.find((o) => o.slug === organisationSlug)
+    : undefined;
+  return { isOrgView: !!organisationSlug, organisationSlug, organisationId: org?.id };
 }
 
 function Brand({ collapsed = false }: { collapsed?: boolean }) {
@@ -82,7 +86,7 @@ function Brand({ collapsed = false }: { collapsed?: boolean }) {
 
 export function ConsoleShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { isOrgView, organisationSlug } = useOrgView();
+  const { isOrgView, organisationSlug, organisationId } = useOrgView();
 
   // The shell only mounts client-side (behind RequirePlatformAuth), so reading
   // localStorage during initial render can't cause a hydration mismatch.
@@ -120,6 +124,7 @@ export function ConsoleShell({ children }: { children: React.ReactNode }) {
               <NavContent
                 mode={isOrgView ? "org" : "platform"}
                 organisationSlug={organisationSlug}
+                organisationId={organisationId}
                 collapsed={collapsed}
               />
             </div>
@@ -184,6 +189,7 @@ export function ConsoleShell({ children }: { children: React.ReactNode }) {
             <NavContent
               mode={isOrgView ? "org" : "platform"}
               organisationSlug={organisationSlug}
+              organisationId={organisationId}
               onNavigate={() => setMobileOpen(false)}
             />
           </div>

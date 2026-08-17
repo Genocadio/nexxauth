@@ -71,9 +71,9 @@ public class OrganisationUserService {
     }
 
     @Transactional(readOnly = true)
-    public List<OrganisationUserResponse> list(String platformSlug, String organisationSlug,
+    public List<OrganisationUserResponse> list(String platformSlug, Long organisationId,
                                                OrgActor requester) {
-        Organisation organisation = resolve(platformSlug, organisationSlug, requester, false);
+        Organisation organisation = resolve(platformSlug, organisationId, requester, false);
         List<OrganisationUser> users =
                 userRepository.findByOrganisationIdOrderByCreatedAtAsc(organisation.getId());
         Map<Long, Map<String, String>> metadata = userFieldService
@@ -84,21 +84,21 @@ public class OrganisationUserService {
     }
 
     @Transactional(readOnly = true)
-    public OrganisationUserResponse get(String platformSlug, String organisationSlug, Long userId,
+    public OrganisationUserResponse get(String platformSlug, Long organisationId, Long userId,
                                         OrgActor requester) {
-        Organisation organisation = resolve(platformSlug, organisationSlug, requester, false);
+        Organisation organisation = resolve(platformSlug, organisationId, requester, false);
         OrganisationUser user = findUser(organisation, userId);
         return userMapper.toResponse(user, userFieldService.readMetadata(user.getId()));
     }
 
     /** Every org user can read their own profile, regardless of permissions. */
     @Transactional(readOnly = true)
-    public OrganisationUserResponse me(String platformSlug, String organisationSlug, OrgActor requester) {
+    public OrganisationUserResponse me(String platformSlug, Long organisationId, OrgActor requester) {
         if (requester.isPlatformUser()) {
             throw new ForbiddenException("Platform users have no organisation profile");
         }
         Platform platform = platformAccess.findPlatform(platformSlug);
-        Organisation organisation = organisationAccess.findOrganisation(platform, organisationSlug);
+        Organisation organisation = organisationAccess.findOrganisationById(organisationId);
         organisationAccess.requireOrgUserOf(organisation, requester);
         OrganisationUser user = findUser(organisation,
                 ((com.nexxserve.nexxauth.security.OrgUserPrincipal) requester).id());
@@ -106,9 +106,9 @@ public class OrganisationUserService {
     }
 
     @Transactional
-    public OrganisationUserResponse create(String platformSlug, String organisationSlug, OrgActor requester,
+    public OrganisationUserResponse create(String platformSlug, Long organisationId, OrgActor requester,
                                            CreateOrganisationUserRequest request) {
-        Organisation organisation = resolve(platformSlug, organisationSlug, requester, true, Permission.ORGANISATION_USER_CREATE);
+        Organisation organisation = resolve(platformSlug, organisationId, requester, true, Permission.ORGANISATION_USER_CREATE);
         String email = normalizedEmail(request.email());
         String username = cleanedUsername(request.username());
         String phone = cleanedPhone(request.phone());
@@ -146,9 +146,9 @@ public class OrganisationUserService {
     }
 
     @Transactional
-    public OrganisationUserResponse update(String platformSlug, String organisationSlug, Long userId,
+    public OrganisationUserResponse update(String platformSlug, Long organisationId, Long userId,
                                            OrgActor requester, UpdateOrganisationUserRequest request) {
-        Organisation organisation = resolve(platformSlug, organisationSlug, requester, true, Permission.ORGANISATION_USER_UPDATE);
+        Organisation organisation = resolve(platformSlug, organisationId, requester, true, Permission.ORGANISATION_USER_UPDATE);
         OrganisationUser user = findUser(organisation, userId);
 
         if (request.firstName() != null) {
@@ -221,8 +221,8 @@ public class OrganisationUserService {
     }
 
     @Transactional
-    public void delete(String platformSlug, String organisationSlug, Long userId, OrgActor requester) {
-        Organisation organisation = resolve(platformSlug, organisationSlug, requester, true, Permission.ORGANISATION_USER_DELETE);
+    public void delete(String platformSlug, Long organisationId, Long userId, OrgActor requester) {
+        Organisation organisation = resolve(platformSlug, organisationId, requester, true, Permission.ORGANISATION_USER_DELETE);
         userRepository.delete(findUser(organisation, userId));
     }
 
@@ -230,9 +230,9 @@ public class OrganisationUserService {
      * Completes the CHANGE_PASSWORD action: the temporary flag is cleared so the
      * next login issues a full session. */
     @Transactional
-    public void changePassword(String platformSlug, String organisationSlug, OrgActor requester,
+    public void changePassword(String platformSlug, Long organisationId, OrgActor requester,
                                ChangePasswordRequest request) {
-        OrganisationUser user = ownUser(platformSlug, organisationSlug, requester);
+        OrganisationUser user = ownUser(platformSlug, organisationId, requester);
         String hash = user.getPasswordHash();
         if (hash == null || !passwordEncoder.matches(request.currentPassword(), hash)) {
             throw new InvalidCredentialsException();
@@ -252,9 +252,9 @@ public class OrganisationUserService {
      * permissions). Used to complete the UPDATE_PROFILE action, e.g. filling
      * values for required organisation user fields. */
     @Transactional
-    public OrganisationUserResponse updateOwnProfile(String platformSlug, String organisationSlug,
+    public OrganisationUserResponse updateOwnProfile(String platformSlug, Long organisationId,
                                                      OrgActor requester, UpdateOwnProfileRequest request) {
-        OrganisationUser user = ownUser(platformSlug, organisationSlug, requester);
+        OrganisationUser user = ownUser(platformSlug, organisationId, requester);
         if (request.firstName() != null) {
             user.setFirstName(request.firstName());
         }
@@ -269,12 +269,12 @@ public class OrganisationUserService {
 
     /** Resolves the requesting org user's own account, forbidding platform
      * users (they have no organisation profile). */
-    private OrganisationUser ownUser(String platformSlug, String organisationSlug, OrgActor requester) {
+    private OrganisationUser ownUser(String platformSlug, Long organisationId, OrgActor requester) {
         if (requester.isPlatformUser()) {
             throw new ForbiddenException("Platform users have no organisation profile");
         }
         Platform platform = platformAccess.findPlatform(platformSlug);
-        Organisation organisation = organisationAccess.findOrganisation(platform, organisationSlug);
+        Organisation organisation = organisationAccess.findOrganisationById(organisationId);
         organisationAccess.requireOrgUserOf(organisation, requester);
         return findUser(organisation, ((OrgUserPrincipal) requester).id());
     }
@@ -324,15 +324,15 @@ public class OrganisationUserService {
                 .orElseThrow(() -> ResourceNotFoundException.of("Organisation user", userId));
     }
 
-    private Organisation resolve(String platformSlug, String organisationSlug, OrgActor requester,
+    private Organisation resolve(String platformSlug, Long organisationId, OrgActor requester,
                                  boolean write) {
-        return resolve(platformSlug, organisationSlug, requester, write, null);
+        return resolve(platformSlug, organisationId, requester, write, null);
     }
 
-    private Organisation resolve(String platformSlug, String organisationSlug, OrgActor requester,
+    private Organisation resolve(String platformSlug, Long organisationId, OrgActor requester,
                                  boolean write, Permission permission) {
         Platform platform = platformAccess.findPlatform(platformSlug);
-        Organisation organisation = organisationAccess.findOrganisation(platform, organisationSlug);
+        Organisation organisation = organisationAccess.findOrganisationById(organisationId);
         if (write) {
             if (permission == null) {
                 platformAccess.requireSuperUser(platform, requester);

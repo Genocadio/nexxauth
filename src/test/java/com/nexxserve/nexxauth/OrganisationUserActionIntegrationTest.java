@@ -40,11 +40,10 @@ class OrganisationUserActionIntegrationTest {
     @Test
     void temporaryPasswordGatesSessionUntilChanged() throws Exception {
         String platform = "/" + SLUGS[0];
-        String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("action-boss@nexx.io", SLUGS[0]);
-        createOrganisation(boss, platform);
-        long orgId = getOrgId(boss, org);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
 
         // platform user registers an org user with a temporary password
         mockMvc.perform(post(org + "/users")
@@ -97,11 +96,10 @@ class OrganisationUserActionIntegrationTest {
     @Test
     void wrongCurrentPasswordCannotCompleteTheAction() throws Exception {
         String platform = "/" + SLUGS[3];
-        String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("action-wrong@nexx.io", SLUGS[3]);
-        createOrganisation(boss, platform);
-        long orgId = getOrgId(boss, org);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
 
         mockMvc.perform(post(org + "/users")
                         .header("Authorization", bearer(boss))
@@ -139,11 +137,10 @@ class OrganisationUserActionIntegrationTest {
     @Test
     void adminTriggeredPasswordChangeKillsSessionsAndGates() throws Exception {
         String platform = "/" + SLUGS[1];
-        String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("action-force@nexx.io", SLUGS[1]);
-        createOrganisation(boss, platform);
-        long orgId = getOrgId(boss, org);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
 
         // register a user normally (no temporary password), then log in
         long userId = registerOrgUser(orgAuth, orgId, "forced", "org-pass-1");
@@ -182,11 +179,10 @@ class OrganisationUserActionIntegrationTest {
     @Test
     void requiredFieldSurfacesNonGatingUpdateProfileAction() throws Exception {
         String platform = "/" + SLUGS[2];
-        String org = platform + "/organisations/" + ORG_SLUG;
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("action-profile@nexx.io", SLUGS[2]);
-        createOrganisation(boss, platform);
-        long orgId = getOrgId(boss, org);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
 
         // a required org user field
         mockMvc.perform(post(org + "/user-fields")
@@ -257,18 +253,12 @@ class OrganisationUserActionIntegrationTest {
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("accessToken").asText();
     }
 
-    private void createOrganisation(String boss, String platform) throws Exception {
-        mockMvc.perform(post(platform + "/organisations")
+    private long createOrganisation(String boss, String platform) throws Exception {
+        MvcResult result = mockMvc.perform(post(platform + "/organisations")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "Action Org", "slug", ORG_SLUG))))
-                .andExpect(status().isCreated());
-    }
-
-    private long getOrgId(String boss, String org) throws Exception {
-        MvcResult result = mockMvc.perform(get(org)
-                        .header("Authorization", bearer(boss)))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
     }

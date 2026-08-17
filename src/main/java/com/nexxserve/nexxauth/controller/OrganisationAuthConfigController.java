@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
  * user. Never applies to the platform auth flow.
  */
 @RestController
-@RequestMapping("/{slug}/organisations/{organisationSlug}/auth-config")
+@RequestMapping("/{slug}/organisations/{organisationId}/auth-config")
 public class OrganisationAuthConfigController {
 
     private final PlatformAccess platformAccess;
@@ -41,26 +41,26 @@ public class OrganisationAuthConfigController {
     @GetMapping
     @PreAuthorize("hasAnyRole('SUPER_USER','READ_ONLY') or hasAuthority('ORG_USER')")
     public OrganisationAuthConfigResponse get(@PathVariable String slug,
-                                              @PathVariable String organisationSlug,
+                                              @PathVariable Long organisationId,
                                               @AuthenticationPrincipal OrgActor requester) {
-        Organisation organisation = resolve(slug, organisationSlug, requester, false);
+        Organisation organisation = resolve(slug, organisationId, requester, false);
         return authConfigService.get(organisation);
     }
 
     @PatchMapping
     @PreAuthorize("hasRole('SUPER_USER')")
     public OrganisationAuthConfigResponse update(@PathVariable String slug,
-                                                 @PathVariable String organisationSlug,
+                                                 @PathVariable Long organisationId,
                                                  @AuthenticationPrincipal OrgActor requester,
                                                  @Valid @RequestBody UpdateOrganisationAuthConfigRequest request) {
-        Organisation organisation = resolve(slug, organisationSlug, requester, true);
+        Organisation organisation = resolve(slug, organisationId, requester, true);
         return authConfigService.update(organisation, request);
     }
 
-    private Organisation resolve(String platformSlug, String organisationSlug, OrgActor requester,
+    private Organisation resolve(String platformSlug, Long organisationId, OrgActor requester,
                                  boolean write) {
         Platform platform = platformAccess.findPlatform(platformSlug);
-        Organisation organisation = organisationAccess.findOrganisation(platform, organisationSlug);
+        Organisation organisation = organisationAccess.findOrganisationById(organisationId);
         if (write) {
             platformAccess.requireSuperUser(platform, requester);
         } else if (requester.isPlatformUser()) {

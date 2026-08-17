@@ -3,7 +3,7 @@ import {
   ORG_ACCESS_COOKIE,
   ORG_REFRESH_COOKIE,
   orgCookieOptions,
-  orgSlugFromToken,
+  orgIdFromToken,
   serverOrgMe,
   serverOrgRefresh,
 } from "@/lib/org-auth";
@@ -35,10 +35,10 @@ export async function GET(request: NextRequest) {
 
   if (!platformSlug || !accessToken) return unauthenticated();
 
-  const organisationSlug = orgSlugFromToken(accessToken);
-  if (!organisationSlug) return unauthenticated();
+  const organisationId = orgIdFromToken(accessToken);
+  if (!organisationId) return unauthenticated();
 
-  const me = await serverOrgMe(platformSlug, organisationSlug, accessToken);
+  const me = await serverOrgMe(platformSlug, organisationId, accessToken);
   if (me.ok) return NextResponse.json({ authenticated: true, user: me.data });
 
   // The access token was rejected. If the backend answered 401 (session
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
       return rotated.status === 401 ? unauthenticated() : transient();
     }
 
-    const retry = await serverOrgMe(platformSlug, organisationSlug, rotated.data.accessToken);
+    const retry = await serverOrgMe(platformSlug, organisationId, rotated.data.accessToken);
     if (retry.ok) {
       const res = NextResponse.json({ authenticated: true, user: retry.data });
       res.cookies.set(ORG_ACCESS_COOKIE, rotated.data.accessToken, orgCookieOptions);

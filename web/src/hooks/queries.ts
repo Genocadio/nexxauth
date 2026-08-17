@@ -54,77 +54,77 @@ export function useMyProfile() {
 }
 
 // ---------------------------------------------------------------------------
-// Organisation level (slug comes from the route)
+// Organisation level (organisationId comes from the route)
 // ---------------------------------------------------------------------------
 
-export function useOrganisation(organisationSlug: string) {
+export function useOrganisation(organisationId: number) {
   const platformSlug = usePlatformSlug();
   return useQuery({
-    queryKey: queryKeys.organisation(organisationSlug),
-    queryFn: () => organisationsApi.get(platformSlug!, organisationSlug),
-    enabled: !!platformSlug && !!organisationSlug,
+    queryKey: queryKeys.organisation(organisationId),
+    queryFn: () => organisationsApi.get(platformSlug!, organisationId),
+    enabled: !!platformSlug && !!organisationId,
   });
 }
 
-export function useOrgUsers(organisationSlug: string) {
+export function useOrgUsers(organisationId: number) {
   const platformSlug = usePlatformSlug();
   return useQuery({
-    queryKey: queryKeys.orgUsers(organisationSlug),
-    queryFn: () => organisationsApi.users(platformSlug!, organisationSlug),
-    enabled: !!platformSlug && !!organisationSlug,
+    queryKey: queryKeys.orgUsers(organisationId),
+    queryFn: () => organisationsApi.users(platformSlug!, organisationId),
+    enabled: !!platformSlug && !!organisationId,
   });
 }
 
-export function useOrgRoles(organisationSlug: string) {
+export function useOrgRoles(organisationId: number) {
   const platformSlug = usePlatformSlug();
   return useQuery({
-    queryKey: queryKeys.orgRoles(organisationSlug),
-    queryFn: () => organisationsApi.roles(platformSlug!, organisationSlug),
-    enabled: !!platformSlug && !!organisationSlug,
+    queryKey: queryKeys.orgRoles(organisationId),
+    queryFn: () => organisationsApi.roles(platformSlug!, organisationId),
+    enabled: !!platformSlug && !!organisationId,
   });
 }
 
-export function useOrgAuthConfig(organisationSlug: string) {
+export function useOrgAuthConfig(organisationId: number) {
   const platformSlug = usePlatformSlug();
   return useQuery({
-    queryKey: queryKeys.orgAuthConfig(organisationSlug),
-    queryFn: () => organisationsApi.authConfig(platformSlug!, organisationSlug),
-    enabled: !!platformSlug && !!organisationSlug,
+    queryKey: queryKeys.orgAuthConfig(organisationId),
+    queryFn: () => organisationsApi.authConfig(platformSlug!, organisationId),
+    enabled: !!platformSlug && !!organisationId,
   });
 }
 
-export function useOrgSessionSettings(organisationSlug: string) {
+export function useOrgSessionSettings(organisationId: number) {
   const platformSlug = usePlatformSlug();
   return useQuery({
-    queryKey: queryKeys.orgSessionSettings(organisationSlug),
-    queryFn: () => organisationsApi.sessionSettings(platformSlug!, organisationSlug),
-    enabled: !!platformSlug && !!organisationSlug,
+    queryKey: queryKeys.orgSessionSettings(organisationId),
+    queryFn: () => organisationsApi.sessionSettings(platformSlug!, organisationId),
+    enabled: !!platformSlug && !!organisationId,
   });
 }
 
-export function useOrgUserFields(organisationSlug: string) {
+export function useOrgUserFields(organisationId: number) {
   const platformSlug = usePlatformSlug();
   return useQuery({
-    queryKey: queryKeys.orgUserFields(organisationSlug),
-    queryFn: () => organisationsApi.userFields(platformSlug!, organisationSlug),
-    enabled: !!platformSlug && !!organisationSlug,
+    queryKey: queryKeys.orgUserFields(organisationId),
+    queryFn: () => organisationsApi.userFields(platformSlug!, organisationId),
+    enabled: !!platformSlug && !!organisationId,
   });
 }
 
-export function useOrgKeys(organisationSlug: string) {
+export function useOrgKeys(organisationId: number) {
   const platformSlug = usePlatformSlug();
   return useQuery({
-    queryKey: queryKeys.orgKeys(organisationSlug),
-    queryFn: () => organisationsApi.keys(platformSlug!, organisationSlug),
-    enabled: !!platformSlug && !!organisationSlug,
+    queryKey: queryKeys.orgKeys(organisationId),
+    queryFn: () => organisationsApi.keys(platformSlug!, organisationId),
+    enabled: !!platformSlug && !!organisationId,
   });
 }
 
-export function useOrgClients(organisationSlug: string) {
+export function useOrgClients(organisationId: number) {
   const platformSlug = usePlatformSlug();
   return useQuery({
-    queryKey: queryKeys.orgClients(organisationSlug),
-    queryFn: () => organisationsApi.clients(platformSlug!, organisationSlug),
-    enabled: !!platformSlug && !!organisationSlug,
+    queryKey: queryKeys.orgClients(organisationId),
+    queryFn: () => organisationsApi.clients(platformSlug!, organisationId),
+    enabled: !!platformSlug && !!organisationId,
   });
 }

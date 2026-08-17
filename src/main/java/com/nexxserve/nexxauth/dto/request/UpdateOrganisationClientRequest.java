@@ -23,6 +23,14 @@ public record UpdateOrganisationClientRequest(
         Boolean enabled,
 
         @Size(max = 50, message = "Settings must contain at most 50 entries")
-        Map<String, String> settings
+        Map<String, String> settings,
+
+        // --- session overrides (null = no change, use -1 to clear back to org default) ---
+
+        Long accessTokenTtlSeconds,
+
+        Long refreshTokenTtlSeconds,
+
+        Integer maxSessionsPerUser
 ) {
 }

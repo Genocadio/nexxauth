@@ -24,12 +24,12 @@ import type { OrganisationUserFieldResponse } from "@/types/api";
 
 interface OrgFieldsTabProps {
   platformSlug: string;
-  organisationSlug: string;
+  organisationId: number;
 }
 
-export function OrgFieldsTab({ platformSlug, organisationSlug }: OrgFieldsTabProps) {
-  const fields = useOrgUserFields(organisationSlug);
-  const deleteMutation = useDeleteUserField(platformSlug, organisationSlug);
+export function OrgFieldsTab({ platformSlug, organisationId }: OrgFieldsTabProps) {
+  const fields = useOrgUserFields(organisationId);
+  const deleteMutation = useDeleteUserField(platformSlug, organisationId);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<OrganisationUserFieldResponse | null>(null);
@@ -137,13 +137,13 @@ export function OrgFieldsTab({ platformSlug, organisationSlug }: OrgFieldsTabPro
 
       <OrgFieldDialog
         platformSlug={platformSlug}
-        organisationSlug={organisationSlug}
+        organisationId={organisationId}
         open={createOpen}
         onOpenChange={setCreateOpen}
       />
       <OrgFieldDialog
         platformSlug={platformSlug}
-        organisationSlug={organisationSlug}
+        organisationId={organisationId}
         open={!!editing}
         onOpenChange={(open) => !open && setEditing(null)}
         field={editing ?? undefined}

@@ -1,16 +1,20 @@
 package com.nexxserve.nexxauth.service;
 
 import com.nexxserve.nexxauth.entity.Organisation;
+import com.nexxserve.nexxauth.entity.OrganisationClient;
 import com.nexxserve.nexxauth.entity.OrganisationRefreshToken;
 import com.nexxserve.nexxauth.entity.OrganisationUser;
+import com.nexxserve.nexxauth.repository.OrganisationClientRepository;
 import com.nexxserve.nexxauth.repository.OrganisationRefreshTokenRepository;
 import com.nexxserve.nexxauth.security.JwtProperties;
+import com.nexxserve.nexxauth.util.RefreshTokens;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -27,17 +31,20 @@ public class OrganisationRefreshTokenService
         extends AbstractRefreshTokenService<OrganisationUser, OrganisationRefreshToken> {
 
     private final OrganisationRefreshTokenRepository refreshTokenRepository;
+    private final OrganisationClientRepository clientRepository;
     private final OrganisationSessionSettingsService sessionSettingsService;
     private final EntityManager entityManager;
     private final AuthAuditService audit;
 
     public OrganisationRefreshTokenService(OrganisationRefreshTokenRepository refreshTokenRepository,
+                                           OrganisationClientRepository clientRepository,
                                            JwtProperties jwtProperties, PlatformTransactionManager transactionManager,
                                            OrganisationSessionSettingsService sessionSettingsService,
                                            EntityManager entityManager,
                                            AuthAuditService audit) {
         super(jwtProperties, transactionManager);
         this.refreshTokenRepository = refreshTokenRepository;
+        this.clientRepository = clientRepository;
         this.sessionSettingsService = sessionSettingsService;
         this.entityManager = entityManager;
         this.audit = audit;
@@ -52,7 +59,7 @@ public class OrganisationRefreshTokenService
      * dies quietly and cannot trigger the family-wide theft detection.
      */
     @Transactional
-    public void enforceSessionLimit(Organisation organisation, Long userId) {
+    public void enforceSessionLimit(Organisation organisation, Long userId, OrganisationClient client) {
         // Serialize concurrent session issuance for the user's organisation on
         // its row: otherwise two parallel logins could both count the same set
         // of active sessions and together exceed the limit. (The user row is
@@ -60,7 +67,7 @@ public class OrganisationRefreshTokenService
         // lock-reentrant across the settings lookup below - is the safe thing
         // to lock.)
         entityManager.lock(entityManager.merge(organisation), LockModeType.PESSIMISTIC_WRITE);
-        int max = sessionSettingsService.maxSessionsPerUser(organisation);
+        int max = sessionSettingsService.maxSessionsPerUser(organisation, client);
         List<OrganisationRefreshToken> active =
                 refreshTokenRepository.findActiveByUserIdOrderByExpiresAtAsc(userId, Instant.now());
         // +1: a new session is about to be issued after this call.
@@ -68,6 +75,30 @@ public class OrganisationRefreshTokenService
         for (int i = 0; i < excess; i++) {
             active.get(i).setEvictedAt(Instant.now());
         }
+    }
+
+    /**
+     * Issues a refresh token that remembers which client created it, so the
+     * correct per-client session settings are applied on rotation.
+     */
+    @Transactional
+    public String issueWithClient(OrganisationUser subject, Duration ttl, String clientKey) {
+        String rawToken = RefreshTokens.generateRaw();
+        OrganisationRefreshToken token = createToken(subject, RefreshTokens.hash(rawToken),
+                Instant.now().plus(ttl));
+        token.setClientKey(clientKey);
+        save(token);
+        return rawToken;
+    }
+
+    /** Returns the client that originally issued this token, or null. */
+    @Transactional(readOnly = true)
+    public OrganisationClient clientOf(String rawToken) {
+        return refreshTokenRepository.findByTokenHash(RefreshTokens.hash(rawToken))
+                .map(t -> t.getClientKey())
+                .filter(k -> k != null && !k.isBlank())
+                .flatMap(clientRepository::findByClientKey)
+                .orElse(null);
     }
 
     @Override

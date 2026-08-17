@@ -119,7 +119,7 @@ class AuthAuditIntegrationTest {
                 .andReturn();
         long orgId = objectMapper.readTree(org.getResponse().getContentAsString()).get("id").asLong();
 
-        mockMvc.perform(post(platform + "/organisations/audit-org/user-fields")
+        mockMvc.perform(post(platform + "/organisations/" + orgId + "/user-fields")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("key", "badge", "fieldType", "STRING"))))
@@ -146,7 +146,7 @@ class AuthAuditIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("refreshToken", refresh))))
                 .andExpect(status().isOk());
-        mockMvc.perform(post(platform + "/organisations/audit-org/keys/rotate")
+        mockMvc.perform(post(platform + "/organisations/" + orgId + "/keys/rotate")
                         .header("Authorization", bearer(boss)))
                 .andExpect(status().isOk());
 
@@ -169,14 +169,14 @@ class AuthAuditIntegrationTest {
     void refreshReuseIsAuditedAsTokenTheft() throws Exception {
         String platform = "/" + SLUGS[2];
         String orgSlug = "reuse-org";
-        String org = platform + "/organisations/" + orgSlug;
         String boss = registerPlatform("audit-reuse-boss@nexx.io", SLUGS[2]);
-        mockMvc.perform(post(platform + "/organisations")
+        MvcResult orgResult = mockMvc.perform(post(platform + "/organisations")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "Reuse Org", "slug", orgSlug))))
-                .andExpect(status().isCreated());
-        long orgId = getOrgId(boss, org);
+                .andExpect(status().isCreated())
+                .andReturn();
+        long orgId = objectMapper.readTree(orgResult.getResponse().getContentAsString()).get("id").asLong();
 
         mockMvc.perform(post(platform + "/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -221,13 +221,6 @@ class AuthAuditIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("accessToken").asText();
-    }
-
-    private long getOrgId(String boss, String org) throws Exception {
-        MvcResult result = mockMvc.perform(get(org).header("Authorization", bearer(boss)))
-                .andExpect(status().isOk())
-                .andReturn();
-        return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
     }
 
     private String bearer(String token) {

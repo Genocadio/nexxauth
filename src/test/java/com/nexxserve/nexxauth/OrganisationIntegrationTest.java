@@ -34,13 +34,15 @@ class OrganisationIntegrationTest {
         String boss = register("org-boss@nexx.io", "Org Platform");
 
         // create: slug derived from name
-        mockMvc.perform(post("/org-platform/organisations")
+        MvcResult createResult = mockMvc.perform(post("/org-platform/organisations")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "Nexx Labs", "description", "R&D"))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.slug").value("nexx-labs"))
-                .andExpect(jsonPath("$.name").value("Nexx Labs"));
+                .andExpect(jsonPath("$.name").value("Nexx Labs"))
+                .andReturn();
+        long orgId = objectMapper.readTree(createResult.getResponse().getContentAsString()).get("id").asLong();
 
         // create with explicit slug + second organisation
         mockMvc.perform(post("/org-platform/organisations")
@@ -56,14 +58,14 @@ class OrganisationIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2));
 
-        // get one
-        mockMvc.perform(get("/org-platform/organisations/nexx-labs")
+        // get one by ID
+        mockMvc.perform(get("/org-platform/organisations/" + orgId)
                         .header("Authorization", bearer(boss)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.description").value("R&D"));
 
         // partial update: name + description
-        mockMvc.perform(patch("/org-platform/organisations/nexx-labs")
+        mockMvc.perform(patch("/org-platform/organisations/" + orgId)
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "Nexx Labs HQ", "description", "HQ"))))
@@ -72,26 +74,24 @@ class OrganisationIntegrationTest {
                 .andExpect(jsonPath("$.description").value("HQ"));
 
         // rename slug
-        mockMvc.perform(patch("/org-platform/organisations/nexx-labs")
+        mockMvc.perform(patch("/org-platform/organisations/" + orgId)
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("slug", "hq"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.slug").value("hq"));
 
-        // old slug 404s, new slug resolves
-        mockMvc.perform(get("/org-platform/organisations/nexx-labs")
+        // ID-based access still works after slug rename
+        mockMvc.perform(get("/org-platform/organisations/" + orgId)
                         .header("Authorization", bearer(boss)))
-                .andExpect(status().isNotFound());
-        mockMvc.perform(get("/org-platform/organisations/hq")
-                        .header("Authorization", bearer(boss)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.slug").value("hq"));
 
         // delete
-        mockMvc.perform(delete("/org-platform/organisations/hq")
+        mockMvc.perform(delete("/org-platform/organisations/" + orgId)
                         .header("Authorization", bearer(boss)))
                 .andExpect(status().isNoContent());
-        mockMvc.perform(get("/org-platform/organisations/hq")
+        mockMvc.perform(get("/org-platform/organisations/" + orgId)
                         .header("Authorization", bearer(boss)))
                 .andExpect(status().isNotFound());
     }
@@ -99,11 +99,13 @@ class OrganisationIntegrationTest {
     @Test
     void readOnlyMembersCanReadButNotWrite() throws Exception {
         String boss = register("org-ro-boss@nexx.io", "Ro Platform");
-        mockMvc.perform(post("/ro-platform/organisations")
+        MvcResult createResult = mockMvc.perform(post("/ro-platform/organisations")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "Readable"))))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andReturn();
+        long orgId = objectMapper.readTree(createResult.getResponse().getContentAsString()).get("id").asLong();
 
         MvcResult add = mockMvc.perform(post("/ro-platform/users")
                         .header("Authorization", bearer(boss))
@@ -136,12 +138,12 @@ class OrganisationIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "Nope"))))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(patch("/ro-platform/organisations/readable")
+        mockMvc.perform(patch("/ro-platform/organisations/" + orgId)
                         .header("Authorization", bearer(member))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "Nope"))))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(delete("/ro-platform/organisations/readable")
+        mockMvc.perform(delete("/ro-platform/organisations/" + orgId)
                         .header("Authorization", bearer(member)))
                 .andExpect(status().isForbidden());
     }
@@ -174,7 +176,7 @@ class OrganisationIntegrationTest {
         mockMvc.perform(get("/isolation-a/organisations")
                         .header("Authorization", bearer(bossB)))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(delete("/isolation-a/organisations/shared")
+        mockMvc.perform(delete("/isolation-a/organisations/999999")
                         .header("Authorization", bearer(bossB)))
                 .andExpect(status().isForbidden());
 
@@ -182,7 +184,7 @@ class OrganisationIntegrationTest {
         mockMvc.perform(get("/does-not-exist/organisations")
                         .header("Authorization", bearer(bossA)))
                 .andExpect(status().isNotFound());
-        mockMvc.perform(get("/isolation-a/organisations/nope")
+        mockMvc.perform(get("/isolation-a/organisations/999999")
                         .header("Authorization", bearer(bossA)))
                 .andExpect(status().isNotFound());
     }

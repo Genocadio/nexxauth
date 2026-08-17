@@ -43,8 +43,8 @@ class OrganisationAuthConfigIntegrationTest {
     void defaultsApplyAndConfigIsReadable() throws Exception {
         String platform = "/" + SLUGS[0];
         String boss = registerPlatform("ac-boss@nexx.io", SLUGS[0]);
-        long orgId = createOrganisationId(boss, platform, "Default Org", "default-org");
-        String configPath = platform + "/organisations/default-org/auth-config";
+        long orgId = createOrganisation(boss, platform, "Default Org", "default-org");
+        String configPath = platform + "/organisations/" + orgId + "/auth-config";
 
         // defaults: PASSWORD auth, 8-72 length, no expiry, no history
         mockMvc.perform(get(configPath).header("Authorization", bearer(boss)))
@@ -66,12 +66,11 @@ class OrganisationAuthConfigIntegrationTest {
     void minLengthRuleIsEnforcedOnRegister() throws Exception {
         String platform = "/" + SLUGS[1];
         String boss = registerPlatform("ac-min-boss@nexx.io", SLUGS[1]);
-        createOrganisation(boss, platform, "Min Org", "min-org");
+        long orgId = createOrganisation(boss, platform, "Min Org", "min-org");
         String orgAuth = platform + "/auth";
-        long orgId = getOrgId(boss, platform + "/organisations/min-org");
 
         // tighten the minimum length to 10
-        mockMvc.perform(patch(platform + "/organisations/min-org/auth-config")
+        mockMvc.perform(patch(platform + "/organisations/" + orgId + "/auth-config")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("passwordMinLength", 10))))
@@ -96,7 +95,7 @@ class OrganisationAuthConfigIntegrationTest {
                 .andExpect(jsonPath("$.user.authType").value("PASSWORD"))
                 .andReturn();
         String token = objectMapper.readTree(reg.getResponse().getContentAsString()).get("accessToken").asText();
-        mockMvc.perform(get(platform + "/organisations/min-org/users/me").header("Authorization", bearer(token)))
+        mockMvc.perform(get(platform + "/organisations/" + orgId + "/users/me").header("Authorization", bearer(token)))
                 .andExpect(status().isOk());
     }
 
@@ -104,10 +103,9 @@ class OrganisationAuthConfigIntegrationTest {
     void userWithoutPasswordCannotLoginUntilOneIsSet() throws Exception {
         String platform = "/" + SLUGS[2];
         String boss = registerPlatform("ac-noauth-boss@nexx.io", SLUGS[2]);
-        createOrganisation(boss, platform, "NoAuth Org", "noauth-org");
-        String org = platform + "/organisations/noauth-org";
+        long orgId = createOrganisation(boss, platform, "NoAuth Org", "noauth-org");
+        String org = platform + "/organisations/" + orgId;
         String orgAuth = platform + "/auth";
-        long orgId = getOrgId(boss, org);
 
         // create a user WITHOUT a password: no auth configured, authType null
         MvcResult created = mockMvc.perform(post(org + "/users")
@@ -154,13 +152,12 @@ class OrganisationAuthConfigIntegrationTest {
     void historyPreventsPasswordReuse() throws Exception {
         String platform = "/" + SLUGS[3];
         String boss = registerPlatform("ac-hist-boss@nexx.io", SLUGS[3]);
-        createOrganisation(boss, platform, "Hist Org", "hist-org");
-        String org = platform + "/organisations/hist-org";
+        long orgId = createOrganisation(boss, platform, "Hist Org", "hist-org");
+        String org = platform + "/organisations/" + orgId;
         String orgAuth = platform + "/auth";
-        long orgId = getOrgId(boss, org);
 
         // enable history (keep last 2)
-        mockMvc.perform(patch(platform + "/organisations/hist-org/auth-config")
+        mockMvc.perform(patch(platform + "/organisations/" + orgId + "/auth-config")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("passwordHistoryCount", 2))))
@@ -194,9 +191,8 @@ class OrganisationAuthConfigIntegrationTest {
     void expiredPasswordBlocksLogin() throws Exception {
         String platform = "/" + SLUGS[4];
         String boss = registerPlatform("ac-exp-boss@nexx.io", SLUGS[4]);
-        createOrganisation(boss, platform, "Exp Org", "exp-org");
+        long orgId = createOrganisation(boss, platform, "Exp Org", "exp-org");
         String orgAuth = platform + "/auth";
-        long orgId = getOrgId(boss, platform + "/organisations/exp-org");
 
         mockMvc.perform(post(orgAuth + "/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -206,7 +202,7 @@ class OrganisationAuthConfigIntegrationTest {
                 .andExpect(status().isCreated());
 
         // passwords expire after 1 day; the just-created one is still fresh
-        mockMvc.perform(patch(platform + "/organisations/exp-org/auth-config")
+        mockMvc.perform(patch(platform + "/organisations/" + orgId + "/auth-config")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("passwordExpirationDays", 1))))
@@ -221,16 +217,16 @@ class OrganisationAuthConfigIntegrationTest {
     void configIsOrgScopedAndPlatformAuthIsUntouched() throws Exception {
         String platform = "/" + SLUGS[5];
         String boss = registerPlatform("ac-scope-boss@nexx.io", SLUGS[5]);
-        createOrganisation(boss, platform, "Scope Org", "scope-org");
-        createOrganisation(boss, platform, "Other Org", "other-org");
+        long scopeOrgId = createOrganisation(boss, platform, "Scope Org", "scope-org");
+        long otherOrgId = createOrganisation(boss, platform, "Other Org", "other-org");
 
         // tighten rules only for scope-org
-        mockMvc.perform(patch(platform + "/organisations/scope-org/auth-config")
+        mockMvc.perform(patch(platform + "/organisations/" + scopeOrgId + "/auth-config")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("passwordMinLength", 12))))
                 .andExpect(status().isOk());
-        mockMvc.perform(get(platform + "/organisations/other-org/auth-config").header("Authorization", bearer(boss)))
+        mockMvc.perform(get(platform + "/organisations/" + otherOrgId + "/auth-config").header("Authorization", bearer(boss)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.passwordMinLength").value(8));
 
@@ -260,27 +256,12 @@ class OrganisationAuthConfigIntegrationTest {
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("accessToken").asText();
     }
 
-    private void createOrganisation(String boss, String platform, String name, String slug) throws Exception {
-        mockMvc.perform(post(platform + "/organisations")
-                        .header("Authorization", bearer(boss))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("name", name, "slug", slug))))
-                .andExpect(status().isCreated());
-    }
-
-    private long createOrganisationId(String boss, String platform, String name, String slug) throws Exception {
+    private long createOrganisation(String boss, String platform, String name, String slug) throws Exception {
         MvcResult result = mockMvc.perform(post(platform + "/organisations")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", name, "slug", slug))))
                 .andExpect(status().isCreated())
-                .andReturn();
-        return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
-    }
-
-    private long getOrgId(String boss, String org) throws Exception {
-        MvcResult result = mockMvc.perform(get(org).header("Authorization", bearer(boss)))
-                .andExpect(status().isOk())
                 .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
     }

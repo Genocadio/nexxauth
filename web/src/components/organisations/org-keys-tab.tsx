@@ -14,12 +14,12 @@ import { useOrgKeys } from "@/hooks/queries";
 
 interface OrgKeysTabProps {
   platformSlug: string;
-  organisationSlug: string;
+  organisationId: number;
 }
 
-export function OrgKeysTab({ platformSlug, organisationSlug }: OrgKeysTabProps) {
-  const keys = useOrgKeys(organisationSlug);
-  const rotate = useRotateOrgKey(platformSlug, organisationSlug);
+export function OrgKeysTab({ platformSlug, organisationId }: OrgKeysTabProps) {
+  const keys = useOrgKeys(organisationId);
+  const rotate = useRotateOrgKey(platformSlug, organisationId);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const activeKey = keys.data?.find((key) => key.active);

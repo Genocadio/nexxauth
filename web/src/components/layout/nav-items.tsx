@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import {
   AppWindow,
+  BookOpen,
   KeyRound,
   LayoutDashboard,
   Layers,
@@ -90,11 +91,13 @@ function OrgNavLink({
 export function NavContent({
   mode,
   organisationSlug,
+  organisationId,
   collapsed = false,
   onNavigate,
 }: {
   mode: "platform" | "org";
   organisationSlug?: string;
+  organisationId?: number;
   collapsed?: boolean;
   onNavigate?: () => void;
 }) {
@@ -107,6 +110,18 @@ export function NavContent({
               <OrgNavLink item={item} organisationSlug={organisationSlug ?? ""} collapsed={collapsed} />
             </span>
           ))}
+          {organisationId && (
+            <span onClick={onNavigate}>
+              <Link
+                href={`/docs/${organisationSlug}/${organisationId}`}
+                title={collapsed ? "Documentation" : undefined}
+                className={itemClasses(false, collapsed)}
+              >
+                <BookOpen className="h-4 w-4 shrink-0" />
+                {!collapsed ? "Documentation" : null}
+              </Link>
+            </span>
+          )}
         </Suspense>
       </nav>
     );

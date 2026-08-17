@@ -50,11 +50,11 @@ class OrganisationAuthIntegrationTest {
     @Test
     void orgUserCanRegisterLoginReadSelfAndBePermissionGated() throws Exception {
         String platform = "/" + SLUGS[0];
-        String org = platform + "/organisations/" + ORG_SLUG;
+
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-boss@nexx.io", SLUGS[0]);
-        createOrganisation(boss, platform);
-        long orgId = getOrgId(boss, org);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
 
         // register an org user (public endpoint, no platform token needed)
         MvcResult reg = mockMvc.perform(post(orgAuth + "/register")
@@ -120,11 +120,11 @@ class OrganisationAuthIntegrationTest {
     @Test
     void orgRolesGateOrgEndpointsForOrgUsers() throws Exception {
         String platform = "/" + SLUGS[1];
-        String org = platform + "/organisations/" + ORG_SLUG;
+
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-role-boss@nexx.io", SLUGS[1]);
-        createOrganisation(boss, platform);
-        long orgId = getOrgId(boss, org);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
 
         // boss creates a role with READ + CREATE and one with no permissions
         long adminRole = createRole(boss, org, "Admin",
@@ -176,11 +176,11 @@ class OrganisationAuthIntegrationTest {
     @Test
     void orgUserPermissionsGateUpdatesAndDeletes() throws Exception {
         String platform = "/" + SLUGS[6];
-        String org = platform + "/organisations/" + ORG_SLUG;
+
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-crud-boss@nexx.io", SLUGS[6]);
-        createOrganisation(boss, platform);
-        long orgId = getOrgId(boss, org);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
 
         // one role with UPDATE+DELETE, one with only READ
         long adminRole = createRole(boss, org, "Admins",
@@ -227,11 +227,11 @@ class OrganisationAuthIntegrationTest {
     @Test
     void orgUserCanReadOwnOrganisationButNotThePlatformDirectory() throws Exception {
         String platform = "/" + SLUGS[7];
-        String org = platform + "/organisations/" + ORG_SLUG;
+
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-orgread-boss@nexx.io", SLUGS[7]);
-        createOrganisation(boss, platform);
-        long orgId = getOrgId(boss, org);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
         registerOrgUser(orgAuth, orgId, "frank", "orgpass1");
         String frankToken = loginOrg(orgAuth, orgId, "frank", "orgpass1");
 
@@ -245,35 +245,39 @@ class OrganisationAuthIntegrationTest {
                 .andExpect(status().isForbidden());
 
         // and a second organisation's context is off-limits too (cross-org)
-        mockMvc.perform(post(platform + "/organisations")
+        MvcResult otherOrgResult = mockMvc.perform(post(platform + "/organisations")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "Other", "slug", "oa-other"))))
-                .andExpect(status().isCreated());
-        mockMvc.perform(get(platform + "/organisations/oa-other").header("Authorization", bearer(frankToken)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long otherOrgId = objectMapper.readTree(otherOrgResult.getResponse().getContentAsString()).get("id").asLong();
+        mockMvc.perform(get(platform + "/organisations/" + otherOrgId).header("Authorization", bearer(frankToken)))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     void orgTokensAreScopedToTheirOrganisationAndDoNotTouchPlatform() throws Exception {
         String platform = "/" + SLUGS[2];
-        String org = platform + "/organisations/" + ORG_SLUG;
+
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-iso-boss@nexx.io", SLUGS[2]);
-        createOrganisation(boss, platform);
-        long orgId = getOrgId(boss, org);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
         registerOrgUser(orgAuth, orgId, "alice", "orgpass1");
         String aliceToken = loginOrg(orgAuth, orgId, "alice", "orgpass1");
 
         // a second organisation in the same platform
-        mockMvc.perform(post(platform + "/organisations")
+        MvcResult otherOrgResult = mockMvc.perform(post(platform + "/organisations")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "Other Org", "slug", "oa-other"))))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andReturn();
+        long otherOrgId = objectMapper.readTree(otherOrgResult.getResponse().getContentAsString()).get("id").asLong();
 
         // alice's token is rejected on the other organisation
-        mockMvc.perform(get(platform + "/organisations/oa-other/users/me")
+        mockMvc.perform(get(platform + "/organisations/" + otherOrgId + "/users/me")
                         .header("Authorization", bearer(aliceToken)))
                 .andExpect(status().isForbidden());
 
@@ -291,11 +295,11 @@ class OrganisationAuthIntegrationTest {
     @Test
     void orgKeysArePublicRotatableAndOldTokensKeepVerifying() throws Exception {
         String platform = "/" + SLUGS[3];
-        String org = platform + "/organisations/" + ORG_SLUG;
+
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-key-boss@nexx.io", SLUGS[3]);
-        createOrganisation(boss, platform);
-        long orgId = getOrgId(boss, org);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
         registerOrgUser(orgAuth, orgId, "karen", "orgpass1");
         String karenToken = loginOrg(orgAuth, orgId, "karen", "orgpass1");
 
@@ -343,8 +347,7 @@ class OrganisationAuthIntegrationTest {
         String platform = "/" + SLUGS[4];
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-refresh-boss@nexx.io", SLUGS[4]);
-        createOrganisation(boss, platform);
-        long orgId = getOrgId(boss, platform + "/organisations/" + ORG_SLUG);
+        long orgId = createOrganisation(boss, platform);
         registerOrgUser(orgAuth, orgId, "nora", "orgpass1");
 
         MvcResult login = mockMvc.perform(post(orgAuth + "/login")
@@ -376,11 +379,11 @@ class OrganisationAuthIntegrationTest {
     @Test
     void usernamesAreCaseInsensitive() throws Exception {
         String platform = "/" + SLUGS[8];
-        String org = platform + "/organisations/" + ORG_SLUG;
+
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-case-boss@nexx.io", SLUGS[8]);
-        createOrganisation(boss, platform);
-        long orgId = getOrgId(boss, org);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
 
         // registering "MixedCase" stores it lowercase, so Bob/bob are one account
         MvcResult reg = mockMvc.perform(post(orgAuth + "/register")
@@ -420,11 +423,11 @@ class OrganisationAuthIntegrationTest {
     @Test
     void defaultRolesAreInheritedOnRegisterAndUserResponsesNeverExposePermissions() throws Exception {
         String platform = "/" + SLUGS[16];
-        String org = platform + "/organisations/" + ORG_SLUG;
+
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-default-boss@nexx.io", SLUGS[16]);
-        createOrganisation(boss, platform);
-        long orgId = getOrgId(boss, org);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
 
         // boss marks "Member" as default (with READ) and leaves "Support" unmarked
         long memberRole = createRole(boss, org, "Member", true,
@@ -475,10 +478,11 @@ class OrganisationAuthIntegrationTest {
     @Test
     void organisationIsResolvedFromClientHeaderForLoginAndRegister() throws Exception {
         String platform = "/" + SLUGS[10];
-        String org = platform + "/organisations/" + ORG_SLUG;
+
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-client-boss@nexx.io", SLUGS[10]);
-        createOrganisation(boss, platform);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
         String clientKey = createClient(boss, org, "Mobile App");
 
         // register via the client: no organisationId in the body
@@ -533,11 +537,11 @@ class OrganisationAuthIntegrationTest {
     @Test
     void organisationIdIsRequiredWhenNoClientHeaderIsPresent() throws Exception {
         String platform = "/" + SLUGS[11];
-        String org = platform + "/organisations/" + ORG_SLUG;
+
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-noclient-boss@nexx.io", SLUGS[11]);
-        createOrganisation(boss, platform);
-        long orgId = getOrgId(boss, org);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
 
         // without a client header the body organisationId is required
         mockMvc.perform(post(orgAuth + "/login")
@@ -566,11 +570,11 @@ class OrganisationAuthIntegrationTest {
     @Test
     void phoneIsALoginIdentifierAndIdentifierTypeIsRespected() throws Exception {
         String platform = "/" + SLUGS[12];
-        String org = platform + "/organisations/" + ORG_SLUG;
+
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-phone-boss@nexx.io", SLUGS[12]);
-        createOrganisation(boss, platform);
-        long orgId = getOrgId(boss, org);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
 
         // email + phone are the login identifiers; username is stored but not login-capable
         mockMvc.perform(patch(org)
@@ -630,11 +634,11 @@ class OrganisationAuthIntegrationTest {
     @Test
     void requiredIdentifiersAndAtLeastOneLoginIdentifierAreEnforced() throws Exception {
         String platform = "/" + SLUGS[13];
-        String org = platform + "/organisations/" + ORG_SLUG;
+
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-req-boss@nexx.io", SLUGS[13]);
-        createOrganisation(boss, platform);
-        long orgId = getOrgId(boss, org);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
 
         // phone is required + login-enabled
         mockMvc.perform(patch(org)
@@ -682,11 +686,11 @@ class OrganisationAuthIntegrationTest {
     @Test
     void passwordCanBeDisabledPerOrganisation() throws Exception {
         String platform = "/" + SLUGS[14];
-        String org = platform + "/organisations/" + ORG_SLUG;
+
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-nopw-boss@nexx.io", SLUGS[14]);
-        createOrganisation(boss, platform);
-        long orgId = getOrgId(boss, org);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
 
         // disable password auth: register without a password is allowed
         mockMvc.perform(patch(org + "/auth-config")
@@ -735,11 +739,11 @@ class OrganisationAuthIntegrationTest {
     @Test
     void disabledUserCannotLoginAndSessionsAreRevoked() throws Exception {
         String platform = "/" + SLUGS[15];
-        String org = platform + "/organisations/" + ORG_SLUG;
+
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-disable-boss@nexx.io", SLUGS[15]);
-        createOrganisation(boss, platform);
-        long orgId = getOrgId(boss, org);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
         long disabled = registerOrgUser(orgAuth, orgId, "toby", "orgpass1");
 
         // a working session first
@@ -782,11 +786,11 @@ class OrganisationAuthIntegrationTest {
     @Test
     void adminPasswordResetRevokesExistingSessions() throws Exception {
         String platform = "/" + SLUGS[9];
-        String org = platform + "/organisations/" + ORG_SLUG;
+
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-reset-boss@nexx.io", SLUGS[9]);
-        createOrganisation(boss, platform);
-        long orgId = getOrgId(boss, org);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
         long pam = registerOrgUser(orgAuth, orgId, "pam", "orgpass1");
 
         MvcResult login = mockMvc.perform(post(orgAuth + "/login")
@@ -824,11 +828,11 @@ class OrganisationAuthIntegrationTest {
     @Test
     void useEmailAsUsernameSettingMakesEmailTheLoginIdentifier() throws Exception {
         String platform = "/" + SLUGS[5];
-        String org = platform + "/organisations/" + ORG_SLUG;
+
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-email-boss@nexx.io", SLUGS[5]);
-        createOrganisation(boss, platform);
-        long orgId = getOrgId(boss, org);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
 
         // enable the setting
         mockMvc.perform(patch(org)
@@ -870,18 +874,12 @@ class OrganisationAuthIntegrationTest {
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("accessToken").asText();
     }
 
-    private void createOrganisation(String boss, String platform) throws Exception {
-        mockMvc.perform(post(platform + "/organisations")
+    private long createOrganisation(String boss, String platform) throws Exception {
+        MvcResult result = mockMvc.perform(post(platform + "/organisations")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("name", "OA Org", "slug", ORG_SLUG))))
-                .andExpect(status().isCreated());
-    }
-
-    private long getOrgId(String boss, String org) throws Exception {
-        MvcResult result = mockMvc.perform(get(org)
-                        .header("Authorization", bearer(boss)))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
     }

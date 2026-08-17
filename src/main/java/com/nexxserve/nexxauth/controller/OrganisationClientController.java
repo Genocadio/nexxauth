@@ -29,7 +29,7 @@ import java.util.List;
  * the only time it is ever shown.
  */
 @RestController
-@RequestMapping("/{slug}/organisations/{organisationSlug}/clients")
+@RequestMapping("/{slug}/organisations/{organisationId}/clients")
 public class OrganisationClientController {
 
     private final OrganisationClientService clientService;
@@ -41,57 +41,57 @@ public class OrganisationClientController {
     @GetMapping
     @PreAuthorize("hasAnyRole('SUPER_USER','READ_ONLY') or hasAuthority('PERM_ORGANISATION_USER_READ')")
     public List<OrganisationClientResponse> list(@PathVariable String slug,
-                                                 @PathVariable String organisationSlug,
+                                                 @PathVariable Long organisationId,
                                                  @AuthenticationPrincipal OrgActor requester) {
-        return clientService.list(slug, organisationSlug, requester);
+        return clientService.list(slug, organisationId, requester);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('SUPER_USER')")
     public OrganisationClientResponse create(@PathVariable String slug,
-                                             @PathVariable String organisationSlug,
+                                             @PathVariable Long organisationId,
                                              @AuthenticationPrincipal OrgActor requester,
                                              @Valid @RequestBody CreateOrganisationClientRequest request) {
-        return clientService.create(slug, organisationSlug, requester, request);
+        return clientService.create(slug, organisationId, requester, request);
     }
 
     @GetMapping("/{clientKey}")
     @PreAuthorize("hasAnyRole('SUPER_USER','READ_ONLY') or hasAuthority('PERM_ORGANISATION_USER_READ')")
     public OrganisationClientResponse get(@PathVariable String slug,
-                                          @PathVariable String organisationSlug,
+                                          @PathVariable Long organisationId,
                                           @PathVariable String clientKey,
                                           @AuthenticationPrincipal OrgActor requester) {
-        return clientService.get(slug, organisationSlug, clientKey, requester);
+        return clientService.get(slug, organisationId, clientKey, requester);
     }
 
     @PatchMapping("/{clientKey}")
     @PreAuthorize("hasRole('SUPER_USER')")
     public OrganisationClientResponse update(@PathVariable String slug,
-                                             @PathVariable String organisationSlug,
+                                             @PathVariable Long organisationId,
                                              @PathVariable String clientKey,
                                              @AuthenticationPrincipal OrgActor requester,
                                              @Valid @RequestBody UpdateOrganisationClientRequest request) {
-        return clientService.update(slug, organisationSlug, clientKey, requester, request);
+        return clientService.update(slug, organisationId, clientKey, requester, request);
     }
 
     @DeleteMapping("/{clientKey}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('SUPER_USER')")
     public ResponseEntity<Void> delete(@PathVariable String slug,
-                                       @PathVariable String organisationSlug,
+                                       @PathVariable Long organisationId,
                                        @PathVariable String clientKey,
                                        @AuthenticationPrincipal OrgActor requester) {
-        clientService.delete(slug, organisationSlug, clientKey, requester);
+        clientService.delete(slug, organisationId, clientKey, requester);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{clientKey}/rotate-token")
     @PreAuthorize("hasRole('SUPER_USER')")
     public OrganisationClientResponse rotateToken(@PathVariable String slug,
-                                                  @PathVariable String organisationSlug,
+                                                  @PathVariable Long organisationId,
                                                   @PathVariable String clientKey,
                                                   @AuthenticationPrincipal OrgActor requester) {
-        return clientService.rotateToken(slug, organisationSlug, clientKey, requester);
+        return clientService.rotateToken(slug, organisationId, clientKey, requester);
     }
 }

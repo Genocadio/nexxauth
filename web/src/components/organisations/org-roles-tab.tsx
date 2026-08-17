@@ -17,12 +17,12 @@ import type { OrganisationRoleResponse } from "@/types/api";
 
 interface OrgRolesTabProps {
   platformSlug: string;
-  organisationSlug: string;
+  organisationId: number;
 }
 
-export function OrgRolesTab({ platformSlug, organisationSlug }: OrgRolesTabProps) {
-  const roles = useOrgRoles(organisationSlug);
-  const deleteMutation = useDeleteOrgRole(platformSlug, organisationSlug);
+export function OrgRolesTab({ platformSlug, organisationId }: OrgRolesTabProps) {
+  const roles = useOrgRoles(organisationId);
+  const deleteMutation = useDeleteOrgRole(platformSlug, organisationId);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<OrganisationRoleResponse | null>(null);
@@ -108,13 +108,13 @@ export function OrgRolesTab({ platformSlug, organisationSlug }: OrgRolesTabProps
 
       <OrgRoleDialog
         platformSlug={platformSlug}
-        organisationSlug={organisationSlug}
+        organisationId={organisationId}
         open={createOpen}
         onOpenChange={setCreateOpen}
       />
       <OrgRoleDialog
         platformSlug={platformSlug}
-        organisationSlug={organisationSlug}
+        organisationId={organisationId}
         open={!!editing}
         onOpenChange={(open) => !open && setEditing(null)}
         role={editing ?? undefined}

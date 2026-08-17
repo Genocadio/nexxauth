@@ -87,7 +87,7 @@ export default function OnboardingPage() {
     setAdvancedStep(next);
     if (target) {
       try {
-        await organisationsApi.update(platformSlug, target.slug, { onboardingStep: next });
+        await organisationsApi.update(platformSlug, target.id, { onboardingStep: next });
         await qc.invalidateQueries({ queryKey: queryKeys.organisations });
       } catch (e) {
         // Progress is best-effort; the wizard state still advances locally.
@@ -335,7 +335,7 @@ function StepIdentifiers({
     setBusy(true);
     setError(null);
     try {
-      await organisationsApi.update(platformSlug, org.slug, flags);
+      await organisationsApi.update(platformSlug, org.id, flags);
       await advance(3);
     } catch (err) {
       setError(getErrorMessage(err));
@@ -410,8 +410,8 @@ function StepFields({
   advance: (next: number) => Promise<void>;
 }) {
   const fieldsQuery = useQuery({
-    queryKey: queryKeys.orgUserFields(org.slug),
-    queryFn: () => organisationsApi.userFields(platformSlug, org.slug),
+    queryKey: queryKeys.orgUserFields(org.id),
+    queryFn: () => organisationsApi.userFields(platformSlug, org.id),
   });
   const [key, setKey] = useState("");
   const [fieldType, setFieldType] = useState<UserFieldType>("STRING");
@@ -433,7 +433,7 @@ function StepFields({
     setBusy(true);
     setError(null);
     try {
-      await organisationsApi.createUserField(platformSlug, org.slug, {
+      await organisationsApi.createUserField(platformSlug, org.id, {
         key: key.trim(),
         fieldType,
         required,
@@ -550,8 +550,8 @@ function StepAuth({
   advance: (next: number) => Promise<void>;
 }) {
   const configQuery = useQuery({
-    queryKey: queryKeys.orgAuthConfig(org.slug),
-    queryFn: () => organisationsApi.authConfig(platformSlug, org.slug),
+    queryKey: queryKeys.orgAuthConfig(org.id),
+    queryFn: () => organisationsApi.authConfig(platformSlug, org.id),
   });
 
   if (configQuery.isLoading) {
@@ -602,7 +602,7 @@ function StepAuthForm({
     setBusy(true);
     setError(null);
     try {
-      await organisationsApi.updateAuthConfig(platformSlug, org.slug, {
+      await organisationsApi.updateAuthConfig(platformSlug, org.id, {
         authType: "PASSWORD",
         passwordEnabled: true,
         passwordMinLength: min,
@@ -723,8 +723,8 @@ function StepSessions({
   advance: (next: number) => Promise<void>;
 }) {
   const settingsQuery = useQuery({
-    queryKey: queryKeys.orgSessionSettings(org.slug),
-    queryFn: () => organisationsApi.sessionSettings(platformSlug, org.slug),
+    queryKey: queryKeys.orgSessionSettings(org.id),
+    queryFn: () => organisationsApi.sessionSettings(platformSlug, org.id),
   });
 
   if (settingsQuery.isLoading) {
@@ -769,7 +769,7 @@ function StepSessionsForm({
     setBusy(true);
     setError(null);
     try {
-      await organisationsApi.updateSessionSettings(platformSlug, org.slug, {
+      await organisationsApi.updateSessionSettings(platformSlug, org.id, {
         accessTokenTtlSeconds: access,
         refreshTokenTtlSeconds: refresh,
         maxSessionsPerUser: sessions,
@@ -848,8 +848,8 @@ function StepClient({
   advance: (next: number) => Promise<void>;
 }) {
   const clientsQuery = useQuery({
-    queryKey: queryKeys.orgClients(org.slug),
-    queryFn: () => organisationsApi.clients(platformSlug, org.slug),
+    queryKey: queryKeys.orgClients(org.id),
+    queryFn: () => organisationsApi.clients(platformSlug, org.id),
   });
 
   const [name, setName] = useState("");
@@ -870,7 +870,7 @@ function StepClient({
     setBusy(true);
     setError(null);
     try {
-      const created = await organisationsApi.createClient(platformSlug, org.slug, {
+      const created = await organisationsApi.createClient(platformSlug, org.id, {
         name: name.trim(),
         type,
       });
@@ -962,12 +962,12 @@ function StepKeys({
   advance: (next: number) => Promise<void>;
 }) {
   const keysQuery = useQuery({
-    queryKey: queryKeys.orgKeys(org.slug),
-    queryFn: () => organisationsApi.keys(platformSlug, org.slug),
+    queryKey: queryKeys.orgKeys(org.id),
+    queryFn: () => organisationsApi.keys(platformSlug, org.id),
   });
   const clientsQuery = useQuery({
-    queryKey: queryKeys.orgClients(org.slug),
-    queryFn: () => organisationsApi.clients(platformSlug, org.slug),
+    queryKey: queryKeys.orgClients(org.id),
+    queryFn: () => organisationsApi.clients(platformSlug, org.id),
   });
   const platformQuery = useQuery({
     queryKey: ["onboarding-platform", platformSlug],

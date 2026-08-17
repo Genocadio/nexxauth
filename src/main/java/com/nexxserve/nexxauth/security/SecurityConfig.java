@@ -56,6 +56,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/slug-suggestions").permitAll()
                         // Public verification keys for an organisation's tokens
                         .requestMatchers(HttpMethod.GET, "/*/organisations/*/keys").permitAll()
+                        // Public documentation context for context-aware API docs
+                        .requestMatchers(HttpMethod.GET, "/*/organisations/*/docs/**").permitAll()
                         // Organisation endpoints: any authenticated token (platform
                         // or org user); the fine-grained platform-role and
                         // org-permission gating happens at method level.

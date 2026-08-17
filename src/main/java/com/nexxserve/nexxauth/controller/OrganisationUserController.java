@@ -31,7 +31,7 @@ import java.util.List;
  * own profile via {@code /me} regardless of permissions.
  */
 @RestController
-@RequestMapping("/{slug}/organisations/{organisationSlug}/users")
+@RequestMapping("/{slug}/organisations/{organisationId}/users")
 public class OrganisationUserController {
 
     private final OrganisationUserService userService;
@@ -43,17 +43,17 @@ public class OrganisationUserController {
     @GetMapping
     @PreAuthorize("hasAnyRole('SUPER_USER','READ_ONLY') or hasAuthority('PERM_ORGANISATION_USER_READ')")
     public List<OrganisationUserResponse> list(@PathVariable String slug,
-                                               @PathVariable String organisationSlug,
+                                               @PathVariable Long organisationId,
                                                @AuthenticationPrincipal OrgActor requester) {
-        return userService.list(slug, organisationSlug, requester);
+        return userService.list(slug, organisationId, requester);
     }
 
     /** Self-service read: every org user can read their own profile. */
     @GetMapping("/me")
     public OrganisationUserResponse me(@PathVariable String slug,
-                                       @PathVariable String organisationSlug,
+                                       @PathVariable Long organisationId,
                                        @AuthenticationPrincipal OrgActor requester) {
-        return userService.me(slug, organisationSlug, requester);
+        return userService.me(slug, organisationId, requester);
     }
 
     /** Self-service profile update: every org user can update their own profile
@@ -61,10 +61,10 @@ public class OrganisationUserController {
      * (e.g. filling values for required org user fields). */
     @PatchMapping("/me")
     public OrganisationUserResponse updateOwnProfile(@PathVariable String slug,
-                                                     @PathVariable String organisationSlug,
+                                                     @PathVariable Long organisationId,
                                                      @AuthenticationPrincipal OrgActor requester,
                                                      @Valid @RequestBody UpdateOwnProfileRequest request) {
-        return userService.updateOwnProfile(slug, organisationSlug, requester, request);
+        return userService.updateOwnProfile(slug, organisationId, requester, request);
     }
 
     /** Self-service password change: completes the CHANGE_PASSWORD action. Every
@@ -73,10 +73,10 @@ public class OrganisationUserController {
     @PostMapping("/me/change-password")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public ResponseEntity<Void> changePassword(@PathVariable String slug,
-                                               @PathVariable String organisationSlug,
+                                               @PathVariable Long organisationId,
                                                @AuthenticationPrincipal OrgActor requester,
                                                @Valid @RequestBody ChangePasswordRequest request) {
-        userService.changePassword(slug, organisationSlug, requester, request);
+        userService.changePassword(slug, organisationId, requester, request);
         return ResponseEntity.noContent().build();
     }
 
@@ -84,39 +84,39 @@ public class OrganisationUserController {
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('SUPER_USER') or hasAuthority('PERM_ORGANISATION_USER_CREATE')")
     public OrganisationUserResponse create(@PathVariable String slug,
-                                           @PathVariable String organisationSlug,
+                                           @PathVariable Long organisationId,
                                            @AuthenticationPrincipal OrgActor requester,
                                            @Valid @RequestBody CreateOrganisationUserRequest request) {
-        return userService.create(slug, organisationSlug, requester, request);
+        return userService.create(slug, organisationId, requester, request);
     }
 
     @GetMapping("/{userId}")
     @PreAuthorize("hasAnyRole('SUPER_USER','READ_ONLY') or hasAuthority('PERM_ORGANISATION_USER_READ')")
     public OrganisationUserResponse get(@PathVariable String slug,
-                                        @PathVariable String organisationSlug,
+                                        @PathVariable Long organisationId,
                                         @PathVariable Long userId,
                                         @AuthenticationPrincipal OrgActor requester) {
-        return userService.get(slug, organisationSlug, userId, requester);
+        return userService.get(slug, organisationId, userId, requester);
     }
 
     @PatchMapping("/{userId}")
     @PreAuthorize("hasRole('SUPER_USER') or hasAuthority('PERM_ORGANISATION_USER_UPDATE')")
     public OrganisationUserResponse update(@PathVariable String slug,
-                                           @PathVariable String organisationSlug,
+                                           @PathVariable Long organisationId,
                                            @PathVariable Long userId,
                                            @AuthenticationPrincipal OrgActor requester,
                                            @Valid @RequestBody UpdateOrganisationUserRequest request) {
-        return userService.update(slug, organisationSlug, userId, requester, request);
+        return userService.update(slug, organisationId, userId, requester, request);
     }
 
     @DeleteMapping("/{userId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('SUPER_USER') or hasAuthority('PERM_ORGANISATION_USER_DELETE')")
     public ResponseEntity<Void> delete(@PathVariable String slug,
-                                       @PathVariable String organisationSlug,
+                                       @PathVariable Long organisationId,
                                        @PathVariable Long userId,
                                        @AuthenticationPrincipal OrgActor requester) {
-        userService.delete(slug, organisationSlug, userId, requester);
+        userService.delete(slug, organisationId, userId, requester);
         return ResponseEntity.noContent().build();
     }
 }

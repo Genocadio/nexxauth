@@ -52,15 +52,12 @@ public class OrganisationService {
     }
 
     @Transactional(readOnly = true)
-    public OrganisationResponse get(String platformSlug, String organisationSlug, OrgActor requester) {
+    public OrganisationResponse get(String platformSlug, Long organisationId, OrgActor requester) {
         Platform platform = platformAccess.findPlatform(platformSlug);
-        Organisation organisation = organisationAccess.findOrganisation(platform, organisationSlug);
+        Organisation organisation = organisationAccess.findOrganisationById(organisationId);
         if (requester.isPlatformUser()) {
-            // Platform members read any org of their platform.
             platformAccess.requireMember(platform, requester);
         } else {
-            // Org users can always read their own organisation (self-context,
-            // like /users/me); the user directory is what needs the permission.
             organisationAccess.requireOrgUserOf(organisation, requester);
         }
         return organisationMapper.toResponse(organisation);
@@ -96,11 +93,11 @@ public class OrganisationService {
     }
 
     @Transactional
-    public OrganisationResponse update(String platformSlug, String organisationSlug, OrgActor requester,
+    public OrganisationResponse update(String platformSlug, Long organisationId, OrgActor requester,
                                        UpdateOrganisationRequest request) {
         Platform platform = platformAccess.findPlatform(platformSlug);
         platformAccess.requireSuperUser(platform, requester);
-        Organisation organisation = organisationAccess.findOrganisation(platform, organisationSlug);
+        Organisation organisation = organisationAccess.findOrganisationById(organisationId);
 
         if (request.name() != null) {
             organisation.setName(request.name());
@@ -160,9 +157,9 @@ public class OrganisationService {
     }
 
     @Transactional
-    public void delete(String platformSlug, String organisationSlug, OrgActor requester) {
+    public void delete(String platformSlug, Long organisationId, OrgActor requester) {
         Platform platform = platformAccess.findPlatform(platformSlug);
         platformAccess.requireSuperUser(platform, requester);
-        organisationRepository.delete(organisationAccess.findOrganisation(platform, organisationSlug));
+        organisationRepository.delete(organisationAccess.findOrganisationById(organisationId));
     }
 }

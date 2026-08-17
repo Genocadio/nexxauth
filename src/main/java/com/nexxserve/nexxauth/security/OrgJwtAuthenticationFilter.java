@@ -38,7 +38,7 @@ public class OrgJwtAuthenticationFilter extends OncePerRequestFilter {
      * negative lookahead keeps a slug literally named "api" from matching
      * /api/... paths (org endpoints live at /{slug}/organisations/...). */
     private static final String ACTION_ENDPOINTS =
-            "^/(?!api/)[^/]+/organisations/[^/]+/users/me/change-password$";
+            "^/(?!api/)[^/]+/organisations/\\d+/users/me/change-password$";
 
     private final OrgJwtService orgJwtService;
     private final OrganisationUserRepository organisationUserRepository;

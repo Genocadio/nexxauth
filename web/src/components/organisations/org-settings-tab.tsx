@@ -29,10 +29,10 @@ import { formatDuration } from "@/lib/constants";
 
 interface OrgSettingsTabProps {
   platformSlug: string;
-  organisationSlug: string;
+  organisationId: number;
 }
 
-export function OrgSettingsTab({ platformSlug, organisationSlug }: OrgSettingsTabProps) {
+export function OrgSettingsTab({ platformSlug, organisationId }: OrgSettingsTabProps) {
   const [section, setSection] = useState("auth");
 
   return (
@@ -44,16 +44,16 @@ export function OrgSettingsTab({ platformSlug, organisationSlug }: OrgSettingsTa
       </TabsList>
 
       <TabsContent value="auth" className="mt-6 space-y-6">
-        <IdentifiersCard platformSlug={platformSlug} organisationSlug={organisationSlug} />
-        <AuthConfigCard platformSlug={platformSlug} organisationSlug={organisationSlug} />
+        <IdentifiersCard platformSlug={platformSlug} organisationId={organisationId} />
+        <AuthConfigCard platformSlug={platformSlug} organisationId={organisationId} />
       </TabsContent>
 
       <TabsContent value="session" className="mt-6">
-        <SessionSettingsCard platformSlug={platformSlug} organisationSlug={organisationSlug} />
+        <SessionSettingsCard platformSlug={platformSlug} organisationId={organisationId} />
       </TabsContent>
 
       <TabsContent value="misc" className="mt-6">
-        <DangerZoneCard platformSlug={platformSlug} organisationSlug={organisationSlug} />
+        <DangerZoneCard platformSlug={platformSlug} organisationId={organisationId} />
       </TabsContent>
     </Tabs>
   );
@@ -63,9 +63,9 @@ export function OrgSettingsTab({ platformSlug, organisationSlug }: OrgSettingsTa
 // Auth: email-as-username
 // ---------------------------------------------------------------------------
 
-function IdentifiersCard({ platformSlug, organisationSlug }: OrgSettingsTabProps) {
-  const org = useOrganisation(organisationSlug);
-  const update = useUpdateOrganisation(platformSlug, organisationSlug);
+function IdentifiersCard({ platformSlug, organisationId }: OrgSettingsTabProps) {
+  const org = useOrganisation(organisationId);
+  const update = useUpdateOrganisation(platformSlug, organisationId);
 
   if (org.isLoading) return <TableSkeleton rows={3} columns={3} />;
   if (org.isError) return <ErrorState error={org.error} onRetry={() => org.refetch()} />;
@@ -140,9 +140,9 @@ function IdentifiersCard({ platformSlug, organisationSlug }: OrgSettingsTabProps
 // Auth: password policy
 // ---------------------------------------------------------------------------
 
-function AuthConfigCard({ platformSlug, organisationSlug }: OrgSettingsTabProps) {
-  const config = useOrgAuthConfig(organisationSlug);
-  const update = useUpdateOrgAuthConfig(platformSlug, organisationSlug);
+function AuthConfigCard({ platformSlug, organisationId }: OrgSettingsTabProps) {
+  const config = useOrgAuthConfig(organisationId);
+  const update = useUpdateOrgAuthConfig(platformSlug, organisationId);
 
   const form = useForm(authConfigSchema, {
     authType: "PASSWORD",
@@ -277,9 +277,9 @@ function AuthConfigCard({ platformSlug, organisationSlug }: OrgSettingsTabProps)
 // Session: token lifetimes
 // ---------------------------------------------------------------------------
 
-function SessionSettingsCard({ platformSlug, organisationSlug }: OrgSettingsTabProps) {
-  const settings = useOrgSessionSettings(organisationSlug);
-  const update = useUpdateOrgSessionSettings(platformSlug, organisationSlug);
+function SessionSettingsCard({ platformSlug, organisationId }: OrgSettingsTabProps) {
+  const settings = useOrgSessionSettings(organisationId);
+  const update = useUpdateOrgSessionSettings(platformSlug, organisationId);
 
   const form = useForm(sessionSettingsSchema, {
     accessTokenTtlSeconds: 900,
@@ -388,10 +388,10 @@ function SessionSettingsCard({ platformSlug, organisationSlug }: OrgSettingsTabP
 // Miscellaneous: danger zone
 // ---------------------------------------------------------------------------
 
-function DangerZoneCard({ platformSlug, organisationSlug }: OrgSettingsTabProps) {
-  const org = useOrganisation(organisationSlug);
+function DangerZoneCard({ platformSlug, organisationId }: OrgSettingsTabProps) {
+  const org = useOrganisation(organisationId);
   const router = useRouter();
-  const remove = useDeleteOrganisation(platformSlug, organisationSlug);
+  const remove = useDeleteOrganisation(platformSlug, organisationId);
 
   const [open, setOpen] = useState(false);
   const [typedName, setTypedName] = useState("");

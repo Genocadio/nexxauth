@@ -30,152 +30,150 @@ export const organisationsApi = {
   list: (platformSlug: string) => get<OrganisationResponse[]>(endpoints.organisations(platformSlug).list, "platform"),
   create: (platformSlug: string, body: CreateOrganisationRequest) =>
     post<OrganisationResponse>(endpoints.organisations(platformSlug).list, body, "platform"),
-  get: (platformSlug: string, organisationSlug: string) =>
-    get<OrganisationResponse>(endpoints.organisations(platformSlug).one(organisationSlug), "platform"),
-  update: (platformSlug: string, organisationSlug: string, body: UpdateOrganisationRequest) =>
+  get: (platformSlug: string, organisationId: number) =>
+    get<OrganisationResponse>(endpoints.organisations(platformSlug).one(organisationId), "platform"),
+  update: (platformSlug: string, organisationId: number, body: UpdateOrganisationRequest) =>
     patch<OrganisationResponse>(
-      endpoints.organisations(platformSlug).one(organisationSlug),
+      endpoints.organisations(platformSlug).one(organisationId),
       body,
       "platform",
     ),
-  remove: (platformSlug: string, organisationSlug: string) =>
-    del<void>(endpoints.organisations(platformSlug).one(organisationSlug), "platform"),
+  remove: (platformSlug: string, organisationId: number) =>
+    del<void>(endpoints.organisations(platformSlug).one(organisationId), "platform"),
 
   // -- users ---------------------------------------------------------------
-  // (The org portal's own /users/me is fetched server-side via the session
-  // route handler — see lib/org-auth.ts — so there is no client counterpart.)
-  users: (platformSlug: string, organisationSlug: string) =>
-    get<OrganisationUserResponse[]>(endpoints.organisations(platformSlug).users(organisationSlug), "platform"),
-  createUser: (platformSlug: string, organisationSlug: string, body: CreateOrganisationUserRequest) =>
+  users: (platformSlug: string, organisationId: number) =>
+    get<OrganisationUserResponse[]>(endpoints.organisations(platformSlug).users(organisationId), "platform"),
+  createUser: (platformSlug: string, organisationId: number, body: CreateOrganisationUserRequest) =>
     post<OrganisationUserResponse>(
-      endpoints.organisations(platformSlug).users(organisationSlug),
+      endpoints.organisations(platformSlug).users(organisationId),
       body,
       "platform",
     ),
   updateUser: (
     platformSlug: string,
-    organisationSlug: string,
+    organisationId: number,
     userId: number,
     body: UpdateOrganisationUserRequest,
   ) =>
     patch<OrganisationUserResponse>(
-      endpoints.organisations(platformSlug).user(organisationSlug, userId),
+      endpoints.organisations(platformSlug).user(organisationId, userId),
       body,
       "platform",
     ),
-  deleteUser: (platformSlug: string, organisationSlug: string, userId: number) =>
-    del<void>(endpoints.organisations(platformSlug).user(organisationSlug, userId), "platform"),
+  deleteUser: (platformSlug: string, organisationId: number, userId: number) =>
+    del<void>(endpoints.organisations(platformSlug).user(organisationId, userId), "platform"),
 
   // -- roles ---------------------------------------------------------------
-  roles: (platformSlug: string, organisationSlug: string) =>
-    get<OrganisationRoleResponse[]>(endpoints.organisations(platformSlug).roles(organisationSlug), "platform"),
-  createRole: (platformSlug: string, organisationSlug: string, body: CreateOrganisationRoleRequest) =>
+  roles: (platformSlug: string, organisationId: number) =>
+    get<OrganisationRoleResponse[]>(endpoints.organisations(platformSlug).roles(organisationId), "platform"),
+  createRole: (platformSlug: string, organisationId: number, body: CreateOrganisationRoleRequest) =>
     post<OrganisationRoleResponse>(
-      endpoints.organisations(platformSlug).roles(organisationSlug),
+      endpoints.organisations(platformSlug).roles(organisationId),
       body,
       "platform",
     ),
   updateRole: (
     platformSlug: string,
-    organisationSlug: string,
+    organisationId: number,
     roleId: number,
     body: UpdateOrganisationRoleRequest,
   ) =>
     patch<OrganisationRoleResponse>(
-      endpoints.organisations(platformSlug).role(organisationSlug, roleId),
+      endpoints.organisations(platformSlug).role(organisationId, roleId),
       body,
       "platform",
     ),
-  deleteRole: (platformSlug: string, organisationSlug: string, roleId: number) =>
-    del<void>(endpoints.organisations(platformSlug).role(organisationSlug, roleId), "platform"),
+  deleteRole: (platformSlug: string, organisationId: number, roleId: number) =>
+    del<void>(endpoints.organisations(platformSlug).role(organisationId, roleId), "platform"),
 
   // -- auth config & session settings --------------------------------------
-  authConfig: (platformSlug: string, organisationSlug: string) =>
+  authConfig: (platformSlug: string, organisationId: number) =>
     get<OrganisationAuthConfigResponse>(
-      endpoints.organisations(platformSlug).authConfig(organisationSlug),
+      endpoints.organisations(platformSlug).authConfig(organisationId),
       "platform",
     ),
-  updateAuthConfig: (platformSlug: string, organisationSlug: string, body: UpdateOrganisationAuthConfigRequest) =>
+  updateAuthConfig: (platformSlug: string, organisationId: number, body: UpdateOrganisationAuthConfigRequest) =>
     patch<OrganisationAuthConfigResponse>(
-      endpoints.organisations(platformSlug).authConfig(organisationSlug),
+      endpoints.organisations(platformSlug).authConfig(organisationId),
       body,
       "platform",
     ),
-  sessionSettings: (platformSlug: string, organisationSlug: string) =>
+  sessionSettings: (platformSlug: string, organisationId: number) =>
     get<OrganisationSessionSettingsResponse>(
-      endpoints.organisations(platformSlug).sessionSettings(organisationSlug),
+      endpoints.organisations(platformSlug).sessionSettings(organisationId),
       "platform",
     ),
   updateSessionSettings: (
     platformSlug: string,
-    organisationSlug: string,
+    organisationId: number,
     body: UpdateOrganisationSessionSettingsRequest,
   ) =>
     patch<OrganisationSessionSettingsResponse>(
-      endpoints.organisations(platformSlug).sessionSettings(organisationSlug),
+      endpoints.organisations(platformSlug).sessionSettings(organisationId),
       body,
       "platform",
     ),
 
   // -- user fields ---------------------------------------------------------
-  userFields: (platformSlug: string, organisationSlug: string) =>
+  userFields: (platformSlug: string, organisationId: number) =>
     get<OrganisationUserFieldResponse[]>(
-      endpoints.organisations(platformSlug).userFields(organisationSlug),
+      endpoints.organisations(platformSlug).userFields(organisationId),
       "platform",
     ),
-  createUserField: (platformSlug: string, organisationSlug: string, body: CreateOrganisationUserFieldRequest) =>
+  createUserField: (platformSlug: string, organisationId: number, body: CreateOrganisationUserFieldRequest) =>
     post<OrganisationUserFieldResponse>(
-      endpoints.organisations(platformSlug).userFields(organisationSlug),
+      endpoints.organisations(platformSlug).userFields(organisationId),
       body,
       "platform",
     ),
   updateUserField: (
     platformSlug: string,
-    organisationSlug: string,
+    organisationId: number,
     fieldId: number,
     body: UpdateOrganisationUserFieldRequest,
   ) =>
     patch<OrganisationUserFieldResponse>(
-      endpoints.organisations(platformSlug).userField(organisationSlug, fieldId),
+      endpoints.organisations(platformSlug).userField(organisationId, fieldId),
       body,
       "platform",
     ),
-  deleteUserField: (platformSlug: string, organisationSlug: string, fieldId: number) =>
-    del<void>(endpoints.organisations(platformSlug).userField(organisationSlug, fieldId), "platform"),
+  deleteUserField: (platformSlug: string, organisationId: number, fieldId: number) =>
+    del<void>(endpoints.organisations(platformSlug).userField(organisationId, fieldId), "platform"),
 
   // -- signing keys --------------------------------------------------------
-  keys: (platformSlug: string, organisationSlug: string) =>
-    get<OrganisationKeyResponse[]>(endpoints.organisations(platformSlug).keys(organisationSlug)),
-  rotateKey: (platformSlug: string, organisationSlug: string) =>
-    post<OrganisationKeyResponse>(endpoints.organisations(platformSlug).rotateKey(organisationSlug), undefined, "platform"),
+  keys: (platformSlug: string, organisationId: number) =>
+    get<OrganisationKeyResponse[]>(endpoints.organisations(platformSlug).keys(organisationId)),
+  rotateKey: (platformSlug: string, organisationId: number) =>
+    post<OrganisationKeyResponse>(endpoints.organisations(platformSlug).rotateKey(organisationId), undefined, "platform"),
 
   // -- clients -------------------------------------------------------------
-  clients: (platformSlug: string, organisationSlug: string) =>
-    get<OrganisationClientResponse[]>(endpoints.organisations(platformSlug).clients(organisationSlug), "platform"),
-  getClient: (platformSlug: string, organisationSlug: string, clientKey: string) =>
-    get<OrganisationClientResponse>(endpoints.organisations(platformSlug).client(organisationSlug, clientKey), "platform"),
-  createClient: (platformSlug: string, organisationSlug: string, body: CreateOrganisationClientRequest) =>
+  clients: (platformSlug: string, organisationId: number) =>
+    get<OrganisationClientResponse[]>(endpoints.organisations(platformSlug).clients(organisationId), "platform"),
+  getClient: (platformSlug: string, organisationId: number, clientKey: string) =>
+    get<OrganisationClientResponse>(endpoints.organisations(platformSlug).client(organisationId, clientKey), "platform"),
+  createClient: (platformSlug: string, organisationId: number, body: CreateOrganisationClientRequest) =>
     post<OrganisationClientResponse>(
-      endpoints.organisations(platformSlug).clients(organisationSlug),
+      endpoints.organisations(platformSlug).clients(organisationId),
       body,
       "platform",
     ),
   updateClient: (
     platformSlug: string,
-    organisationSlug: string,
+    organisationId: number,
     clientKey: string,
     body: UpdateOrganisationClientRequest,
   ) =>
     patch<OrganisationClientResponse>(
-      endpoints.organisations(platformSlug).client(organisationSlug, clientKey),
+      endpoints.organisations(platformSlug).client(organisationId, clientKey),
       body,
       "platform",
     ),
-  deleteClient: (platformSlug: string, organisationSlug: string, clientKey: string) =>
-    del<void>(endpoints.organisations(platformSlug).client(organisationSlug, clientKey), "platform"),
-  rotateClientToken: (platformSlug: string, organisationSlug: string, clientKey: string) =>
+  deleteClient: (platformSlug: string, organisationId: number, clientKey: string) =>
+    del<void>(endpoints.organisations(platformSlug).client(organisationId, clientKey), "platform"),
+  rotateClientToken: (platformSlug: string, organisationId: number, clientKey: string) =>
     post<OrganisationClientResponse>(
-      endpoints.organisations(platformSlug).rotateClientToken(organisationSlug, clientKey),
+      endpoints.organisations(platformSlug).rotateClientToken(organisationId, clientKey),
       undefined,
       "platform",
     ),

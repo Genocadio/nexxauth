@@ -23,16 +23,16 @@ import type { Permission } from "@/types/enums";
 
 interface OrgRoleDialogProps {
   platformSlug: string;
-  organisationSlug: string;
+  organisationId: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   role?: OrganisationRoleResponse;
 }
 
-export function OrgRoleDialog({ platformSlug, organisationSlug, open, onOpenChange, role }: OrgRoleDialogProps) {
+export function OrgRoleDialog({ platformSlug, organisationId, open, onOpenChange, role }: OrgRoleDialogProps) {
   const isEdit = !!role;
-  const create = useCreateOrgRole(platformSlug, organisationSlug);
-  const update = useUpdateOrgRole(platformSlug, organisationSlug);
+  const create = useCreateOrgRole(platformSlug, organisationId);
+  const update = useUpdateOrgRole(platformSlug, organisationId);
   const pending = create.isPending || update.isPending;
 
   const form = useForm(roleSchema, {

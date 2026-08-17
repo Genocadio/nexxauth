@@ -28,16 +28,16 @@ import { updateOrganisationSchema } from "@/lib/validation";
 
 interface OrgOverviewTabProps {
   platformSlug: string;
-  organisationSlug: string;
+  organisationId: number;
 }
 
-export function OrgOverviewTab({ platformSlug, organisationSlug }: OrgOverviewTabProps) {
-  const org = useOrganisation(organisationSlug);
+export function OrgOverviewTab({ platformSlug, organisationId }: OrgOverviewTabProps) {
+  const org = useOrganisation(organisationId);
   const platform = usePlatform();
   const backendOrigin = useBackendOrigin();
 
   const [editOpen, setEditOpen] = useState(false);
-  const update = useUpdateOrganisation(platformSlug, organisationSlug);
+  const update = useUpdateOrganisation(platformSlug, organisationId);
 
   // The project base URL is the platform URL; all org endpoints live under it.
   const projectUrl = resolvePlatformApiUrl(platform.data?.apiBaseUrl, platformSlug, backendOrigin);

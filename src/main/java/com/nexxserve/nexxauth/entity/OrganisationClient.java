@@ -56,4 +56,18 @@ public class OrganisationClient extends BaseEntity {
     /** Free-form JSON settings (may be blank). */
     @Column(name = "settings", length = 4000)
     private String settings;
+
+    // --- session overrides (null = use organisation defaults) ---
+
+    /** Override for access-token lifetime (seconds). Null falls back to org default. */
+    @Column(name = "access_token_ttl_seconds")
+    private Long accessTokenTtlSeconds;
+
+    /** Override for refresh-token lifetime (seconds). Null falls back to org default. */
+    @Column(name = "refresh_token_ttl_seconds")
+    private Long refreshTokenTtlSeconds;
+
+    /** Override for concurrent sessions per user. Null falls back to org default. */
+    @Column(name = "max_sessions_per_user")
+    private Integer maxSessionsPerUser;
 }

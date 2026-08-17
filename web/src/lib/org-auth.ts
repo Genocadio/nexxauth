@@ -45,7 +45,12 @@ export interface OrgJwtClaims {
   roles?: string[];
 }
 
-/** The organisation slug from the access token claims, if any. */
+/** The organisation ID from the access token claims, if any. */
+export function orgIdFromToken(accessToken: string): number | undefined {
+  return decodeJwtPayload<OrgJwtClaims>(accessToken)?.orgId;
+}
+
+/** The organisation slug from the access token claims, if any (display-only). */
 export function orgSlugFromToken(accessToken: string): string | undefined {
   return decodeJwtPayload<OrgJwtClaims>(accessToken)?.orgSlug;
 }
@@ -101,14 +106,14 @@ export function serverOrgLogout(platformSlug: string, refreshToken: string): Pro
   return postJson<void>(`/${platformSlug}/auth/logout`, body);
 }
 
-/** GET /{slug}/organisations/{orgSlug}/users/me */
+/** GET /{slug}/organisations/{orgId}/users/me */
 export function serverOrgMe(
   platformSlug: string,
-  organisationSlug: string,
+  organisationId: number,
   accessToken: string,
 ): Promise<ApiResult<OrganisationUserResponse>> {
   return getJson<OrganisationUserResponse>(
-    `/${platformSlug}/organisations/${organisationSlug}/users/me`,
+    `/${platformSlug}/organisations/${organisationId}/users/me`,
     accessToken,
   );
 }
