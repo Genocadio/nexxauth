@@ -1,3 +1,4 @@
+import { DocsContextProvider } from "@/components/docs/docs-context-provider";
 import { DocsLayout } from "@/components/docs/docs-layout";
 
 export default async function DocsPageLayout({
@@ -10,7 +11,9 @@ export default async function DocsPageLayout({
   const { platformSlug, organisationId } = await params;
   return (
     <DocsLayout platformSlug={platformSlug} organisationId={organisationId}>
-      {children}
+      <DocsContextProvider platformSlug={platformSlug} organisationId={Number(organisationId)}>
+        {children}
+      </DocsContextProvider>
     </DocsLayout>
   );
 }

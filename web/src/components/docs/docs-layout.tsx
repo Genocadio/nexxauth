@@ -171,7 +171,9 @@ export function DocsLayout({ children, platformSlug, organisationId }: DocsLayou
                   </h4>
                   <ul className="space-y-1">
                     {section.items.map((item) => {
-                      const href = `${basePath}${item.href === "/docs" ? "" : item.href}`;
+                      // NAV_SECTION hrefs keep their full /docs prefix; strip it
+                      // so they join the basePath (/docs/{platform}/{org}) once.
+                      const href = `${basePath}${item.href.replace(/^\/docs/, "")}`;
                       const isActive = pathname === href;
                       return (
                         <li key={item.href}>
