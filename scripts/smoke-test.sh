@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# End-to-end smoke test of the nexxauth API with curl.
+# End-to-end smoke test of the nauth API with curl.
 #
 # Usage:
 #   BASE=http://localhost:8080 MGMT=http://localhost:8081 scripts/smoke-test.sh
@@ -12,8 +12,8 @@ set -u
 BASE="${BASE:-http://localhost:8080}"
 MGMT="${MGMT:-http://localhost:8081}"
 LOG="${LOG:-}"  # optional app log file to check audit events against
-RESP=/tmp/nexxauth-resp.json
-HDRS=/tmp/nexxauth-headers.txt
+RESP=/tmp/nauth-resp.json
+HDRS=/tmp/nauth-headers.txt
 PASS=0
 FAIL=0
 
@@ -522,7 +522,7 @@ check "health" 200 "$H"
 check "health UP" UP "$(field '["status"]')"
 H=$(curl -s -o "$RESP" -w '%{http_code}' "$MGMT/actuator/info")
 check "info" 200 "$H"
-check "info app name" nexxauth "$(field '["app"]["name"]')"
+check "info app name" nauth "$(field '["app"]["name"]')"
 check "info app version" 0.0.1-SNAPSHOT "$(field '["app"]["version"]')"
 H=$(curl -s -o "$RESP" -w '%{http_code}' "$MGMT/actuator/health/liveness")
 check "liveness" 200 "$H"

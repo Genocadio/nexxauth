@@ -77,7 +77,7 @@ tasks.named('test') {
 // Fixed jar name (no version in the filename) so the Dockerfile can COPY it
 // without globbing and the layered extraction can reference it directly.
 tasks.named('bootJar') {
-	archiveFileName = 'nexxauth.jar'
+	archiveFileName = 'nauth.jar'
 }
 
 // Boot 4 removed the bootBuildInfo task; generate the build-info.properties

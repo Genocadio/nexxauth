@@ -66,9 +66,9 @@ jobs:
           context: .
           platforms: linux/amd64
           push: true
-          tags: genoyves/nexxauth-backend:latest
-          cache-from: type=gha,scope=nexxauth-backend
-          cache-to: type=gha,mode=max,scope=nexxauth-backend
+          tags: genoyves/nauth-backend:latest
+          cache-from: type=gha,scope=nauth-backend
+          cache-to: type=gha,mode=max,scope=nauth-backend
 
       - name: Build and push web
         if: ${{ needs.changes.outputs.web == 'true' }}
@@ -77,7 +77,7 @@ jobs:
           context: ./web
           platforms: linux/amd64
           push: true
-          tags: genoyves/nexxauth-web:latest
+          tags: genoyves/nauth-web:latest
           build-args: BACKEND_URL=http://backend:8080
-          cache-from: type=gha,scope=nexxauth-web
-          cache-to: type=gha,mode=max,scope=nexxauth-web
+          cache-from: type=gha,scope=nauth-web
+          cache-to: type=gha,mode=max,scope=nauth-web

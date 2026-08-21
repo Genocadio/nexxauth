@@ -28,10 +28,10 @@ COPY src src
 
 # CI runs tests separately. Produce the Boot jar and split it into its layers
 # so the runtime stage can copy each as a separate image layer (Boot 4 jarmode
-# emits application/nexxauth.jar + dependencies/lib/ + empty loader layers).
+# emits application/nauth.jar + dependencies/lib/ + empty loader layers).
 RUN --mount=type=cache,target=/root/.gradle \
     ./gradlew bootJar --no-daemon -x test \
-    && java -Djarmode=tools -jar build/libs/nexxauth.jar extract --layers --destination extracted
+    && java -Djarmode=tools -jar build/libs/nauth.jar extract --layers --destination extracted
 
 # ---- Runtime stage ----------------------------------------------------------
 FROM ${RUNTIME_JAVA_IMAGE}
@@ -39,26 +39,26 @@ FROM ${RUNTIME_JAVA_IMAGE}
 WORKDIR /app
 
 # curl for the healthcheck; non-root user; log directory owned by that user so
-# the prod profile can write /var/log/nexxauth/nexxauth.log (also the compose
+# the prod profile can write /var/log/nauth/nauth.log (also the compose
 # app-logs volume mount point).
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
-    && groupadd --system nexxauth \
-    && useradd --system --gid nexxauth --no-create-home nexxauth \
-    && mkdir -p /var/log/nexxauth \
-    && chown -R nexxauth:nexxauth /var/log/nexxauth
+    && groupadd --system nauth \
+    && useradd --system --gid nauth --no-create-home nauth \
+    && mkdir -p /var/log/nauth \
+    && chown -R nauth:nauth /var/log/nauth
 
 # Boot layers, least to most frequently changing, so deploy pushes only
 # re-transfer the application layer. Boot 4 extracts to a thin
-# application/nexxauth.jar whose manifest Class-Path resolves the dependency
+# application/nauth.jar whose manifest Class-Path resolves the dependency
 # jars from lib/ next to it.
 COPY --from=build /workspace/extracted/dependencies/ ./
 COPY --from=build /workspace/extracted/application/ ./
 
 EXPOSE 8080 8081
 
-USER nexxauth
+USER nauth
 
 ENV SPRING_PROFILES_ACTIVE=prod \
     SPRING_DOCKER_COMPOSE_ENABLED=false \
@@ -72,4 +72,4 @@ HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=12 \
 # Container-aware heap (75% of the cgroup limit) and exit on OOM so an
 # orchestrator restarts a wedged JVM instead of serving degraded. The thin
 # application jar resolves its dependencies from lib/ next to it.
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-XX:+ExitOnOutOfMemoryError", "-jar", "nexxauth.jar"]
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-XX:+ExitOnOutOfMemoryError", "-jar", "nauth.jar"]

@@ -1,4 +1,4 @@
-# Nexxauth
+# Nauth
 
 Multi-tenant authentication backend for the Nexxserve platform. A **platform** is a
 tenant with its own **platform users** (email + password, `SUPER_USER` / `READ_ONLY`);
@@ -79,7 +79,7 @@ inside their own organisation.
 ## Quick start
 
 ```bash
-docker compose up -d          # PostgreSQL 16 on localhost:5432 (db/user/pass: nexxauth)
+docker compose up -d          # PostgreSQL 16 on localhost:5432 (db/user/pass: nauth)
 ./gradlew bootRun             # app on :8080, actuator on :8081
 ```
 
@@ -146,7 +146,7 @@ Redis instance (`app.rate-limit.redis.host/port/password/ssl`); the repo's
 correct per-IP throttling once more than one instance serves traffic.
 
 **Production:** `SPRING_PROFILES_ACTIVE=prod` switches to ECS-structured JSON logging
-(console + rotating file at `/var/log/nexxauth/nexxauth.log`, 50 MB × 14) and tones
+(console + rotating file at `/var/log/nauth/nauth.log`, 50 MB × 14) and tones
 down noisy frameworks. Every log line carries the `requestId` MDC value.
 
 ## API reference
@@ -263,11 +263,11 @@ never direct permissions. A role may have zero permissions. Enforcement matrix:
 with the **organisation's own keypair**, `kid` in the JOSE header, claims:
 
 ```json
-{ "sub": "6", "iss": "nexxauth", "orgId": 3, "orgSlug": "rbac-corp",
+{ "sub": "6", "iss": "nauth", "orgId": 3, "orgSlug": "rbac-corp",
   "roles": ["manager"], "type": "org-access", "iat": ..., "exp": ... }
 ```
 
-Only **roles** are in the token — permissions are an internal nexxauth concept
+Only **roles** are in the token — permissions are an internal nauth concept
 (users never hold permissions directly, only via roles) and are **never exposed**
 in the token. The roles are a **snapshot at issue time** (drift window = token
 lifetime); every request re-validates user + org against the DB and resolves the
@@ -338,7 +338,7 @@ detector, so a stale device cannot kill the user's newer sessions).
   with curl against a running instance and greps the app log for the audit trail:
   ```bash
   BASE=http://localhost:8080 MGMT=http://localhost:8081 \
-    LOG=/tmp/nexxauth.log scripts/smoke-test.sh
+    LOG=/tmp/nauth.log scripts/smoke-test.sh
   ```
   It expects a fresh app with `login.capacity=5` and `register.capacity=5`
   (e.g. `JAVA_TOOL_OPTIONS='-Dapp.rate-limit.login.capacity=5

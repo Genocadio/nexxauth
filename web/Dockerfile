@@ -35,7 +35,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
-    && groupadd --system nexxauth && useradd --system --gid nexxauth --no-create-home nexxauth
+    && groupadd --system nauth && useradd --system --gid nauth --no-create-home nauth
 
 # Copy the standalone output (traced deps + server.js) and static assets.
 COPY --from=build /app/.next/standalone ./
@@ -43,7 +43,7 @@ COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
 
 EXPOSE 3000
-USER nexxauth
+USER nauth
 
 # Health probe for orchestrators; compose's depends_on: service_healthy uses
 # this image healthcheck too.
