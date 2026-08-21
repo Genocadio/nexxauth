@@ -42,7 +42,7 @@ dependencies {
 	annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
 
 	// JWT (access tokens)
-	implementation platform('io.jsonwebtoken:jjwt-bom:0.12.7')
+	implementation platform('io.jsonwebtoken:jjwt-bom:0.13.0')
 	implementation 'io.jsonwebtoken:jjwt-api'
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl'
 	runtimeOnly 'io.jsonwebtoken:jjwt-jackson'
