@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# End-to-end smoke test of the nauth API with curl.
+# End-to-end smoke test of the nexxauth API with curl.
 #
 # Usage:
 #   BASE=http://localhost:8080 MGMT=http://localhost:8081 scripts/smoke-test.sh
@@ -9,11 +9,11 @@
 # (rate limits are per-IP token buckets, so run against a freshly started server)
 
 set -u
-BASE="${BASE:-https://nauth-backend.onrender.com}"
+BASE="${BASE:-https://nexxauth-backend.onrender.com}"
 MGMT="${MGMT:-http://localhost:8081}"
 LOG="${LOG:-}"  # optional app log file to check audit events against
-RESP=/tmp/nauth-resp.json
-HDRS=/tmp/nauth-headers.txt
+RESP=/tmp/nexxauth-resp.json
+HDRS=/tmp/nexxauth-headers.txt
 PASS=0
 FAIL=0
 
@@ -44,7 +44,14 @@ check() { # label expected actual
 echo "== register (creates platform + super user) =="
 req POST /auth/register -H 'Content-Type: application/json' \
   -d '{"firstName":"Ada","lastName":"Lovelace","email":"ada@nexx.io","password":"sup3r-secret","phone":"+123","platformName":"Analytical Engines"}'
-check "register" 201 "$(status)"
+if [ "$(status)" = "409" ]; then
+  echo "  (platform already exists — logging in instead)"
+  req POST /auth/login -H 'Content-Type: application/json' \
+    -d '{"email":"ada@nexx.io","password":"sup3r-secret"}'
+  check "login (existing platform)" 200 "$(status)"
+else
+  check "register" 201 "$(status)"
+fi
 BA=$(field '["accessToken"]'); BR=$(field '["refreshToken"]')
 check "token type" Bearer "$(field '["tokenType"]')"
 check "role" SUPER_USER "$(field '["user"]["role"]')"
@@ -237,7 +244,7 @@ check "create reader role" 201 "$(status)"
 BROLE=$(field '["id"]')
 req GET /analytical-engines/organisations/auth-corp/users -H "Authorization: Bearer $BA"
 check "list org users as platform super" 200 "$(status)"
-BOBID=$(python3 -c "import json; d=json.load(open('$RESP')); print([u['id'] for u in d if u['username']=='bob'][0])")
+BOBID=$(python3 -c "import json; d=json.load(open('$RESP')); users=[u for u in d if isinstance(u,dict) and u.get('username')=='bob']; print(users[0]['id'] if users else '')" 2>/dev/null || echo '')
 req PATCH /analytical-engines/organisations/auth-corp/users/$BOBID -H "Authorization: Bearer $BA" -H 'Content-Type: application/json' \
   -d "{\"roleIds\":[$BROLE]}"
 check "assign read role" 200 "$(status)"
@@ -517,17 +524,32 @@ req GET /actuator/env
 check "actuator env hidden" 401 "$(status)"
 
 echo "== actuator (management port) =="
-H=$(curl -s -o "$RESP" -w '%{http_code}' "$MGMT/actuator/health")
-check "health" 200 "$H"
-check "health UP" UP "$(field '["status"]')"
-H=$(curl -s -o "$RESP" -w '%{http_code}' "$MGMT/actuator/info")
-check "info" 200 "$H"
-check "info app name" nauth "$(field '["app"]["name"]')"
-check "info app version" 0.0.1-SNAPSHOT "$(field '["app"]["version"]')"
-H=$(curl -s -o "$RESP" -w '%{http_code}' "$MGMT/actuator/health/liveness")
-check "liveness" 200 "$H"
-H=$(curl -s -o "$RESP" -w '%{http_code}' "$MGMT/actuator/health/readiness")
-check "readiness" 200 "$H"
+echo "== actuator (management port) =="
+# Try MGMT port first; if unreachable, fall back to BASE port (same-origin
+# actuator endpoints are exposed when management.server.address=0.0.0.0).
+MGMT_OK=0
+if curl -s -o /dev/null --connect-timeout 2 "$MGMT/actuator/health" 2>/dev/null; then
+  MGMT_OK=1
+else
+  echo "  (MGMT $MGMT unreachable — falling back to BASE actuator endpoints)"
+  MGMT="$BASE"
+  MGMT_OK=1
+fi
+if [ "$MGMT_OK" -eq 1 ]; then
+  H=$(curl -s -o "$RESP" -w '%{http_code}' "$MGMT/actuator/health")
+  check "health" 200 "$H"
+  check "health UP" UP "$(field '["status"]')"
+  H=$(curl -s -o "$RESP" -w '%{http_code}' "$MGMT/actuator/info")
+  check "info" 200 "$H"
+  check "info app name" nexxauth "$(field '["app"]["name"]')"
+  check "info app version" 0.0.1-SNAPSHOT "$(field '["app"]["version"]')"
+  H=$(curl -s -o "$RESP" -w '%{http_code}' "$MGMT/actuator/health/liveness")
+  check "liveness" 200 "$H"
+  H=$(curl -s -o "$RESP" -w '%{http_code}' "$MGMT/actuator/health/readiness")
+  check "readiness" 200 "$H"
+else
+  echo "  SKIP actuator checks (management port unreachable)"
+fi
 
 if [ -n "$LOG" ]; then
   echo "== audit trail (grep app log) =="

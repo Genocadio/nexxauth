@@ -1,10 +1,10 @@
 # Distinct project name so this stack does NOT collide with the dev
-# compose.yaml (which owns `nauth-postgres` / `nauth-redis` and their
-# volumes). Everything here is scoped under nauth-prod-*.
-name: nauth-prod
+# compose.yaml (which owns `nexxauth-postgres` / `nexxauth-redis` and their
+# volumes). Everything here is scoped under nexxauth-prod-*.
+name: nexxauth-prod
 
-# Production compose: runs the Nauth backend + web console from the published
-# Docker Hub images (genoyves/nauth-backend / nauth-web :latest) with
+# Production compose: runs the Nexxauth backend + web console from the published
+# Docker Hub images (genoyves/nexxauth-backend / nexxauth-web :latest) with
 # PostgreSQL and Redis. The images are built and pushed by
 # .github/workflows/docker.yml after CI passes. Bring everything up with:
 #
@@ -22,13 +22,13 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-nauth}
-      POSTGRES_USER: ${POSTGRES_USER:-nauth}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nauth}
+      POSTGRES_DB: ${POSTGRES_DB:-nexxauth}
+      POSTGRES_USER: ${POSTGRES_USER:-nexxauth}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexxauth}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nauth} -d ${POSTGRES_DB:-nauth}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nexxauth} -d ${POSTGRES_DB:-nexxauth}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -48,7 +48,7 @@ services:
     # No host ports: only reachable from within the compose network.
 
   backend:
-    image: genoyves/nauth-backend:latest
+    image: genoyves/nexxauth-backend:latest
     restart: unless-stopped
     depends_on:
       postgres:
@@ -58,9 +58,9 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       SPRING_DOCKER_COMPOSE_ENABLED: "false"
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-nauth}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-nauth}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-nauth}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-nexxauth}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-nexxauth}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-nexxauth}
       # HS256 signing secret — MUST be a strong, stable value in production
       # (rotate only with a strategy; changing it invalidates all access tokens).
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
@@ -81,7 +81,7 @@ services:
       APP_CORS_EXTRA_ORIGINS: ${CORS_EXTRA_ORIGINS:-}
     volumes:
       # Prod profile rotates JSON logs here; keep them on a volume.
-      - app-logs:/var/log/nauth
+      - app-logs:/var/log/nexxauth
     ports:
       - "${BACKEND_PORT:-8080}:8080"
       # Actuator management port — expose only if you need external probes
@@ -91,7 +91,7 @@ services:
   web:
     # The /api/v1 proxy target is baked into the image at build time
     # (.github/workflows/docker.yml passes BACKEND_URL=http://backend:8080).
-    image: genoyves/nauth-web:latest
+    image: genoyves/nexxauth-web:latest
     restart: unless-stopped
     depends_on:
       backend:

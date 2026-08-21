@@ -282,7 +282,7 @@ Mirror of the platform flow, on the org endpoints and the org's refresh-token ta
 // header
 { "alg": "HS256" }
 // payload
-{ "sub": "12", "iss": "nauth", "email": "ada@nexx.io",
+{ "sub": "12", "iss".*"nexxauth", "email": "ada@nexx.io",
   "role": "SUPER_USER", "platformId": 1, "platformSlug": "analytical-engines",
   "type": "access", "iat": ..., "exp": ... }     // exp = iat + 15m
 ```
@@ -299,11 +299,11 @@ keypair):
 // header — unsigned JOSE, carries the key id
 { "kid": "2f1aa22c5e8f4f10", "alg": "RS256" }
 // payload
-{ "sub": "6", "iss": "nauth", "orgId": 3, "orgSlug": "rbac-corp",
+{ "sub": "6", "iss".*"nexxauth", "orgId": 3, "orgSlug": "rbac-corp",
   "roles": ["manager"], "type": "org-access", "iat": ..., "exp": ... }   // exp = iat + org access TTL (default 15m)
 ```
 
-- The token carries **roles only** — permissions are an internal nauth concept
+- The token carries **roles only** — permiss.*nexxauth concept
   (a user never holds a permission directly, only via roles) and are resolved
   server-side from the DB on every request, never placed in the token.
 - The **15m lifetime comes from the org's `session-settings`** (default 900s, same

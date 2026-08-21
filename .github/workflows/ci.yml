@@ -72,13 +72,13 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_DB: nauth
-          POSTGRES_USER: nauth
-          POSTGRES_PASSWORD: nauth
+          POSTGRES_DB: nexxauth
+          POSTGRES_USER: nexxauth
+          POSTGRES_PASSWORD: nexxauth
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U nauth -d nauth"
+          --health-cmd "pg_isready -U nexxauth -d nexxauth"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -99,9 +99,9 @@ jobs:
       # docker-compose integration would start its own Postgres; disable it and
       # point the datasource + rate-limit store at the CI services instead.
       SPRING_DOCKER_COMPOSE_ENABLED: "false"
-      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/nauth
-      SPRING_DATASOURCE_USERNAME: nauth
-      SPRING_DATASOURCE_PASSWORD: nauth
+      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/nexxauth
+      SPRING_DATASOURCE_USERNAME: nexxauth
+      SPRING_DATASOURCE_PASSWORD: nexxauth
       JAVA_TOOL_OPTIONS: >-
         -Dapp.rate-limit.store=redis
         -Dapp.rate-limit.redis.host=localhost

@@ -1,6 +1,6 @@
-# Nauth Console (frontend)
+# Nexxauth Console (frontend)
 
-A modern admin console for the Nauth backend — manage platforms, organisations,
+A modern admin console for the Nexxauth backend — manage platforms, organisations,
 their users, roles, security policies and signing keys, plus a self-service portal
 for organisation users.
 

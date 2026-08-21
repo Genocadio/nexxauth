@@ -1,6 +1,6 @@
 # Client & Token Integration Guide
 
-How external apps talk to the Nauth organisation API, how a verifier that
+How external apps talk to the Nexxauth organisation API, how a verifier that
 holds the organisation's **public key** can validate a token and read roles,
 and how to refresh tokens.
 
@@ -33,7 +33,7 @@ This guide is about the organisation side: an app logs a user in through the
 organisation auth endpoints, then calls the organisation API with the returned
 access token. Any service that holds the organisation's public key can
 independently verify that token and read the user's roles without contacting
-Nauth again.
+Nexxauth again.
 
 ---
 
@@ -382,14 +382,14 @@ Payload claims:
 | `orgSlug` | string | organisation slug |
 | `roles` | string[] | **role names** the user holds, e.g. `["admin","support"]` |
 | `type` | string | always `org-access` |
-| `iss` | string | always `nauth` |
+| `iss.*nexxauth` |
 | `iat` | number | issued-at (Unix seconds) |
 | `exp` | number | expires-at (Unix seconds) |
 
 > **Permissions are not in the token.** Roles are; permissions are resolved
 > server-side from the database on every request and never shipped in the JWT.
 > A verifier can authenticate the user and read their roles, but cannot derive
-> permission-level authorization offline — that remains Nauth's job.
+> permission-level authorization offline — that remains Nexxauth's job.
 
 ### 6.3 Verify (curl + openssl)
 
@@ -424,7 +424,7 @@ openssl dgst -sha256 -verify /tmp/pub.pem -signature /tmp/token-sig /tmp/token-d
 decode_b64url "$P" | jq .
 ```
 
-Always additionally check `exp` (and `iss == "nauth"`, `type == "org-access"`).
+Always additionally check `exp` (and `iss.*nexxauth"`, `type == "org-access"`).
 
 ### 6.4 Verify (Node.js)
 
@@ -450,7 +450,7 @@ async function verifyOrgToken(token, organisationId) {
 
   return jwt.verify(token, spkiDerToPem(key.publicKey), {
     algorithms: ["RS256"],
-    issuer: "nauth",
+    iss.*nexxauth",
   });
 }
 
@@ -478,7 +478,7 @@ def verify_org_token(token: str, organisation_id: int) -> dict:
         keys = json.load(r)
     key = next(k for k in keys if k["kid"] == header["kid"])
     return jwt.decode(token, spki_der_to_pem(key["publicKey"]),
-                      algorithms=["RS256"], issuer="nauth")
+                      algorithms=["RS256"], iss.*nexxauth")
 ```
 
 ### 6.6 Extracting roles
@@ -492,14 +492,14 @@ The decoded payload already carries the role names:
   "orgSlug": "acme",
   "roles": ["admin", "support"],
   "type": "org-access",
-  "iss": "nauth",
+  "iss.*nexxauth",
   "iat": 1730000000,
   "exp": 1730000900
 }
 ```
 
 Use `roles` for coarse UI gating (e.g. "is the user an admin?"). For
-permission-level checks, call the API and let Nauth enforce them.
+permission-level checks, call the API and let Nexxauth enforce them.
 
 ---
 
@@ -537,7 +537,7 @@ organisation's session settings (defaults: access 900 s, refresh 604800 s).
 ### 7.2 Replay protection (important)
 
 Because every refresh rotates the token, presenting an **already-used** refresh
-token is treated as token theft: Nauth revokes **every** outstanding refresh
+token is treated as token theft: Nexxauth revokes **every** outstanding refresh
 token of that user (all their sessions) and rejects the request. So:
 
 - Never reuse a refresh token.
@@ -571,7 +571,7 @@ Console/admin tokens come from `POST /auth/login` (or `/register`):
 ```
 
 These are **HS256** tokens signed with the shared `JWT_SECRET` — **not
-verifiable with any public key**; only Nauth itself (or a party holding the
+verifiable with any public key**; only Nexxauth itself (or a party holding the
 secret) can verify them. They carry a single `role` claim
 (`SUPER_USER`/`READ_ONLY`) and are meant for the console. Endpoints:
 `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`.
