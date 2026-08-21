@@ -9,7 +9,7 @@
 # (rate limits are per-IP token buckets, so run against a freshly started server)
 
 set -u
-BASE="${BASE:-http://localhost:8080}"
+BASE="${BASE:-https://nauth-backend.onrender.com}"
 MGMT="${MGMT:-http://localhost:8081}"
 LOG="${LOG:-}"  # optional app log file to check audit events against
 RESP=/tmp/nauth-resp.json

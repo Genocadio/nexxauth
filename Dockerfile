@@ -56,7 +56,7 @@ RUN apt-get update \
 COPY --from=build /workspace/extracted/dependencies/ ./
 COPY --from=build /workspace/extracted/application/ ./
 
-EXPOSE 8080 8081
+EXPOSE 8080
 
 USER nauth
 
