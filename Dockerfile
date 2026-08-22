@@ -61,8 +61,7 @@ EXPOSE 8080
 USER nexxauth
 
 ENV SPRING_PROFILES_ACTIVE=prod \
-    SPRING_DOCKER_COMPOSE_ENABLED=false \
-    MANAGEMENT_SERVER_ADDRESS=0.0.0.0
+    SPRING_DOCKER_COMPOSE_ENABLED=false
 
 # Health probe for any orchestrator; compose's depends_on: service_healthy
 # uses this image healthcheck too (compose overrides with its own if defined).
