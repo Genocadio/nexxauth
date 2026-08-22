@@ -56,7 +56,7 @@ RUN apt-get update \
 COPY --from=build /workspace/extracted/dependencies/ ./
 COPY --from=build /workspace/extracted/application/ ./
 
-EXPOSE 8080 8081
+EXPOSE 8080
 
 USER nexxauth
 
@@ -67,7 +67,7 @@ ENV SPRING_PROFILES_ACTIVE=prod \
 # Health probe for any orchestrator; compose's depends_on: service_healthy
 # uses this image healthcheck too (compose overrides with its own if defined).
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=12 \
-    CMD curl -fsS http://localhost:8081/actuator/health/readiness || exit 1
+    CMD curl -fsS http://localhost:8080/actuator/health/readiness || exit 1
 
 # Container-aware heap (75% of the cgroup limit) and exit on OOM so an
 # orchestrator restarts a wedged JVM instead of serving degraded. The thin

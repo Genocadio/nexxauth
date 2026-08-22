@@ -18,6 +18,7 @@ WORKDIR /app
 ARG BACKEND_URL=http://localhost:8080
 ENV BACKEND_URL=$BACKEND_URL
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_OUTPUT=standalone
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .

@@ -80,7 +80,7 @@ inside their own organisation.
 
 ```bash
 docker compose up -d          # PostgreSQL 16 on localhost:5432 (db/user/pass: nexxauth)
-./gradlew bootRun             # app on :8080, actuator on :8081
+./gradlew bootRun             # app on :8080 (actuator health as subpath: /actuator/health)
 ```
 
 Spring Boot's docker-compose integration starts the container and wires the
@@ -129,7 +129,7 @@ Overridable via environment variables.
 | `app.rate-limit.use-forwarded-for` | `false` | set `true` only behind a trusted proxy that sets `X-Forwarded-For` |
 | `app.rate-limit.store` | `in-memory` | bucket store: `in-memory` (single instance, Caffeine) or `redis` (shared store for horizontal scaling — see below) |
 | `app.http.max-body-bytes` | `65536` | max request body size (larger → 413, DoS guard) |
-| `management.server.port` | `8081` | actuator port (health/info/liveness/readiness) |
+| — | — | actuator health served on main port (8080) as /actuator/health |
 | `spring.jpa.hibernate.ddl-auto` | `validate` | schema is owned by Flyway; Hibernate only validates |
 | `BACKEND_PUBLIC_URL` | — | public origin of the API (e.g. `https://auth.example.com`). Drives the copyable project base URL shown on the dashboards (`BACKEND_PUBLIC_URL` + the platform segment — no `/api/v1`, Supabase-style) and returned as `apiBaseUrl` from the platform details endpoint. Unset → the row is omitted |
 
@@ -228,7 +228,7 @@ platform-wide and lives at the origin root.
 ### Actuator (management port 8081)
 
 `GET /actuator/health` (+ `/liveness`, `/readiness`), `GET /actuator/info` — open,
-no token, for monitoring probes.
+no token, for monitoring probes (served on the main port as subpaths).
 
 ## Access control
 
@@ -317,7 +317,7 @@ detector, so a stale device cannot kill the user's newer sessions).
 ## Observability
 
 - `requestId` in every log line (dev console pattern) and every JSON event (prod ECS).
-- Actuator health/liveness/readiness/info on a **separate management port** (8081),
+- Actuator health/liveness/readiness/info on the **main port** (8080) as subpaths,
   probes need no token. Bind to localhost or restrict via network policy in prod.
 - Prod logging: one JSON document per line (ECS) to console and a rotating file —
   ready for Elastic/Loki/Datadog-style aggregators.
@@ -337,7 +337,7 @@ detector, so a stale device cannot kill the user's newer sessions).
 - **167-check live smoke suite** — `scripts/smoke-test.sh` exercises every flow
   with curl against a running instance and greps the app log for the audit trail:
   ```bash
-  BASE=http://localhost:8080 MGMT=http://localhost:8081 \
+  BASE=http://localhost:8080 \
     LOG=/tmp/nexxauth.log scripts/smoke-test.sh
   ```
   It expects a fresh app with `login.capacity=5` and `register.capacity=5`

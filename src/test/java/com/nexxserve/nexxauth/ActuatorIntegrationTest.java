@@ -21,13 +21,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * the test classpath shadows the main properties file; the main file remains
  * the source of truth for real deployments.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "management.server.port=0")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureTestRestTemplate
 class ActuatorIntegrationTest {
-
-    @LocalManagementPort
-    private int managementPort;
 
     @LocalServerPort
     private int serverPort;
@@ -36,9 +32,9 @@ class ActuatorIntegrationTest {
     private TestRestTemplate restTemplate;
 
     @Test
-    void healthIsOpenWithoutAuthOnManagementPort() {
+    void healthIsOpenWithoutAuthOnMainPort() {
         ResponseEntity<String> response = restTemplate.getForEntity(
-                url(managementPort, "/actuator/health"), String.class);
+                url(serverPort, "/actuator/health"), String.class);
 
         // Anonymous clients see only the overall status: with
         // show-details=when-authorized the component internals (datasource,
@@ -53,7 +49,7 @@ class ActuatorIntegrationTest {
     @Test
     void infoExposesAppMetadataWithoutAuth() {
         ResponseEntity<String> response = restTemplate.getForEntity(
-                url(managementPort, "/actuator/info"), String.class);
+                url(serverPort, "/actuator/info"), String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody())
@@ -68,12 +64,12 @@ class ActuatorIntegrationTest {
     @Test
     void livenessAndReadinessProbesAreAvailable() {
         ResponseEntity<String> liveness = restTemplate.getForEntity(
-                url(managementPort, "/actuator/health/liveness"), String.class);
+                url(serverPort, "/actuator/health/liveness"), String.class);
         assertThat(liveness.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(liveness.getBody()).contains("\"status\":\"UP\"");
 
         ResponseEntity<String> readiness = restTemplate.getForEntity(
-                url(managementPort, "/actuator/health/readiness"), String.class);
+                url(serverPort, "/actuator/health/readiness"), String.class);
         assertThat(readiness.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(readiness.getBody()).contains("\"status\":\"UP\"");
     }
@@ -83,11 +79,11 @@ class ActuatorIntegrationTest {
         // Not exposed and not permitted: rejected by the security chain, so no
         // actuator data ever leaks from these paths.
         ResponseEntity<String> env = restTemplate.getForEntity(
-                url(managementPort, "/actuator/env"), String.class);
+                url(serverPort, "/actuator/env"), String.class);
         assertThat(env.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
 
         ResponseEntity<String> beans = restTemplate.getForEntity(
-                url(managementPort, "/actuator/beans"), String.class);
+                url(serverPort, "/actuator/beans"), String.class);
         assertThat(beans.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 

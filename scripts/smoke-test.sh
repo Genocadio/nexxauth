@@ -9,8 +9,8 @@
 # (rate limits are per-IP token buckets, so run against a freshly started server)
 
 set -u
-BASE="${BASE:-https://nexxauth-backend.onrender.com}"
-MGMT="${MGMT:-http://localhost:8081}"
+BASE="${BASE:-https://auth.nexxserve.dev}"
+MGMT="${BASE}"
 LOG="${LOG:-}"  # optional app log file to check audit events against
 RESP=/tmp/nexxauth-resp.json
 HDRS=/tmp/nexxauth-headers.txt

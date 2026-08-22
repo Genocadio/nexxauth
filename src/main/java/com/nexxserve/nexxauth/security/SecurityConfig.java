@@ -40,8 +40,7 @@ public class SecurityConfig {
                         .authenticationEntryPoint(entryPoint(errorResponseWriter))
                         .accessDeniedHandler(accessDeniedHandler(errorResponseWriter)))
                 .authorizeHttpRequests(auth -> auth
-                        // Actuator health/info: served on the separate management
-                        // port (8081), open so monitoring probes need no token.
+                        // Actuator health/info: open so monitoring probes need no token.
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         // Platform (console) auth at the clean root origin.
                         .requestMatchers("/auth/login", "/auth/register",

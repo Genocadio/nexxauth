@@ -12,7 +12,7 @@ name: nexxauth-prod
 #   docker compose -f compose.prod.yaml up -d
 #
 #   web     -> http://localhost:3000   (the console; proxies /api/v1 to backend)
-#   backend -> http://localhost:8080   (API; actuator health on :8081)
+#   backend -> http://localhost:8080   (API; actuator health as subpath on same port)
 #
 # The Next.js server proxies /api/v1/* to the backend, so browsers are
 # same-origin and the backend needs no CORS configuration.
@@ -84,9 +84,6 @@ services:
       - app-logs:/var/log/nexxauth
     ports:
       - "${BACKEND_PORT:-8080}:8080"
-      # Actuator management port — expose only if you need external probes
-      # (e.g. Prometheus); otherwise rely on the container healthcheck below.
-      - "${MANAGEMENT_PORT:-8081}:8081"
 
   web:
     # The /api/v1 proxy target is baked into the image at build time
