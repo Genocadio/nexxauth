@@ -169,7 +169,10 @@ export function OrgClientsTab({ platformSlug, organisationId }: OrgClientsTabPro
         </CardContent>
       </Card>
 
+      {/* Keyed so each opened client remounts the dialog with its data
+          (form state initialises only on mount). */}
       <OrgClientDialog
+        key="create"
         platformSlug={platformSlug}
         organisationId={organisationId}
         open={createOpen}
@@ -180,6 +183,7 @@ export function OrgClientsTab({ platformSlug, organisationId }: OrgClientsTabPro
       />
 
       <OrgClientDialog
+        key={editing?.clientKey ?? "edit"}
         platformSlug={platformSlug}
         organisationId={organisationId}
         open={!!editing}

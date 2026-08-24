@@ -309,10 +309,13 @@ detector, so a stale device cannot kill the user's newer sessions).
   locked behind clients. A request with `X-Client-Id` follows that client's
   configured CORS origins and access rules. With **no** `X-Client-Id`, an org
   user from a foreign `Origin` is rejected (403) — external browser access
-  requires a client; only the self/server path passes (the admin console as a
+  requires a   client; only the self/server path passes (the admin console as a
   platform user, and the server-side org portal with no `Origin` header). Per-
   client CORS headers come from `ClientCorsFilter` (trusted origins are echoed,
-  others get none and are blocked by the browser).
+  others get none and are blocked by the browser). Browser preflights never
+  carry `X-Client-Id`, so preflight `OPTIONS` are answered from the union of
+  all enabled clients' trusted origins — the real request still needs its own
+  matching client.
 
 ## Observability
 

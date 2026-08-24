@@ -24,6 +24,12 @@ import java.util.stream.Collectors;
  * (web clients are the typical case); requests from origins that are not
  * trusted get no CORS headers and are blocked by the browser.
  * <p>
+ * Preflight {@code OPTIONS} requests never carry custom headers — browsers
+ * strip them, so {@code X-Client-Id} cannot identify the client yet. A
+ * preflight is answered whenever <em>any</em> enabled client trusts the
+ * {@code Origin}; the real request that follows still needs its own matching
+ * {@code X-Client-Id}, so this widens nothing beyond configured origins.
+ * <p>
  * Runs before Spring Security (and the rate-limit filter) so preflight
  * {@code OPTIONS} are answered directly without hitting auth.
  */
@@ -46,28 +52,40 @@ public class ClientCorsFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        String clientIdHeader = request.getHeader(CLIENT_ID_HEADER);
         String origin = request.getHeader(ORIGIN);
-        if (clientIdHeader == null || origin == null || origin.isBlank()) {
+        boolean preflight = isPreflight(request);
+        if (origin == null || origin.isBlank()) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        OrganisationClient client = findEnabledClient(clientIdHeader);
-        if (client == null || !allowedOrigins(client).contains(origin)) {
+        String clientIdHeader = request.getHeader(CLIENT_ID_HEADER);
+        if (clientIdHeader != null) {
+            OrganisationClient client = findEnabledClient(clientIdHeader);
+            if (client == null || !allowedOrigins(client).contains(origin)) {
+                // Unknown/disabled client or untrusted origin: no per-client
+                // CORS; the global policy decides (normally none -> browser blocks).
+                filterChain.doFilter(request, response);
+                return;
+            }
+            applyCorsHeaders(response, origin);
+            if (preflight) {
+                applyPreflightHeaders(response);
+                response.setStatus(HttpServletResponse.SC_OK);
+                return;
+            }
             filterChain.doFilter(request, response);
             return;
         }
 
-        response.setHeader("Access-Control-Allow-Origin", origin);
-        response.addHeader("Vary", "Origin");
-        response.setHeader("Access-Control-Expose-Headers", EXPOSED_HEADERS);
-
-        if (isPreflight(request)) {
+        // No X-Client-Id: browsers strip custom headers from preflights, so the
+        // client cannot be identified yet. Answer the preflight when any enabled
+        // client trusts this origin — the real request still carries its own
+        // X-Client-Id and must match that client's origins to be served.
+        if (preflight && anyEnabledClientTrusts(origin)) {
+            applyCorsHeaders(response, origin);
+            applyPreflightHeaders(response);
             response.setStatus(HttpServletResponse.SC_OK);
-            response.setHeader("Access-Control-Allow-Methods", ALLOWED_METHODS);
-            response.setHeader("Access-Control-Allow-Headers", ALLOWED_HEADERS);
-            response.setHeader("Access-Control-Max-Age", "3600");
             return;
         }
 
@@ -81,6 +99,27 @@ public class ClientCorsFilter extends OncePerRequestFilter {
         }
         OrganisationClient client = clientRepository.findByClientKey(key).orElse(null);
         return client != null && client.isEnabled() ? client : null;
+    }
+
+    private boolean anyEnabledClientTrusts(String origin) {
+        for (OrganisationClient client : clientRepository.findByEnabledTrue()) {
+            if (allowedOrigins(client).contains(origin)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void applyCorsHeaders(HttpServletResponse response, String origin) {
+        response.setHeader("Access-Control-Allow-Origin", origin);
+        response.addHeader("Vary", "Origin");
+        response.setHeader("Access-Control-Expose-Headers", EXPOSED_HEADERS);
+    }
+
+    private static void applyPreflightHeaders(HttpServletResponse response) {
+        response.setHeader("Access-Control-Allow-Methods", ALLOWED_METHODS);
+        response.setHeader("Access-Control-Allow-Headers", ALLOWED_HEADERS);
+        response.setHeader("Access-Control-Max-Age", "3600");
     }
 
     private static boolean isPreflight(HttpServletRequest request) {

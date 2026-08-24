@@ -441,6 +441,42 @@ class OrganisationClientIntegrationTest {
                 .andExpect(header().string("Access-Control-Allow-Origin", "https://svc.example.com"));
     }
 
+    @Test
+    void corsPreflightWithoutClientIdHeader() throws Exception {
+        // Real browsers strip custom headers from preflights, so the OPTIONS
+        // request cannot carry X-Client-Id. It must still be answered for an
+        // origin some client trusts — otherwise the browser blocks the real
+        // request even though its client allows the origin.
+        String boss = register("client-preflight@nexx.io", "Client Preflight Platform");
+        long orgId = createOrg(boss, ORG_SLUG);
+        String platform = getPlatformSlug(boss);
+        createClient(boss, clientsPath(platform, orgId), "Web", "WEB",
+                Map.of("allowedOrigins", List.of("https://app.example.com")));
+
+        // trusted-origin preflight without X-Client-Id -> answered
+        mockMvc.perform(options("/" + platform + "/auth/login")
+                        .header("Origin", "https://app.example.com")
+                        .header("Access-Control-Request-Method", "POST"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "https://app.example.com"))
+                .andExpect(header().string("Access-Control-Allow-Methods", containsString("POST")))
+                .andExpect(header().string("Access-Control-Allow-Headers", containsString("X-Client-Id")));
+
+        // origin no client trusts -> no CORS headers
+        mockMvc.perform(options("/" + platform + "/auth/login")
+                        .header("Origin", "https://evil.example.com")
+                        .header("Access-Control-Request-Method", "POST"))
+                .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
+
+        // the real request still requires its own X-Client-Id: no per-client
+        // headers are echoed for cross-origin requests without one
+        mockMvc.perform(post("/" + platform + "/auth/login")
+                        .header("Origin", "https://app.example.com")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
+    }
+
     // --- helpers ---
 
     private String register(String email, String platformName) throws Exception {

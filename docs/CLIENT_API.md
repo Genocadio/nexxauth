@@ -323,6 +323,13 @@ disabled client → `403 Client is disabled`; a no-auth client (e.g. `WEB`)
 reaching anything beyond `login`/`register` without a user JWT → `403 This
 client type can only access the organisation login and register endpoints`.
 
+Preflight `OPTIONS` requests are special: browsers strip custom headers from
+them, so they cannot carry `X-Client-Id`. A preflight is therefore answered
+whenever **any** enabled client trusts the `Origin`. The real request that
+follows still needs its own `X-Client-Id`, and that client's origins must
+contain the `Origin` — so configuring an origin on a client is exactly what
+lets that origin's browser app call the API.
+
 ---
 
 ## 6. Verifying organisation tokens (public key)

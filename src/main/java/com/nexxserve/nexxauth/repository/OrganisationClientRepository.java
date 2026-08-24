@@ -14,6 +14,8 @@ public interface OrganisationClientRepository extends JpaRepository<Organisation
 
     Optional<OrganisationClient> findByClientKeyAndOrganisationId(String clientKey, Long organisationId);
 
+    List<OrganisationClient> findByEnabledTrue();
+
     List<OrganisationClient> findByClientKeyIsNull();
 
     boolean existsByOrganisationIdAndName(Long organisationId, String name);

@@ -77,10 +77,10 @@ export function OrgClientDialog({
     enabled: client?.enabled ?? true,
   });
 
-  // Reset all local state when the dialog opens with a different client.
-  // Using key forces a remount so every useState re-initialises from the
-  // current props, eliminating the need for a useEffect that calls setState.
-  const dialogKey = open ? String(client?.clientKey ?? "new") : undefined;
+  // NOTE: this component must be keyed by the client (see OrgClientsTab).
+  // useForm and every useState above only read their initial values on mount,
+  // so a remount per opened client is what keeps edit mode showing the
+  // existing data instead of stale/empty fields.
 
   const authMode = CLIENT_TYPE_AUTH_MODE[form.values.type];
   const authLocked = authMode !== "optional";
@@ -130,7 +130,7 @@ export function OrgClientDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => !pending && onOpenChange(next)}>
-      <DialogContent key={dialogKey} className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit client" : "New client"}</DialogTitle>
           <DialogDescription>
