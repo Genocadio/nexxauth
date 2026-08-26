@@ -58,7 +58,10 @@ export function OrgOverviewTab({ platformSlug, organisationId }: OrgOverviewTabP
         <CardHeader>
           <CardTitle className="flex items-center justify-between text-base">
             <span className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-primary" /> Organisation details
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 text-primary">
+                <Building2 className="h-3.5 w-3.5" />
+              </div>
+              Organisation details
             </span>
             <Button variant="outline" size="sm" className="gap-2" onClick={() => setEditOpen(true)}>
               <Pencil /> Edit
@@ -66,7 +69,7 @@ export function OrgOverviewTab({ platformSlug, organisationId }: OrgOverviewTabP
           </CardTitle>
           <CardDescription>Identity and sign-in behaviour of this organisation.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4 text-sm">
+        <CardContent className="space-y-3 text-sm">
           {projectUrl ? <UrlRow label="Project URL" value={projectUrl} /> : null}
           <DetailRow label="Name" value={data.name} />
           <DetailRow label="Slug" value={data.slug} mono />
@@ -131,7 +134,7 @@ export function OrgOverviewTab({ platformSlug, organisationId }: OrgOverviewTabP
 
 function DetailRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-4">
+    <div className="flex items-center justify-between gap-4 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted/50">
       <span className="text-muted-foreground">{label}</span>
       <span className={`max-w-[65%] truncate text-right font-medium ${mono ? "font-mono text-xs" : ""}`}>
         {value}
@@ -142,7 +145,7 @@ function DetailRow({ label, value, mono }: { label: string; value: string; mono?
 
 function UrlRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-4">
+    <div className="flex items-center justify-between gap-4 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted/50">
       <span className="text-muted-foreground">{label}</span>
       <div className="flex min-w-0 items-center justify-end gap-1.5">
         <code className="max-w-[70%] truncate font-mono text-xs font-medium">{value}</code>

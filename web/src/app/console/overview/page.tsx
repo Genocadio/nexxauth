@@ -55,9 +55,27 @@ export default function OverviewPage() {
       ) : (
         <FadeIn delay={0.05}>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <StatCard icon={Building2} label="Organisations" value={orgCount} sub="under this platform" />
-            <StatCard icon={Users} label="Platform users" value={userCount} sub="members with access" />
-            <StatCard icon={ShieldCheck} label="Your role" value={platformData ? "Admin" : "—"} sub="full access to everything" />
+            <StatCard
+              icon={Building2}
+              label="Organisations"
+              value={orgCount}
+              sub="under this platform"
+              gradient="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 text-blue-600 dark:text-blue-400"
+            />
+            <StatCard
+              icon={Users}
+              label="Platform users"
+              value={userCount}
+              sub="members with access"
+              gradient="bg-gradient-to-br from-emerald-500/10 to-teal-500/10 text-emerald-600 dark:text-emerald-400"
+            />
+            <StatCard
+              icon={ShieldCheck}
+              label="Your role"
+              value={platformData ? "Admin" : "—"}
+              sub="full access to everything"
+              gradient="bg-gradient-to-br from-violet-500/10 to-purple-500/10 text-violet-600 dark:text-violet-400"
+            />
           </div>
         </FadeIn>
       )}
@@ -106,10 +124,10 @@ export default function OverviewPage() {
                     <li key={org.id}>
                       <Link
                         href={`/console/organisations/${org.slug}`}
-                        className="flex items-center justify-between gap-3 py-3 transition-colors hover:text-primary"
+                        className="group flex items-center justify-between gap-3 py-3 transition-colors hover:text-primary"
                       >
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">{org.name}</p>
+                          <p className="truncate text-sm font-medium group-hover:text-primary transition-colors">{org.name}</p>
                           <p className="truncate text-xs text-muted-foreground">{org.slug}</p>
                         </div>
                         <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">

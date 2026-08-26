@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Building2, Plus, Rocket } from "lucide-react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { OrganisationDialog } from "@/components/organisations/organisation-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
@@ -33,10 +34,12 @@ export default function OrganisationsPage() {
       {platformSlug && (organisations.data ?? []).some((o) => (o.onboardingStep ?? 0) < 8) ? (
         <Link
           href={`/console/onboarding/${platformSlug}`}
-          className="mb-6 flex items-center justify-between gap-4 rounded-lg border bg-primary/5 p-4 transition-colors hover:bg-primary/10"
+          className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10 p-4 transition-all duration-200 hover:shadow-md hover:shadow-primary/5"
         >
           <div className="flex items-center gap-3">
-            <Rocket className="h-5 w-5 text-primary" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Rocket className="h-4.5 w-4.5" />
+            </div>
             <div>
               <p className="text-sm font-medium">Finish setting up your organisation</p>
               <p className="text-xs text-muted-foreground">
@@ -54,27 +57,42 @@ export default function OrganisationsPage() {
         <ErrorState error={organisations.error} onRetry={() => organisations.refetch()} />
       ) : organisations.data && organisations.data.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {organisations.data.map((org) => (
-            <Card key={org.id} className="flex flex-col transition-shadow hover:shadow-lg">
-              <CardContent className="flex-1 p-5">
-                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Building2 className="h-5 w-5" />
-                </div>
-                <Link href={`/console/organisations/${org.slug}`} className="text-base font-semibold hover:text-primary">
-                  {org.name}
-                </Link>
-                <p className="mt-0.5 font-mono text-xs text-muted-foreground">{org.slug}</p>
-                {org.description ? (
-                  <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{org.description}</p>
-                ) : null}
-              </CardContent>
-              <CardFooter className="flex items-center justify-between border-t px-5 py-3 text-xs text-muted-foreground">
-                <span>
-                  {org.useEmailAsUsername ? "Email as username" : "Username login"}
-                </span>
-                <span>Created {formatDate(org.createdAt)}</span>
-              </CardFooter>
-            </Card>
+          {organisations.data.map((org, i) => (
+            <motion.div
+              key={org.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05, duration: 0.3 }}
+            >
+              <Card className="group flex h-full flex-col transition-all duration-200 hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-0.5">
+                <CardContent className="flex-1 p-5">
+                  <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 text-primary transition-transform duration-200 group-hover:scale-110">
+                    <Building2 className="h-5 w-5" />
+                  </div>
+                  <Link
+                    href={`/console/organisations/${org.slug}`}
+                    className="text-base font-semibold transition-colors hover:text-primary"
+                  >
+                    {org.name}
+                  </Link>
+                  <p className="mt-0.5 font-mono text-xs text-muted-foreground">{org.slug}</p>
+                  {org.description ? (
+                    <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{org.description}</p>
+                  ) : null}
+                </CardContent>
+                <CardFooter className="flex items-center justify-between border-t px-5 py-3 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        org.useEmailAsUsername ? "bg-emerald-500" : "bg-blue-500"
+                      }`}
+                    />
+                    {org.useEmailAsUsername ? "Email as username" : "Username login"}
+                  </span>
+                  <span>Created {formatDate(org.createdAt)}</span>
+                </CardFooter>
+              </Card>
+            </motion.div>
           ))}
         </div>
       ) : (

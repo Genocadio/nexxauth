@@ -17,8 +17,8 @@ interface InitialsAvatarProps {
 
 export function InitialsAvatar({ name, className }: InitialsAvatarProps) {
   return (
-    <Avatar className={cn("h-9 w-9 border", className)}>
-      <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+    <Avatar className={cn("h-9 w-9 border shadow-sm", className)}>
+      <AvatarFallback className="bg-gradient-to-br from-primary/15 to-primary/5 text-xs font-semibold text-primary">
         {initialsOf(name) || "?"}
       </AvatarFallback>
     </Avatar>

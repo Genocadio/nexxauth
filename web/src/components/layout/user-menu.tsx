@@ -23,7 +23,10 @@ export function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="h-auto gap-2 px-2 py-1.5">
+        <Button
+          variant="ghost"
+          className="h-auto gap-2 px-2 py-1.5 transition-opacity hover:opacity-80"
+        >
           <InitialsAvatar name={user ? fullName(user) : "?"} className="h-8 w-8" />
           <span className="hidden text-sm font-medium sm:block">{user?.firstName ?? "…"}</span>
         </Button>

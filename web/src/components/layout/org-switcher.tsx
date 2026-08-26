@@ -39,7 +39,10 @@ export function OrgSwitcher() {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="h-9 gap-2 px-3">
+          <Button
+            variant="outline"
+            className="h-9 gap-2 px-3 transition-all duration-200 hover:border-primary/30 hover:bg-primary/5"
+          >
             <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
             <span className="max-w-40 truncate font-medium">
               {current?.name ?? (currentSlug ? currentSlug : "Select an organisation")}

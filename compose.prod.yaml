@@ -75,7 +75,7 @@ services:
       # (frontend) and backend public origins always qualify; CORS_EXTRA_ORIGINS
       # appends more origins (comma-separated) treated like the frontend.
       # Org-level per-client CORS is still enforced separately.
-      BACKEND_PUBLIC_URL: ${BACKEND_PUBLIC_URL:-http://localhost:8080}
+      do: ${BACKEND_PUBLIC_URL:-http://localhost:8080}
       APP_CORS_FRONTEND_ORIGIN: ${WEB_PUBLIC_URL:-http://localhost:3000}
       APP_CORS_BACKEND_ORIGIN: ${BACKEND_PUBLIC_URL:-http://localhost:8080}
       APP_CORS_EXTRA_ORIGINS: ${CORS_EXTRA_ORIGINS:-}

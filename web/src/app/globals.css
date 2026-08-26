@@ -115,4 +115,82 @@
   body {
     @apply bg-background text-foreground;
   }
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* ── Utility classes ──────────────────────────────────────────────────── */
+
+/* Glass effect for overlays and floating panels */
+.glass {
+  background: color-mix(in oklab, var(--card) 80%, transparent);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+}
+
+/* Gradient text */
+.text-gradient {
+  background: linear-gradient(135deg, var(--primary), color-mix(in oklab, var(--primary) 60%, var(--chart-2)));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Subtle grid background pattern */
+.bg-grid {
+  background-image:
+    linear-gradient(color-mix(in oklab, var(--border) 50%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklab, var(--border) 50%, transparent) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* Animated shimmer for skeleton loading */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--muted) 25%,
+    color-mix(in oklab, var(--muted) 60%, var(--background)) 50%,
+    var(--muted) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* Subtle float animation */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+/* Pulse glow for primary elements */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 20%, transparent); }
+  50% { box-shadow: 0 0 20px 4px color-mix(in oklab, var(--primary) 15%, transparent); }
+}
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+/* Card hover lift effect */
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px -8px color-mix(in oklab, var(--primary) 12%, transparent);
+}
+
+/* Smooth focus ring */
+.focus-ring:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: var(--radius);
 }
