@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Building2, Menu, ShieldCheck } from "lucide-react";
-import Link from "next/link";
+import { Building2, Menu, PanelLeftClose, PanelLeftOpen, ShieldCheck } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { NavContent } from "@/components/layout/nav-items";
 import { OrgSwitcher } from "@/components/layout/org-switcher";
@@ -13,6 +12,9 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { useIsClient } from "@/hooks/use-is-client";
 import { useOrganisations } from "@/hooks/queries";
 import { selectPlatformSession, useAppSelector } from "@/store/store";
+import { cn } from "@/lib/utils";
+
+const SIDEBAR_STORAGE_KEY = "console-sidebar-collapsed";
 
 /** Redirects to /login when no platform session exists. */
 export function RequirePlatformAuth({ children }: { children: React.ReactNode }) {
@@ -39,76 +41,72 @@ function useOrgView() {
   return { isOrgView: !!organisationSlug, organisationSlug, organisationId: org?.id };
 }
 
-function Brand() {
-  const session = useAppSelector(selectPlatformSession);
-  const { isOrgView, organisationSlug } = useOrgView();
-  const organisations = useOrganisations();
-  const org = isOrgView
-    ? organisations.data?.find((o) => o.slug === organisationSlug)
-    : undefined;
-
-  if (isOrgView) {
-    return (
-      <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-md shadow-primary/20">
-          <Building2 className="h-4.5 w-4.5" />
-        </div>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold leading-tight">{org?.name ?? organisationSlug}</p>
-          <p className="truncate text-[11px] text-muted-foreground">{org?.slug ?? "organisation"}</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-3">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-md shadow-primary/20">
-        <ShieldCheck className="h-4.5 w-4.5" />
-      </div>
-      <div className="min-w-0">
-        <p className="truncate text-sm font-semibold leading-tight">
-          {session?.user.platform.name ?? "Nexxauth"}
-        </p>
-        <p className="truncate text-[11px] text-muted-foreground">
-          {session?.user.platform.slug}
-        </p>
-      </div>
-    </div>
-  );
-}
-
 export function ConsoleShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { isOrgView, organisationSlug, organisationId } = useOrgView();
 
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const isOrg = isOrgView;
+
   return (
     <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-      <div className="min-h-dvh lg:grid lg:grid-cols-[260px_1fr]">
+      <div
+        className={cn(
+          "min-h-dvh lg:grid transition-[grid-template-columns] duration-300 ease-in-out",
+          collapsed ? "lg:grid-cols-[68px_1fr]" : "lg:grid-cols-[240px_1fr]",
+        )}
+      >
         {/* ── Desktop sidebar ────────────────────────────────────────── */}
-        <aside className="hidden border-r bg-sidebar lg:flex lg:flex-col">
-          {/* Brand */}
-          <div className="flex h-16 items-center gap-3 border-b px-5">
-            <Brand />
+        <aside className="hidden bg-sidebar lg:flex lg:flex-col">
+          {/* Brand / collapse trigger */}
+          <div className="flex h-14 items-center px-3">
+            <button
+              onClick={toggleCollapsed}
+              className={cn(
+                "flex items-center gap-2.5 rounded-xl transition-all duration-200 hover:bg-muted",
+                collapsed ? "h-9 w-9 justify-center" : "h-9 w-full px-2.5",
+              )}
+              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-sm shadow-primary/20">
+                {isOrg ? (
+                  <Building2 className="h-4 w-4" />
+                ) : (
+                  <ShieldCheck className="h-4 w-4" />
+                )}
+              </div>
+              {!collapsed && (
+                <span className="text-sm font-semibold tracking-tight">Nexxauth</span>
+              )}
+            </button>
           </div>
 
           {/* Navigation */}
-          <div className="flex flex-1 flex-col overflow-y-auto px-3 py-4">
-            <div className="flex-1">
-              <NavContent
-                mode={isOrgView ? "org" : "platform"}
-                organisationSlug={organisationSlug}
-                organisationId={organisationId}
-              />
-            </div>
-          </div>
-
-          {/* Bottom section: theme toggle */}
-          <div className="border-t px-4 py-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Appearance</span>
-              <ThemeToggle />
-            </div>
+          <div className="flex flex-1 flex-col overflow-y-auto px-3 py-1">
+            <NavContent
+              mode={isOrg ? "org" : "platform"}
+              organisationSlug={organisationSlug}
+              organisationId={organisationId}
+              collapsed={collapsed}
+            />
           </div>
         </aside>
 
@@ -134,14 +132,19 @@ export function ConsoleShell({ children }: { children: React.ReactNode }) {
 
       {/* ── Mobile navigation sheet ──────────────────────────────────── */}
       <SheetContent side="left" className="w-72 p-0">
-        <SheetHeader className="border-b px-5 py-4">
+        <SheetHeader className="px-5 py-4">
           <SheetTitle className="text-base">
-            <Brand />
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-sm shadow-primary/20">
+                {isOrg ? <Building2 className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
+              </div>
+              <span className="text-sm font-semibold">Nexxauth</span>
+            </div>
           </SheetTitle>
         </SheetHeader>
-        <div className="flex flex-1 flex-col overflow-y-auto px-3 py-4">
+        <div className="flex flex-1 flex-col overflow-y-auto px-3 py-2">
           <NavContent
-            mode={isOrgView ? "org" : "platform"}
+            mode={isOrg ? "org" : "platform"}
             organisationSlug={organisationSlug}
             organisationId={organisationId}
             onNavigate={() => setMobileOpen(false)}

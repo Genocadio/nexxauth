@@ -162,7 +162,7 @@ export function DocsLayout({ children, platformSlug, organisationId }: DocsLayou
 
       <div className="mx-auto max-w-7xl">
         <div className="flex">
-          <aside className="hidden w-64 shrink-0 border-r py-6 lg:block">
+          <aside className="hidden w-64 shrink-0 border-r lg:block lg:sticky lg:top-14 lg:h-[calc(100vh-3.5rem)] lg:overflow-y-auto lg:py-6">
             <nav className="space-y-6 px-4">
               {NAV_SECTIONS.map((section) => (
                 <div key={section.title}>
@@ -198,7 +198,7 @@ export function DocsLayout({ children, platformSlug, organisationId }: DocsLayou
             </nav>
           </aside>
 
-          <main className="flex-1 py-8 px-6 lg:px-10">
+          <main className="flex-1 min-w-0 py-8 px-6 lg:px-10">
             {children}
           </main>
         </div>

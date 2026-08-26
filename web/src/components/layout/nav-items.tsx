@@ -4,7 +4,6 @@ import { Suspense } from "react";
 import {
   AppWindow,
   BookOpen,
-  CreditCard,
   KeyRound,
   LayoutDashboard,
   Layers,
@@ -27,7 +26,6 @@ export interface OrgNavItem {
   tab: string;
   label: string;
   icon: LucideIcon;
-  /** Optional section group label */
   section?: string;
 }
 
@@ -47,25 +45,38 @@ export const ORG_NAV: OrgNavItem[] = [
   { tab: "settings", label: "Settings", icon: Settings },
 ];
 
+function SectionLabel({ children, collapsed }: { children: React.ReactNode; collapsed?: boolean }) {
+  if (collapsed) return null;
+  return (
+    <p className="mb-1 mt-4 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60 first:mt-0">
+      {children}
+    </p>
+  );
+}
+
 function NavItemLink({
   active,
   href,
   icon: Icon,
   label,
+  collapsed = false,
   onClick,
 }: {
   active: boolean;
   href: string;
   icon: LucideIcon;
   label: string;
+  collapsed?: boolean;
   onClick?: () => void;
 }) {
   return (
     <Link
       href={href}
       onClick={onClick}
+      title={collapsed ? label : undefined}
       className={cn(
-        "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150",
+        "group relative flex items-center rounded-lg text-sm font-medium transition-all duration-150",
+        collapsed ? "h-9 justify-center" : "h-9 gap-3 px-3",
         active
           ? "bg-primary/10 text-primary"
           : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -81,16 +92,8 @@ function NavItemLink({
           active ? "text-primary" : "text-muted-foreground group-hover:text-foreground",
         )}
       />
-      {label}
+      {!collapsed && label}
     </Link>
-  );
-}
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="mb-1 mt-4 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 first:mt-0">
-      {children}
-    </p>
   );
 }
 
@@ -98,15 +101,16 @@ export function NavContent({
   mode,
   organisationSlug,
   organisationId,
+  collapsed = false,
   onNavigate,
 }: {
   mode: "platform" | "org";
   organisationSlug?: string;
   organisationId?: number;
+  collapsed?: boolean;
   onNavigate?: () => void;
 }) {
   if (mode === "org") {
-    // Group nav items by section
     let lastSection: string | undefined;
 
     return (
@@ -114,28 +118,33 @@ export function NavContent({
         <Suspense fallback={null}>
           {ORG_NAV.map((item) => {
             const href = `/console/organisations/${organisationSlug}?tab=${item.tab}`;
-            const showSection = item.section && item.section !== lastSection;
+            const showSection = item.section && item.section !== lastSection && !collapsed;
             if (item.section) lastSection = item.section;
 
             return (
               <div key={item.tab}>
                 {showSection && <SectionLabel>{item.section}</SectionLabel>}
                 <span onClick={onNavigate}>
-                  <OrgNavLink item={item} organisationSlug={organisationSlug ?? ""} />
+                  <OrgNavLink
+                    item={item}
+                    organisationSlug={organisationSlug ?? ""}
+                    collapsed={collapsed}
+                  />
                 </span>
               </div>
             );
           })}
 
           {organisationId && (
-            <div className="mt-2">
-              <SectionLabel>Resources</SectionLabel>
+            <div className={collapsed ? "" : "mt-2"}>
+              {!collapsed && <SectionLabel>Resources</SectionLabel>}
               <span onClick={onNavigate}>
                 <NavItemLink
                   active={false}
                   href={`/docs/${organisationSlug}/${organisationId}`}
                   icon={BookOpen}
                   label="Documentation"
+                  collapsed={collapsed}
                 />
               </span>
             </div>
@@ -149,12 +158,7 @@ export function NavContent({
     <nav className="flex flex-col gap-0.5">
       {CONSOLE_NAV.map((item) => (
         <span key={item.href} onClick={onNavigate}>
-          <NavItemLink
-            active={useIsPathActive(item.href)}
-            href={item.href}
-            icon={item.icon}
-            label={item.label}
-          />
+          <PlatformNavLink item={item} collapsed={collapsed} />
         </span>
       ))}
     </nav>
@@ -164,9 +168,11 @@ export function NavContent({
 function OrgNavLink({
   item,
   organisationSlug,
+  collapsed = false,
 }: {
   item: OrgNavItem;
   organisationSlug: string;
+  collapsed?: boolean;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -180,11 +186,22 @@ function OrgNavLink({
       href={href}
       icon={item.icon}
       label={item.label}
+      collapsed={collapsed}
     />
   );
 }
 
-function useIsPathActive(href: string): boolean {
+function PlatformNavLink({ item, collapsed = false }: { item: NavItem; collapsed?: boolean }) {
   const pathname = usePathname();
-  return pathname === href || pathname.startsWith(`${href}/`);
+  const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+
+  return (
+    <NavItemLink
+      active={active}
+      href={item.href}
+      icon={item.icon}
+      label={item.label}
+      collapsed={collapsed}
+    />
+  );
 }
