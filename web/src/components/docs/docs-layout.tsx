@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useOrganisations } from "@/hooks/queries";
 import {
   BookOpen,
   Key,
@@ -136,6 +137,11 @@ const NAV_SECTIONS = [
 export function DocsLayout({ children, platformSlug, organisationId }: DocsLayoutProps) {
   const pathname = usePathname();
   const basePath = `/docs/${platformSlug}/${organisationId}`;
+  const organisations = useOrganisations();
+  const org = organisations.data?.find((o) => o.id === Number(organisationId));
+  const consoleHref = org
+    ? `/console/organisations/${org.slug}`
+    : "/console/organisations";
 
   return (
     <div className="min-h-screen bg-background">
@@ -143,11 +149,11 @@ export function DocsLayout({ children, platformSlug, organisationId }: DocsLayou
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
           <div className="flex items-center gap-4">
             <Link
-              href="/console"
+              href={consoleHref}
               className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               <ArrowLeft className="h-4 w-4" />
-              Console
+              {org?.name ?? "Console"}
             </Link>
             <span className="text-muted-foreground">/</span>
             <span className="text-sm font-medium">Documentation</span>
