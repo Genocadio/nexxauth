@@ -8,24 +8,30 @@ import {
   CalendarDays,
   FileText,
   Globe,
+  KeyRound,
   Lightbulb,
   Plus,
   RefreshCw,
   Server,
   ShieldCheck,
+  ShieldAlert,
   Terminal,
+  TrendingDown,
+  TrendingUp,
   Users,
+  Wifi,
 } from "lucide-react";
 import Link from "next/link";
 import { FadeIn } from "@/components/shared/fade-in";
 import { AnimatedCounter } from "@/components/shared/animated-counter";
 import { CardsSkeleton, TableSkeleton } from "@/components/shared/loading";
-import { StatCard } from "@/components/shared/stat-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CopyButton } from "@/components/shared/copy-button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { CopyButton } from "@/components/shared/copy-button";
 import { logsApi } from "@/api/logs";
+import { organisationsHealthApi, type OrganisationHealth } from "@/api/organisations-health";
 import { useOrganisations, usePlatform, usePlatformSlug, usePlatformUsers } from "@/hooks/queries";
 import { resolvePlatformApiUrl } from "@/lib/api-url";
 import { useBackendOrigin } from "@/lib/backend-url";
@@ -49,6 +55,41 @@ export default function OverviewPage() {
   const projectUrl = platformData
     ? resolvePlatformApiUrl(platformData.apiBaseUrl, platformData.slug, backendOrigin)
     : null;
+
+  // Aggregate health stats from all orgs
+  const [healthData, setHealthData] = useState<OrganisationHealth[]>([]);
+  const [healthLoaded, setHealthLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!platformSlug) return;
+    let cancelled = false;
+    organisationsHealthApi
+      .list(platformSlug)
+      .then((data) => {
+        if (!cancelled) {
+          setHealthData(data);
+          setHealthLoaded(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setHealthLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [platformSlug]);
+
+  const aggregates = useMemo(() => {
+    const totalSessions = healthData.reduce((sum, h) => sum + h.activeSessions, 0);
+    const totalKeys = healthData.reduce((sum, h) => sum + h.signingKeys, 0);
+    const totalClients = healthData.reduce((sum, h) => sum + h.apiClients, 0);
+    const totalOrgUsers = healthData.reduce((sum, h) => sum + h.userCount, 0);
+    const avgScore =
+      healthData.length > 0
+        ? Math.round(healthData.reduce((sum, h) => sum + h.score, 0) / healthData.length)
+        : 0;
+    return { totalSessions, totalKeys, totalClients, totalOrgUsers, avgScore };
+  }, [healthData]);
 
   return (
     <div className="space-y-8">
@@ -83,7 +124,7 @@ export default function OverviewPage() {
             </div>
 
             {/* Animated stats */}
-            <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
               <HeroStat
                 icon={<Building2 className="h-5 w-5" />}
                 label="Organisations"
@@ -93,15 +134,15 @@ export default function OverviewPage() {
               />
               <HeroStat
                 icon={<Users className="h-5 w-5" />}
-                label="Team members"
-                value={userCount}
+                label="Org users"
+                value={aggregates.totalOrgUsers || userCount}
                 color="text-emerald-600 dark:text-emerald-400"
                 bg="bg-emerald-500/10"
               />
               <HeroStat
-                icon={<ShieldCheck className="h-5 w-5" />}
-                label="Your role"
-                value="Admin"
+                icon={<Wifi className="h-5 w-5" />}
+                label="Active sessions"
+                value={aggregates.totalSessions}
                 color="text-violet-600 dark:text-violet-400"
                 bg="bg-violet-500/10"
               />
@@ -121,9 +162,7 @@ export default function OverviewPage() {
       </FadeIn>
 
       {/* Quick Connect + Recent Activity */}
-      {loading && (
-        <CardsSkeleton />
-      )}
+      {loading && <CardsSkeleton />}
       {error && !loading && (
         <p className="text-sm text-destructive">Couldn&apos;t load the overview.</p>
       )}
@@ -132,10 +171,7 @@ export default function OverviewPage() {
         {/* Quick Connect — 2 cols */}
         <div className="lg:col-span-2">
           <FadeIn delay={0.1}>
-            <QuickConnectCard
-              platformSlug={platformSlug}
-              projectUrl={projectUrl}
-            />
+            <QuickConnectCard platformSlug={platformSlug} projectUrl={projectUrl} />
           </FadeIn>
         </div>
 
@@ -147,10 +183,22 @@ export default function OverviewPage() {
         </div>
       </div>
 
+      {/* Platform Health + Security Summary */}
+      {healthLoaded && healthData.length > 0 && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <FadeIn delay={0.2}>
+            <PlatformHealthCard healthData={healthData} aggregates={aggregates} />
+          </FadeIn>
+          <FadeIn delay={0.25}>
+            <SecuritySummaryCard platformSlug={platformSlug} />
+          </FadeIn>
+        </div>
+      )}
+
       {/* Quick Actions + Org List */}
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Quick Actions */}
-        <FadeIn delay={0.2}>
+        <FadeIn delay={0.3}>
           <Card className="h-full">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
@@ -188,7 +236,7 @@ export default function OverviewPage() {
         </FadeIn>
 
         {/* Recent Organisations */}
-        <FadeIn delay={0.25}>
+        <FadeIn delay={0.35}>
           <Card className="lg:col-span-2 h-full">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -246,9 +294,279 @@ export default function OverviewPage() {
       </div>
 
       {/* Tips */}
-      <FadeIn delay={0.3}>
+      <FadeIn delay={0.4}>
         <TipsCard orgCount={orgCount} userCount={userCount} />
       </FadeIn>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Platform Health Card
+// ---------------------------------------------------------------------------
+
+function PlatformHealthCard({
+  healthData,
+  aggregates,
+}: {
+  healthData: OrganisationHealth[];
+  aggregates: {
+    totalSessions: number;
+    totalKeys: number;
+    totalClients: number;
+    totalOrgUsers: number;
+    avgScore: number;
+  };
+}) {
+  const scoreColor =
+    aggregates.avgScore >= 75
+      ? "text-emerald-600 dark:text-emerald-400"
+      : aggregates.avgScore >= 50
+        ? "text-blue-600 dark:text-blue-400"
+        : aggregates.avgScore >= 25
+          ? "text-amber-600 dark:text-amber-400"
+          : "text-red-500";
+
+  const scoreBg =
+    aggregates.avgScore >= 75
+      ? "bg-emerald-500/10"
+      : aggregates.avgScore >= 50
+        ? "bg-blue-500/10"
+        : aggregates.avgScore >= 25
+          ? "bg-amber-500/10"
+          : "bg-red-500/10";
+
+  return (
+    <Card className="h-full">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <ShieldCheck className="h-4 w-4" />
+          Platform health
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {/* Average score */}
+        <div className="flex items-center gap-4">
+          <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-xl ${scoreBg}`}>
+            <span className={`text-2xl font-bold ${scoreColor}`}>{aggregates.avgScore}</span>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">Average health score</p>
+            <Progress value={aggregates.avgScore} className="mt-1.5 h-1.5" />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Across {healthData.length} organisation{healthData.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+        </div>
+
+        {/* Aggregate stats */}
+        <div className="grid grid-cols-3 gap-3">
+          <HealthStat icon={<Wifi className="h-3.5 w-3.5" />} label="Sessions" value={aggregates.totalSessions} />
+          <HealthStat icon={<KeyRound className="h-3.5 w-3.5" />} label="Signing keys" value={aggregates.totalKeys} />
+          <HealthStat icon={<ShieldCheck className="h-3.5 w-3.5" />} label="API clients" value={aggregates.totalClients} />
+        </div>
+
+        {/* Per-org breakdown */}
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">Per organisation</p>
+          {healthData.slice(0, 5).map((h) => {
+            const org = healthData.find((x) => x.organisationId === h.organisationId);
+            if (!org) return null;
+            const barColor =
+              org.score >= 75
+                ? "bg-emerald-500"
+                : org.score >= 50
+                  ? "bg-blue-500"
+                  : org.score >= 25
+                    ? "bg-amber-500"
+                    : "bg-red-400";
+            return (
+              <div key={h.organisationId} className="flex items-center gap-3">
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                    style={{ width: `${org.score}%` }}
+                  />
+                </div>
+                <span className="shrink-0 text-[10px] font-medium text-muted-foreground w-8 text-right">
+                  {org.score}%
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function HealthStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
+  return (
+    <div className="rounded-lg bg-muted/50 p-3 text-center">
+      <div className="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-md bg-background text-muted-foreground">
+        {icon}
+      </div>
+      <div className="text-lg font-bold">
+        <AnimatedCounter target={value} durationMs={800} />
+      </div>
+      <p className="text-[10px] text-muted-foreground">{label}</p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Security Summary Card
+// ---------------------------------------------------------------------------
+
+function SecuritySummaryCard({ platformSlug }: { platformSlug: string }) {
+  const [logs, setLogs] = useState<LogEntryResponse[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!platformSlug) return;
+    let cancelled = false;
+    logsApi
+      .list(platformSlug, { category: "SECURITY", size: 10 })
+      .then((data) => {
+        if (!cancelled) setLogs(data.content);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [platformSlug]);
+
+  const securityStats = useMemo(() => {
+    const total = logs.length;
+    const tokenReuse = logs.filter((l) => l.eventType.includes("TOKEN_REUSE")).length;
+    const loginFailures = logs.filter((l) => l.eventType.includes("LOGIN_FAILURE")).length;
+    const disabled = logs.filter((l) => l.eventType.includes("DISABLED")).length;
+    return { total, tokenReuse, loginFailures, disabled };
+  }, [logs]);
+
+  const levelColors: Record<string, string> = {
+    INFO: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    WARN: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    ERROR: "bg-red-500/10 text-red-600 dark:text-red-400",
+  };
+
+  return (
+    <Card className="h-full">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ShieldAlert className="h-4 w-4" />
+            Security summary
+          </CardTitle>
+          <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
+            <Link href="/console/logs">
+              View all
+              <ArrowRight className="ml-1 h-3 w-3" />
+            </Link>
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!loaded ? (
+          <TableSkeleton rows={3} columns={2} />
+        ) : (
+          <>
+            {/* Security stats */}
+            <div className="grid grid-cols-3 gap-3">
+              <SecurityStat
+                label="Token reuse"
+                value={securityStats.tokenReuse}
+                icon={<KeyRound className="h-3.5 w-3.5" />}
+                tone={securityStats.tokenReuse > 0 ? "warning" : "default"}
+              />
+              <SecurityStat
+                label="Login failures"
+                value={securityStats.loginFailures}
+                icon={<ShieldAlert className="h-3.5 w-3.5" />}
+                tone={securityStats.loginFailures > 0 ? "warning" : "default"}
+              />
+              <SecurityStat
+                label="Disabled"
+                value={securityStats.disabled}
+                icon={<Users className="h-3.5 w-3.5" />}
+                tone={securityStats.disabled > 0 ? "warning" : "default"}
+              />
+            </div>
+
+            {/* Recent security events */}
+            {logs.length > 0 ? (
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Recent events</p>
+                {logs.slice(0, 5).map((log) => (
+                  <div
+                    key={log.id}
+                    className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-muted/50"
+                  >
+                    <span className={`inline-flex h-5 shrink-0 items-center rounded px-1.5 text-[10px] font-medium ${levelColors[log.level] ?? "bg-muted"}`}>
+                      {log.level}
+                    </span>
+                    <span className="flex-1 truncate font-mono text-muted-foreground/70">
+                      {log.eventType.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}
+                    </span>
+                    {log.organisationSlug && (
+                      <span className="hidden sm:inline rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                        {log.organisationSlug}
+                      </span>
+                    )}
+                    <span className="shrink-0 text-[10px] text-muted-foreground/50">
+                      {new Date(log.createdAt).toLocaleTimeString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2 py-6 text-center">
+                <ShieldCheck className="h-6 w-6 text-emerald-500/40" />
+                <p className="text-xs text-muted-foreground">No security events — all clear</p>
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function SecurityStat({
+  label,
+  value,
+  icon,
+  tone,
+}: {
+  label: string;
+  value: number;
+  icon: React.ReactNode;
+  tone: "default" | "warning";
+}) {
+  return (
+    <div
+      className={`rounded-lg p-3 text-center transition-colors ${
+        tone === "warning"
+          ? "bg-amber-500/10 border border-amber-500/20"
+          : "bg-muted/50"
+      }`}
+    >
+      <div
+        className={`mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-md ${
+          tone === "warning"
+            ? "bg-amber-500/20 text-amber-600 dark:text-amber-400"
+            : "bg-background text-muted-foreground"
+        }`}
+      >
+        {icon}
+      </div>
+      <div className={`text-lg font-bold ${tone === "warning" ? "text-amber-600 dark:text-amber-400" : ""}`}>
+        {value}
+      </div>
+      <p className="text-[10px] text-muted-foreground">{label}</p>
     </div>
   );
 }
@@ -434,7 +752,7 @@ function RecentLogsCard({ platformSlug }: { platformSlug: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Quick Action
+// Hero Stat
 // ---------------------------------------------------------------------------
 
 function HeroStat({
@@ -474,6 +792,10 @@ function HeroStat({
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Quick Action
+// ---------------------------------------------------------------------------
 
 function QuickAction({
   href,

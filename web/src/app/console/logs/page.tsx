@@ -360,10 +360,10 @@ export default function LogsPage() {
                     clearLogs();
                     setPage(0);
                   }}
-                  className="w-full"
+                  className="flex-1 sm:flex-none"
                 >
                   <XCircle className="mr-1 h-3.5 w-3.5" />
-                  Clear filters
+                  Clear
                 </Button>
               </div>
             </div>
@@ -401,7 +401,7 @@ export default function LogsPage() {
                 <p className="text-sm text-muted-foreground">No log entries yet.</p>
               </div>
             ) : (
-              <div className="divide-y">
+              <div className="divide-y overflow-hidden">
                 {allLogs.map((entry) => (
                   <LogRow key={entry.id} entry={entry} />
                 ))}
@@ -470,7 +470,7 @@ function LogRow({ entry }: { entry: LogEntryResponse }) {
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-start gap-3 px-4 py-3 text-left"
+        className="flex w-full min-w-0 items-start gap-3 px-4 py-3 text-left"
       >
         {/* Level icon */}
         <div className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${levelStyle}`}>
@@ -479,18 +479,18 @@ function LogRow({ entry }: { entry: LogEntryResponse }) {
 
         {/* Content */}
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className={`text-[10px] ${levelStyle}`}>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <Badge variant="outline" className={`shrink-0 text-[10px] ${levelStyle}`}>
               {entry.level}
             </Badge>
             {entry.category && (
-              <Badge variant="outline" className={`text-[10px] ${CATEGORY_STYLES[entry.category] ?? "bg-muted text-muted-foreground"}`}>
+              <Badge variant="outline" className={`shrink-0 text-[10px] ${CATEGORY_STYLES[entry.category] ?? "bg-muted text-muted-foreground"}`}>
                 {entry.category.replace("_", " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}
               </Badge>
             )}
-            <span className="font-mono text-xs font-medium text-foreground">{entry.eventType}</span>
+            <span className="shrink-0 font-mono text-xs font-medium text-foreground">{entry.eventType}</span>
             {entry.organisationSlug && (
-              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+              <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                 {entry.organisationSlug}
               </span>
             )}
@@ -523,7 +523,7 @@ function LogRow({ entry }: { entry: LogEntryResponse }) {
       {/* Expanded detail panel */}
       {expanded && (
         <div className="border-t border-dashed border-border/60 bg-muted/20 px-4 py-3">
-          <dl className="grid gap-x-6 gap-y-2 text-[11px] sm:grid-cols-2 lg:grid-cols-3">
+          <dl className="grid min-w-0 gap-x-6 gap-y-2 text-[11px] sm:grid-cols-2 lg:grid-cols-3">
             <DetailRow label="Event type" value={entry.eventType} mono />
             <DetailRow label="Category" value={entry.category ?? "—"} />
             <DetailRow label="Level" value={entry.level} />
@@ -550,7 +550,7 @@ function DetailRow({ label, value, mono }: { label: string; value: string; mono?
   return (
     <div className="flex flex-col gap-0.5">
       <dt className="font-medium text-muted-foreground/60 uppercase tracking-wider">{label}</dt>
-      <dd className={`truncate ${mono ? "font-mono" : ""} text-foreground/80`}>{value}</dd>
+      <dd className={`min-w-0 truncate ${mono ? "font-mono" : ""} text-foreground/80`}>{value}</dd>
     </div>
   );
 }

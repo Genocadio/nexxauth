@@ -9,48 +9,109 @@ import type { LogEntryResponse } from "@/types/api";
 /**
  * Subscribes to the server-sent event stream for new log entries.
  * Returns the latest log entries in real time.
+ *
+ * Uses `fetch` + `ReadableStream` instead of `EventSource` because
+ * `EventSource` cannot send custom headers and the backend requires
+ * `Authorization: Bearer <token>` for authentication.
  */
 export function useLogStream(organisationId?: number) {
   const platformSlug = usePlatformSlug() ?? "";
   const session = useAppSelector(selectPlatformSession);
   const [logs, setLogs] = useState<LogEntryResponse[]>([]);
   const [connected, setConnected] = useState(false);
-  const eventSourceRef = useRef<EventSource | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const connectRef = useRef<() => void>(() => {});
 
   const connect = useCallback(() => {
     if (!platformSlug || !session) return;
 
     const streamUrl = logsApi.stream(platformSlug, organisationId);
-    // EventSource doesn't support custom headers, so we encode the token
-    // in a query param that the backend ignores (auth is via cookie or
-    // the existing JWT filter). For SSE the browser sends cookies
-    // automatically, which is enough for the platform session.
-    const es = new EventSource(streamUrl, { withCredentials: true });
+    const token = session.accessToken;
 
-    es.onopen = () => setConnected(true);
+    const abortController = new AbortController();
+    abortRef.current = abortController;
 
-    es.addEventListener("log", (event) => {
-      try {
-        const entry = JSON.parse(event.data) as LogEntryResponse;
-        setLogs((prev) => [entry, ...prev].slice(0, 200)); // keep last 200
-      } catch {
-        // malformed event — ignore
-      }
-    });
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
 
-    es.onerror = () => {
-      setConnected(false);
-      es.close();
-      // Reconnect after a short delay
-      setTimeout(() => {
-        if (eventSourceRef.current === es) {
-          connectRef.current();
+    fetch(streamUrl, {
+      headers,
+      signal: abortController.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          setConnected(false);
+          // Schedule reconnect on auth / server errors
+          setTimeout(() => {
+            if (abortRef.current === abortController) {
+              connectRef.current();
+            }
+          }, 3000);
+          return;
         }
-      }, 3000);
-    };
 
-    eventSourceRef.current = es;
+        setConnected(true);
+
+        const reader = res.body?.getReader();
+        if (!reader) return;
+
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          // SSE events are separated by double newlines
+          const events = buffer.split("\n\n");
+          // Keep the last (potentially incomplete) chunk in the buffer
+          buffer = events.pop() ?? "";
+
+          for (const raw of events) {
+            let eventType = "";
+            let data = "";
+
+            for (const line of raw.split("\n")) {
+              if (line.startsWith("event:")) {
+                eventType = line.slice(6).trim();
+              } else if (line.startsWith("data:")) {
+                data = line.slice(5).trim();
+              }
+            }
+
+            if (eventType === "log" && data) {
+              try {
+                const entry = JSON.parse(data) as LogEntryResponse;
+                setLogs((prev) => [entry, ...prev].slice(0, 200)); // keep last 200
+              } catch {
+                // malformed event — ignore
+              }
+            }
+          }
+        }
+
+        // Stream ended — attempt reconnect
+        setConnected(false);
+        setTimeout(() => {
+          if (abortRef.current === abortController) {
+            connectRef.current();
+          }
+        }, 3000);
+      })
+      .catch(() => {
+        // Network error / abort — attempt reconnect unless intentionally closed
+        if (!abortController.signal.aborted) {
+          setConnected(false);
+          setTimeout(() => {
+            if (abortRef.current === abortController) {
+              connectRef.current();
+            }
+          }, 3000);
+        }
+      });
   }, [platformSlug, session, organisationId]);
 
   // Keep the ref fresh so the reconnect callback always calls the latest connect
@@ -61,8 +122,8 @@ export function useLogStream(organisationId?: number) {
   useEffect(() => {
     connect();
     return () => {
-      eventSourceRef.current?.close();
-      eventSourceRef.current = null;
+      abortRef.current?.abort();
+      abortRef.current = null;
       setConnected(false);
     };
   }, [connect]);
