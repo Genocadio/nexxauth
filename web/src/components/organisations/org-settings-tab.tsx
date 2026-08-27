@@ -68,9 +68,9 @@ function IdentifiersCard({ platformSlug, organisationId }: OrgSettingsTabProps) 
   const update = useUpdateOrganisation(platformSlug, organisationId);
 
   if (org.isLoading) return <TableSkeleton rows={3} columns={3} />;
-  if (org.isError) return <ErrorState error={org.error} onRetry={() => org.refetch()} />;
+  if (org.isError || !org.data) return <ErrorState error={org.error ?? new Error("Organisation not found")} onRetry={() => org.refetch()} />;
 
-  const data = org.data!;
+  const data = org.data;
 
   /** Toggle one flag; the full set is sent so the at-least-one-login rule
    * (enforced server-side too) never leaves the UI out of sync. */
@@ -397,9 +397,9 @@ function DangerZoneCard({ platformSlug, organisationId }: OrgSettingsTabProps) {
   const [typedName, setTypedName] = useState("");
 
   if (org.isLoading) return <TableSkeleton rows={2} columns={2} />;
-  if (org.isError) return <ErrorState error={org.error} onRetry={() => org.refetch()} />;
+  if (org.isError || !org.data) return <ErrorState error={org.error ?? new Error("Organisation not found")} onRetry={() => org.refetch()} />;
 
-  const data = org.data!;
+  const data = org.data;
 
   return (
     <>

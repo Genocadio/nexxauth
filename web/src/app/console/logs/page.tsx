@@ -363,7 +363,7 @@ export default function LogsPage() {
                   className="flex-1 sm:flex-none"
                 >
                   <XCircle className="mr-1 h-3.5 w-3.5" />
-                  Clear
+                  Clear filters
                 </Button>
               </div>
             </div>

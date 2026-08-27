@@ -7,6 +7,7 @@ import com.nexxserve.nexxauth.entity.LogEntry;
 import com.nexxserve.nexxauth.entity.LogLevel;
 import com.nexxserve.nexxauth.entity.Platform;
 import com.nexxserve.nexxauth.repository.LogEntryRepository;
+import com.nexxserve.nexxauth.repository.OrganisationRepository;
 import com.nexxserve.nexxauth.repository.PlatformRepository;
 import com.nexxserve.nexxauth.util.ClientIps;
 import jakarta.servlet.http.HttpServletRequest;
@@ -41,15 +42,21 @@ public class LogService {
 
     private final LogEntryRepository logEntryRepository;
     private final PlatformRepository platformRepository;
+    private final OrganisationRepository organisationRepository;
     private final ObjectMapper objectMapper;
 
     private final Map<String, CopyOnWriteArrayList<SseEmitter>> emitters = new ConcurrentHashMap<>();
 
+    /** In-memory cache of organisation id → slug to avoid repeated lookups. */
+    private final Map<Long, String> orgSlugCache = new ConcurrentHashMap<>();
+
     public LogService(LogEntryRepository logEntryRepository,
                       PlatformRepository platformRepository,
+                      OrganisationRepository organisationRepository,
                       ObjectMapper objectMapper) {
         this.logEntryRepository = logEntryRepository;
         this.platformRepository = platformRepository;
+        this.organisationRepository = organisationRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -138,6 +145,7 @@ public class LogService {
     // --- Specification helpers ---
 
     private Specification<LogEntry> hasPlatformId(Long platformId) {
+        if (platformId == null) return null;
         return (root, query, cb) -> cb.equal(root.get("platformId"), platformId);
     }
 
@@ -250,7 +258,7 @@ public class LogService {
         return new LogEntryResponse(
                 entry.getId(),
                 entry.getOrganisationId(),
-                null, // slug resolved separately if needed
+                resolveOrgSlug(entry.getOrganisationId()),
                 entry.getLevel().name(),
                 entry.getCategory() != null ? entry.getCategory().name() : "AUTH",
                 entry.getEventType(),
@@ -262,6 +270,16 @@ public class LogService {
                 entry.getClientKey(),
                 entry.getDomain(),
                 entry.getCreatedAt()
+        );
+    }
+
+    /** Resolve an organisation id to its slug, using an in-memory cache. */
+    private String resolveOrgSlug(Long organisationId) {
+        if (organisationId == null) return null;
+        return orgSlugCache.computeIfAbsent(organisationId, id ->
+                organisationRepository.findById(id)
+                        .map(o -> o.getSlug())
+                        .orElse("unknown")
         );
     }
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Building2, Menu, ShieldCheck } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
+import { ErrorBoundary } from "@/components/shared/error-boundary";
 import { NavContent } from "@/components/layout/nav-items";
 import { OrgSwitcher } from "@/components/layout/org-switcher";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
@@ -126,7 +127,9 @@ export function ConsoleShell({ children }: { children: React.ReactNode }) {
               <UserMenu />
             </div>
           </header>
-          <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">{children}</main>
+          <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
+              <ErrorBoundary>{children}</ErrorBoundary>
+            </main>
         </div>
       </div>
 

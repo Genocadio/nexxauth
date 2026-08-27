@@ -93,9 +93,9 @@ export function OrgOverviewTab({ platformSlug, organisationId }: OrgOverviewTabP
   }, [platformSlug, organisationId]);
 
   if (org.isLoading) return <TableSkeleton rows={4} columns={2} />;
-  if (org.isError) return <ErrorState error={org.error} onRetry={() => org.refetch()} />;
+  if (org.isError || !org.data) return <ErrorState error={org.error ?? new Error("Organisation not found")} onRetry={() => org.refetch()} />;
 
-  const data = org.data!;
+  const data = org.data;
   const userCount = users.data?.length ?? 0;
   const keyCount = keys.data?.length ?? 0;
   const clientCount = clients.data?.length ?? 0;
