@@ -218,9 +218,11 @@ function SessionRow({
   return (
     <div>
       {/* Main row — clickable to expand */}
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setExpanded((v) => !v)}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded((v) => !v); } }}
         className={`flex w-full items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/30 ${expanded ? "bg-muted/20" : ""}`}
       >
         {/* Expand chevron */}
@@ -306,7 +308,7 @@ function SessionRow({
             <ShieldOff className="h-3.5 w-3.5" />
           </Button>
         )}
-      </button>
+      </div>
 
       {/* Expanded: token rotation timeline */}
       {expanded && (

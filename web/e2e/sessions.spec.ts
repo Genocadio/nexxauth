@@ -170,8 +170,8 @@ test.describe("sessions tab", () => {
     await authedPage.goto(`/console/organisations/${org.slug}`);
     await expect(authedPage.getByRole("heading", { name: org.name })).toBeVisible({ timeout: 10_000 });
 
-    // Click Sessions in sidebar
-    await authedPage.getByRole("link", { name: "Sessions" }).click();
+    // Click Sessions in sidebar (use exact to avoid matching "Active sessions" quick link)
+    await authedPage.getByRole("link", { name: "Sessions", exact: true }).click();
     await expect(authedPage).toHaveURL(/tab=sessions/);
     await expect(authedPage.getByText("Active sessions")).toBeVisible({ timeout: 10_000 });
   });

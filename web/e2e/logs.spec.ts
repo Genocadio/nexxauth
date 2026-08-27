@@ -184,13 +184,13 @@ test.describe("logs page", () => {
     await expect(liveIndicator.or(connectingIndicator)).toBeVisible({ timeout: 15_000 });
   });
 
-  test("navigates to logs from the sidebar", async ({ authedPage }) => {
-    // Start at overview
+  test("navigates to logs from the sidebar", async ({ authedPage, platform }) => {
+    // Start at overview (authedPage fixture already lands here, but re-navigate for clarity)
     await authedPage.goto("/console/overview");
-    await expect(authedPage.getByRole("heading", { name: /Platform/ })).toBeVisible();
+    await expect(authedPage.getByRole("heading", { name: platform.platformName })).toBeVisible();
 
-    // Click the Logs nav item in the sidebar
-    await authedPage.getByRole("link", { name: "Logs" }).click();
+    // Click the Logs nav item in the sidebar (use exact to avoid matching overview links like "Audit logs")
+    await authedPage.getByRole("link", { name: "Logs", exact: true }).click();
 
     // Should land on the logs page
     await expect(authedPage).toHaveURL(/\/console\/logs/);
