@@ -45,6 +45,19 @@ public class OrganisationRefreshToken extends BaseEntity {
     @Column(name = "client_key", length = 64)
     private String clientKey;
 
+    /** IP address of the client that created this token. */
+    @Column(name = "ip_address", length = 45)
+    private String ipAddress;
+
+    /** User-Agent header of the client that created this token. */
+    @Column(name = "user_agent", length = 2000)
+    private String userAgent;
+
+    /** UUID grouping tokens belonging to the same logical session.
+     * Inherited on rotation so the session remains trackable. */
+    @Column(name = "session_id", length = 36)
+    private String sessionId;
+
     public boolean isExpired() {
         return expiresAt.isBefore(Instant.now());
     }

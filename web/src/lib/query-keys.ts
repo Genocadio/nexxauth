@@ -17,6 +17,9 @@ export const queryKeys = {
   orgUserFields: (organisationId: number) => [...queryKeys.organisation(organisationId), "user-fields"] as const,
   orgKeys: (organisationId: number) => [...queryKeys.organisation(organisationId), "keys"] as const,
   orgClients: (organisationId: number) => [...queryKeys.organisation(organisationId), "clients"] as const,
+  orgSessions: (organisationId: number, userId?: number) =>
+    [...queryKeys.organisation(organisationId), "sessions", userId ?? "all"] as const,
   docsContext: (platformSlug: string, organisationId: number) =>
     ["docs", platformSlug, organisationId] as const,
+  logs: (platformSlug: string) => ["logs", platformSlug] as const,
 } as const;

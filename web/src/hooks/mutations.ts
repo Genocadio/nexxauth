@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { organisationsApi } from "@/api/organisations";
+import { sessionsApi } from "@/api/sessions";
 import { platformApi } from "@/api/platform";
 import { queryKeys } from "@/lib/query-keys";
 import { getErrorMessage } from "@/types/errors";
@@ -288,5 +289,29 @@ export function useRotateOrgClientToken(platformSlug: string, organisationId: nu
     mutationFn: (clientKey) => organisationsApi.rotateClientToken(platformSlug, organisationId, clientKey),
     invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgClients(organisationId) })],
     successMessage: "Client token rotated",
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Sessions
+// ---------------------------------------------------------------------------
+
+export function useRevokeSession(platformSlug: string, organisationId: number) {
+  return useApiMutation<void, string>({
+    mutationFn: (sessionId) => sessionsApi.revoke(platformSlug, organisationId, sessionId),
+    invalidate: [
+      (qc) => qc.invalidateQueries({ queryKey: queryKeys.orgSessions(organisationId) }),
+    ],
+    successMessage: "Session revoked",
+  });
+}
+
+export function useRevokeAllUserSessions(platformSlug: string, organisationId: number) {
+  return useApiMutation<void, number>({
+    mutationFn: (userId) => sessionsApi.revokeAllForUser(platformSlug, organisationId, userId),
+    invalidate: [
+      (qc) => qc.invalidateQueries({ queryKey: queryKeys.orgSessions(organisationId) }),
+    ],
+    successMessage: "All user sessions revoked",
   });
 }

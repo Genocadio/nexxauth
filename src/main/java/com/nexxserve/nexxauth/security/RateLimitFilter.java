@@ -1,6 +1,8 @@
 package com.nexxserve.nexxauth.security;
 
+import com.nexxserve.nexxauth.entity.LogLevel;
 import com.nexxserve.nexxauth.exception.ErrorResponseWriter;
+import com.nexxserve.nexxauth.service.AuthAuditService;
 import com.nexxserve.nexxauth.util.ClientIps;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -38,12 +40,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private final RateLimitService rateLimitService;
     private final RateLimitProperties properties;
     private final ErrorResponseWriter errorResponseWriter;
+    private final AuthAuditService audit;
 
     public RateLimitFilter(RateLimitService rateLimitService, RateLimitProperties properties,
-                           ErrorResponseWriter errorResponseWriter) {
+                           ErrorResponseWriter errorResponseWriter, AuthAuditService audit) {
         this.rateLimitService = rateLimitService;
         this.properties = properties;
         this.errorResponseWriter = errorResponseWriter;
+        this.audit = audit;
     }
 
     @Override
@@ -62,6 +66,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
             Optional<Long> retryAfter = rateLimitService.tryConsume(endpointFor(path) + ":"
                     + ClientIps.resolve(request, properties.isUseForwardedFor()), limit);
             if (retryAfter.isPresent()) {
+                String ip = ClientIps.resolve(request, properties.isUseForwardedFor());
+                String domain = extractDomain(request);
+                String endpoint = endpointFor(path);
+                audit.logRisk(LogLevel.WARN, AuthAuditService.RATE_LIMIT_EXCEEDED,
+                        ip, domain,
+                        "endpoint=" + endpoint + " retryAfter=" + retryAfter.get());
                 response.setHeader(HttpHeaders.RETRY_AFTER, retryAfter.get().toString());
                 errorResponseWriter.write(response, HttpStatus.TOO_MANY_REQUESTS,
                         "Too many requests, please try again later", path);
@@ -85,6 +95,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
             return properties.getSuggestions();
         }
         return null;
+    }
+
+    private String extractDomain(jakarta.servlet.http.HttpServletRequest request) {
+        String host = request.getHeader("Host");
+        if (host == null || host.isBlank()) return null;
+        int colon = host.lastIndexOf(":");
+        return colon > 0 ? host.substring(0, colon) : host;
     }
 
     private boolean isOrgAuth(String path, String endpoint) {

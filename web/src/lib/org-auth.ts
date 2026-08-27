@@ -57,7 +57,12 @@ export function orgSlugFromToken(accessToken: string): string | undefined {
 
 type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string; status: number };
 
-async function postJson<T>(path: string, body: unknown, token?: string): Promise<ApiResult<T>> {
+async function postJson<T>(
+  path: string,
+  body: unknown,
+  token?: string,
+  extraHeaders?: Record<string, string>,
+): Promise<ApiResult<T>> {
   let res: Response;
   try {
     res = await fetch(apiPath(path), {
@@ -66,6 +71,7 @@ async function postJson<T>(path: string, body: unknown, token?: string): Promise
         Accept: "application/json",
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...extraHeaders,
       },
       body: JSON.stringify(body),
     });
@@ -90,14 +96,26 @@ async function errorMessage(res: Response): Promise<string> {
 }
 
 /** POST /{slug}/auth/login */
-export function serverOrgLogin(platformSlug: string, body: OrgLoginRequest): Promise<ApiResult<OrgAuthResponse>> {
-  return postJson<OrgAuthResponse>(`/${platformSlug}/auth/login`, body);
+export function serverOrgLogin(
+  platformSlug: string,
+  body: OrgLoginRequest,
+  userAgent?: string,
+): Promise<ApiResult<OrgAuthResponse>> {
+  const headers: Record<string, string> = {};
+  if (userAgent) headers["User-Agent"] = userAgent;
+  return postJson<OrgAuthResponse>(`/${platformSlug}/auth/login`, body, undefined, headers);
 }
 
 /** POST /{slug}/auth/refresh — rotates the refresh token. */
-export function serverOrgRefresh(platformSlug: string, refreshToken: string): Promise<ApiResult<OrgAuthResponse>> {
+export function serverOrgRefresh(
+  platformSlug: string,
+  refreshToken: string,
+  userAgent?: string,
+): Promise<ApiResult<OrgAuthResponse>> {
   const body: RefreshTokenRequest = { refreshToken };
-  return postJson<OrgAuthResponse>(`/${platformSlug}/auth/refresh`, body);
+  const headers: Record<string, string> = {};
+  if (userAgent) headers["User-Agent"] = userAgent;
+  return postJson<OrgAuthResponse>(`/${platformSlug}/auth/refresh`, body, undefined, headers);
 }
 
 /** POST /{slug}/auth/logout — best effort (204 on success). */
@@ -130,4 +148,59 @@ async function getJson<T>(path: string, token: string): Promise<ApiResult<T>> {
   }
   if (!res.ok) return { ok: false, error: await errorMessage(res), status: res.status };
   return { ok: true, data: (await res.json()) as T };
+}
+
+async function deleteJson<T>(path: string, token: string): Promise<ApiResult<T>> {
+  let res: Response;
+  try {
+    res = await fetch(apiPath(path), {
+      method: "DELETE",
+      headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    return { ok: false, error: "Could not reach the server. Please try again.", status: 0 };
+  }
+  if (res.status === 204) return { ok: true, data: undefined as T };
+  if (!res.ok) return { ok: false, error: await errorMessage(res), status: res.status };
+  return { ok: true, data: (await res.json()) as T };
+}
+
+/** Session info returned by the backend. */
+export interface OrgSessionInfo {
+  sessionId: string;
+  userId: number;
+  userIdentifier: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
+  lastActivityAt: string;
+  expiresAt: string;
+  active: boolean;
+  tokenCount: number;
+}
+
+/** GET /{slug}/organisations/{orgId}/sessions?userId={userId} */
+export async function serverOrgSessions(
+  platformSlug: string,
+  organisationId: number,
+  userId: number,
+  accessToken: string,
+): Promise<ApiResult<OrgSessionInfo[]>> {
+  return getJson<OrgSessionInfo[]>(
+    `/${platformSlug}/organisations/${organisationId}/sessions?userId=${userId}`,
+    accessToken,
+  );
+}
+
+/** DELETE /{slug}/organisations/{orgId}/sessions/{sessionId} */
+export async function serverOrgRevokeSession(
+  platformSlug: string,
+  organisationId: number,
+  sessionId: string,
+  accessToken: string,
+): Promise<ApiResult<void>> {
+  return deleteJson<void>(
+    `/${platformSlug}/organisations/${organisationId}/sessions/${sessionId}`,
+    accessToken,
+  );
 }

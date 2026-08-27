@@ -67,4 +67,17 @@ export const endpoints = {
     context: (organisationId: number) =>
       `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/docs/context`,
   }),
+
+  logs: (platformSlug: string) => ({
+    list: `${API_BASE_URL}/${platformSlug}/logs`,
+    stream: `${API_BASE_URL}/${platformSlug}/logs/stream`,
+  }),
+
+  sessions: (platformSlug: string, organisationId: number) => ({
+    list: `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/sessions`,
+    revoke: (sessionId: string) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/sessions/${sessionId}`,
+    revokeAllForUser: (userId: number) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/sessions?userId=${userId}`,
+  }),
 };

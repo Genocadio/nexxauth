@@ -3,6 +3,8 @@ package com.nexxserve.nexxauth.service;
 import com.nexxserve.nexxauth.dto.request.CreateOrganisationRoleRequest;
 import com.nexxserve.nexxauth.dto.request.UpdateOrganisationRoleRequest;
 import com.nexxserve.nexxauth.dto.response.OrganisationRoleResponse;
+import com.nexxserve.nexxauth.entity.LogCategory;
+import com.nexxserve.nexxauth.entity.LogLevel;
 import com.nexxserve.nexxauth.entity.Organisation;
 import com.nexxserve.nexxauth.entity.OrganisationRole;
 import com.nexxserve.nexxauth.entity.Platform;
@@ -30,13 +32,16 @@ public class OrganisationRoleService {
     private final PlatformAccess platformAccess;
     private final OrganisationAccess organisationAccess;
     private final OrganisationRoleMapper roleMapper;
+    private final AuthAuditService audit;
 
     public OrganisationRoleService(OrganisationRoleRepository roleRepository, PlatformAccess platformAccess,
-                                   OrganisationAccess organisationAccess, OrganisationRoleMapper roleMapper) {
+                                   OrganisationAccess organisationAccess, OrganisationRoleMapper roleMapper,
+                                   AuthAuditService audit) {
         this.roleRepository = roleRepository;
         this.platformAccess = platformAccess;
         this.organisationAccess = organisationAccess;
         this.roleMapper = roleMapper;
+        this.audit = audit;
     }
 
     @Transactional(readOnly = true)
@@ -67,7 +72,10 @@ public class OrganisationRoleService {
         role.setOrganisation(organisation);
         role.setDefaultRole(Boolean.TRUE.equals(request.isDefault()));
         rejectNullPermissions(request.permissions());
-        return roleMapper.toResponse(roleRepository.save(role));
+        OrganisationRole saved = roleRepository.save(role);
+        audit.logPersisted(LogLevel.INFO, LogCategory.CONFIG, AuthAuditService.ORG_ROLE_CREATED, null,
+                organisation.getSlug(), organisation.getId(), saved.getName());
+        return roleMapper.toResponse(saved);
     }
 
     @Transactional
@@ -90,13 +98,19 @@ public class OrganisationRoleService {
         if (request.isDefault() != null) {
             role.setDefaultRole(request.isDefault());
         }
-        return roleMapper.toResponse(roleRepository.save(role));
+        OrganisationRole saved = roleRepository.save(role);
+        audit.logPersisted(LogLevel.INFO, LogCategory.CONFIG, AuthAuditService.ORG_ROLE_UPDATED, null,
+                organisation.getSlug(), organisation.getId(), saved.getName());
+        return roleMapper.toResponse(saved);
     }
 
     @Transactional
     public void delete(String platformSlug, Long organisationId, Long roleId, OrgActor requester) {
         Organisation organisation = resolve(platformSlug, organisationId, requester, true);
-        roleRepository.delete(findRole(organisation, roleId));
+        OrganisationRole role = findRole(organisation, roleId);
+        audit.logPersisted(LogLevel.INFO, LogCategory.CONFIG, AuthAuditService.ORG_ROLE_DELETED, null,
+                organisation.getSlug(), organisation.getId(), role.getName());
+        roleRepository.delete(role);
     }
 
     /** A null element in the permission set would fail the NOT NULL join-table

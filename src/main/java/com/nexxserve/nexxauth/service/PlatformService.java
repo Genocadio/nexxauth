@@ -3,6 +3,8 @@ package com.nexxserve.nexxauth.service;
 import com.nexxserve.nexxauth.dto.request.AddPlatformUserRequest;
 import com.nexxserve.nexxauth.dto.response.PlatformResponse;
 import com.nexxserve.nexxauth.dto.response.PlatformUserResponse;
+import com.nexxserve.nexxauth.entity.LogCategory;
+import com.nexxserve.nexxauth.entity.LogLevel;
 import com.nexxserve.nexxauth.entity.Platform;
 import com.nexxserve.nexxauth.entity.PlatformUser;
 import com.nexxserve.nexxauth.entity.Role;
@@ -30,6 +32,7 @@ public class PlatformService {
     private final PlatformUserMapper platformUserMapper;
     private final PasswordEncoder passwordEncoder;
     private final PlatformAccess platformAccess;
+    private final AuthAuditService audit;
 
     /** Public origin of this backend ({@code BACKEND_PUBLIC_URL}), used to
      * build the platform's copiable API base URL shown on the console. */
@@ -38,13 +41,15 @@ public class PlatformService {
 
     public PlatformService(PlatformRepository platformRepository, PlatformUserRepository platformUserRepository,
                            PlatformMapper platformMapper, PlatformUserMapper platformUserMapper,
-                           PasswordEncoder passwordEncoder, PlatformAccess platformAccess) {
+                           PasswordEncoder passwordEncoder, PlatformAccess platformAccess,
+                           AuthAuditService audit) {
         this.platformRepository = platformRepository;
         this.platformUserRepository = platformUserRepository;
         this.platformMapper = platformMapper;
         this.platformUserMapper = platformUserMapper;
         this.passwordEncoder = passwordEncoder;
         this.platformAccess = platformAccess;
+        this.audit = audit;
     }
 
     /**
@@ -117,7 +122,10 @@ public class PlatformService {
         user.setPlatform(platform);
         user.setPassword(passwordEncoder.encode(request.password()));
         user.setRole(request.role() != null ? request.role() : Role.READ_ONLY);
-        return platformUserMapper.toResponse(platformUserRepository.save(user));
+        PlatformUser saved = platformUserRepository.save(user);
+        audit.logPersisted(LogLevel.INFO, LogCategory.USER_MANAGEMENT, AuthAuditService.PLATFORM_USER_ADDED,
+                request.email(), null, null, saved.getRole().name());
+        return platformUserMapper.toResponse(saved);
     }
 
 }

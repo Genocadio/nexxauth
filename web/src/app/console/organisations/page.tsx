@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Building2, Plus, Rocket } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Building2, KeyRound, Minus, Plus, Rocket, ShieldCheck, TrendingDown, TrendingUp, Users, Wifi } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { OrganisationDialog } from "@/components/organisations/organisation-dialog";
@@ -12,12 +12,26 @@ import { CardsSkeleton } from "@/components/shared/loading";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { useOrganisations, usePlatformSlug } from "@/hooks/queries";
+import { organisationsHealthApi, type OrganisationHealth } from "@/api/organisations-health";
 import { formatDate } from "@/lib/constants";
 
 export default function OrganisationsPage() {
   const platformSlug = usePlatformSlug() ?? "";
   const organisations = useOrganisations();
   const [open, setOpen] = useState(false);
+  const [healthMap, setHealthMap] = useState<Record<number, OrganisationHealth>>({});
+
+  useEffect(() => {
+    if (!platformSlug || !organisations.data) return;
+    organisationsHealthApi
+      .list(platformSlug)
+      .then((data) => {
+        const map: Record<number, OrganisationHealth> = {};
+        for (const h of data) map[h.organisationId] = h;
+        setHealthMap(map);
+      })
+      .catch(() => {});
+  }, [platformSlug, organisations.data]);
 
   return (
     <div>
@@ -79,6 +93,9 @@ export default function OrganisationsPage() {
                   {org.description ? (
                     <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{org.description}</p>
                   ) : null}
+                  {healthMap[org.id] && (
+                    <OrgHealthBar health={healthMap[org.id]} />
+                  )}
                 </CardContent>
                 <CardFooter className="flex items-center justify-between border-t px-5 py-3 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1.5">
@@ -109,6 +126,79 @@ export default function OrganisationsPage() {
       )}
 
       <OrganisationDialog platformSlug={platformSlug} open={open} onOpenChange={setOpen} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Org Health Bar
+// ---------------------------------------------------------------------------
+
+function OrgHealthBar({ health }: { health: OrganisationHealth }) {
+  const scoreColor =
+    health.score >= 75
+      ? "bg-emerald-500"
+      : health.score >= 50
+        ? "bg-blue-500"
+        : health.score >= 25
+          ? "bg-amber-500"
+          : "bg-red-400";
+
+  const TrendIcon =
+    health.trend === "UP" ? TrendingUp
+    : health.trend === "DOWN" ? TrendingDown
+    : Minus;
+  const trendColor =
+    health.trend === "UP"
+      ? "text-emerald-600 dark:text-emerald-400"
+      : health.trend === "DOWN"
+        ? "text-red-500"
+        : "text-muted-foreground";
+  const trendDelta =
+    health.previousScore != null ? health.score - health.previousScore : null;
+
+  return (
+    <div className="mt-3 space-y-2">
+      {/* Score bar */}
+      <div className="flex items-center gap-2">
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${scoreColor}`}
+            style={{ width: `${health.score}%` }}
+          />
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] font-medium text-muted-foreground">{health.score}%</span>
+          {health.trend && trendDelta !== null && trendDelta !== 0 && (
+            <span className={`flex items-center gap-0.5 text-[10px] font-medium ${trendColor}`}>
+              <TrendIcon className="h-3 w-3" />
+              {trendDelta > 0 ? "+" : ""}{trendDelta}
+            </span>
+          )}
+          {health.trend === "SAME" && (
+            <span className="text-[10px] text-muted-foreground/50">stable</span>
+          )}
+        </div>
+      </div>
+      {/* Stats row */}
+      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground/70">
+        <span className="flex items-center gap-1">
+          <Users className="h-2.5 w-2.5" />
+          {health.userCount} user{health.userCount !== 1 ? "s" : ""}
+        </span>
+        <span className="flex items-center gap-1">
+          <Wifi className="h-2.5 w-2.5" />
+          {health.activeSessions} session{health.activeSessions !== 1 ? "s" : ""}
+        </span>
+        <span className="flex items-center gap-1">
+          <KeyRound className="h-2.5 w-2.5" />
+          {health.signingKeys} key{health.signingKeys !== 1 ? "s" : ""}
+        </span>
+        <span className="flex items-center gap-1">
+          <ShieldCheck className="h-2.5 w-2.5" />
+          {health.apiClients} client{health.apiClients !== 1 ? "s" : ""}
+        </span>
+      </div>
     </div>
   );
 }

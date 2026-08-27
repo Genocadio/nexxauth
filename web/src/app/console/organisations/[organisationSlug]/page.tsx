@@ -7,12 +7,13 @@ import { OrgFieldsTab } from "@/components/organisations/org-fields-tab";
 import { OrgKeysTab } from "@/components/organisations/org-keys-tab";
 import { OrgOverviewTab } from "@/components/organisations/org-overview-tab";
 import { OrgRolesTab } from "@/components/organisations/org-roles-tab";
+import { OrgSessionsTab } from "@/components/organisations/org-sessions-tab";
 import { OrgSettingsTab } from "@/components/organisations/org-settings-tab";
 import { OrgUsersTab } from "@/components/organisations/org-users-tab";
 import { FadeIn } from "@/components/shared/fade-in";
 import { useOrganisations, usePlatformSlug } from "@/hooks/queries";
 
-type Tab = "overview" | "users" | "roles" | "fields" | "keys" | "clients" | "settings";
+type Tab = "overview" | "users" | "roles" | "fields" | "keys" | "clients" | "settings" | "sessions";
 
 export default function OrganisationDetailPage() {
   return (
@@ -61,6 +62,7 @@ function OrganisationDetail() {
     keys: <OrgKeysTab platformSlug={platformSlug} organisationId={organisationId} />,
     clients: <OrgClientsTab platformSlug={platformSlug} organisationId={organisationId} />,
     settings: <OrgSettingsTab platformSlug={platformSlug} organisationId={organisationId} />,
+    sessions: <OrgSessionsTab platformSlug={platformSlug} organisationId={organisationId} />,
   };
 
   return (

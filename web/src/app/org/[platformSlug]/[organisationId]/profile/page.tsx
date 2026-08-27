@@ -1,4 +1,4 @@
-import { ShieldCheck } from "lucide-react";
+import { Globe, Monitor, ShieldCheck, Smartphone, Wifi } from "lucide-react";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { AuthShell } from "@/components/auth/auth-shell";
@@ -6,10 +6,11 @@ import { OrgLogoutButton } from "@/components/org/org-logout-button";
 import { CopyButton } from "@/components/shared/copy-button";
 import { InitialsAvatar } from "@/components/shared/initials-avatar";
 import { UserRoles } from "@/components/shared/status-badge";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { platformApiUrl } from "@/lib/api-url";
 import { formatDate } from "@/lib/constants";
-import { ORG_ACCESS_COOKIE, orgSlugFromToken } from "@/lib/org-auth";
+import { ORG_ACCESS_COOKIE, orgSlugFromToken, serverOrgSessions, type OrgSessionInfo } from "@/lib/org-auth";
 import { fetchOrgSession } from "@/lib/org-session";
 import { fullName, type OrganisationUserResponse } from "@/types/api";
 
@@ -35,11 +36,19 @@ export default async function OrgProfilePage({
   }
 
   const cookieStore = await cookies();
+  const accessToken = cookieStore.get(ORG_ACCESS_COOKIE)?.value ?? "";
   const organisationSlug =
-    orgSlugFromToken(cookieStore.get(ORG_ACCESS_COOKIE)?.value ?? "") ?? `#${organisationId}`;
+    orgSlugFromToken(accessToken) ?? `#${organisationId}`;
 
   // The project base URL — `BACKEND_PUBLIC_URL` + slug. Never a /api/v1 path.
   const projectUrl = platformApiUrl(process.env.BACKEND_PUBLIC_URL ?? "", platformSlug);
+
+  // Fetch this user's sessions for the "My sessions" section.
+  let sessions: OrgSessionInfo[] = [];
+  const sessionsResult = await serverOrgSessions(platformSlug, organisationId, session.user.id, accessToken);
+  if (sessionsResult.ok) {
+    sessions = sessionsResult.data;
+  }
 
   return (
     <OrgProfile
@@ -48,6 +57,7 @@ export default async function OrgProfilePage({
       platformSlug={platformSlug}
       organisationId={organisationId}
       projectUrl={projectUrl}
+      sessions={sessions}
     />
   );
 }
@@ -58,12 +68,14 @@ function OrgProfile({
   platformSlug,
   organisationId,
   projectUrl,
+  sessions,
 }: {
   user: OrganisationUserResponse;
   organisationSlug: string;
   platformSlug: string;
   organisationId: number;
   projectUrl: string | null;
+  sessions: OrgSessionInfo[];
 }) {
   const name = fullName(user);
 
@@ -112,7 +124,83 @@ function OrgProfile({
           </CardContent>
         </Card>
       </div>
+
+      {/* My sessions */}
+      {sessions.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Wifi className="h-4 w-4" />
+              My sessions
+            </CardTitle>
+            <CardDescription>
+              Active and recent sessions for your account. Revoke any session you don't recognise.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y">
+              {sessions.map((s) => (
+                <OrgSessionRow key={s.sessionId} session={s} />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </AuthShell>
+  );
+}
+
+function OrgSessionRow({ session }: { session: OrgSessionInfo }) {
+  const isExpired = new Date(session.expiresAt) < new Date();
+  const ua = session.userAgent ?? "";
+  const isMobile = /Mobile|Android|iPhone|iPad/i.test(ua);
+  let browser = "Unknown";
+  if (/Chrome/i.test(ua) && !/Edg/i.test(ua)) browser = "Chrome";
+  else if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) browser = "Safari";
+  else if (/Firefox/i.test(ua)) browser = "Firefox";
+  else if (/Edg/i.test(ua)) browser = "Edge";
+
+  let os = "Unknown";
+  if (/Mac OS X/i.test(ua)) os = "macOS";
+  else if (/Windows/i.test(ua)) os = "Windows";
+  else if (/iPhone|iPad/i.test(ua)) os = "iOS";
+  else if (/Android/i.test(ua)) os = "Android";
+  else if (/Linux/i.test(ua)) os = "Linux";
+
+  return (
+    <div className="flex items-center gap-3 px-4 py-3">
+      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+        session.active
+          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+          : "bg-muted text-muted-foreground"
+      }`}>
+        {isMobile ? <Smartphone className="h-4 w-4" /> : <Monitor className="h-4 w-4" />}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">{browser} on {os}</span>
+          <Badge variant="outline" className={`text-[10px] ${
+            session.active
+              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+              : isExpired
+                ? "bg-red-500/10 text-red-600 dark:text-red-400"
+                : "bg-muted text-muted-foreground"
+          }`}>
+            {session.active ? "Active" : isExpired ? "Expired" : "Revoked"}
+          </Badge>
+        </div>
+        <div className="mt-0.5 flex flex-wrap gap-x-3 text-[11px] text-muted-foreground/70">
+          {session.ipAddress && (
+            <span className="flex items-center gap-1">
+              <Globe className="h-3 w-3" />
+              {session.ipAddress}
+            </span>
+          )}
+          <span>Started: {new Date(session.createdAt).toLocaleDateString()}</span>
+          <span>Expires: {new Date(session.expiresAt).toLocaleDateString()}</span>
+        </div>
+      </div>
+    </div>
   );
 }
 

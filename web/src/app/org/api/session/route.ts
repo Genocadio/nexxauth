@@ -48,7 +48,8 @@ export async function GET(request: NextRequest) {
   if (me.status === 401) {
     if (!refreshToken) return unauthenticated();
 
-    const rotated = await serverOrgRefresh(platformSlug, refreshToken);
+    const userAgent = request.headers.get("user-agent") ?? undefined;
+    const rotated = await serverOrgRefresh(platformSlug, refreshToken, userAgent);
     if (!rotated.ok) {
       // Refresh token itself rejected (401) — the session is dead, clear the
       // cookies. Any other failure is transient and keeps them.

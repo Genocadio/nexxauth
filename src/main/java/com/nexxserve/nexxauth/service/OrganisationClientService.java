@@ -4,6 +4,8 @@ import com.nexxserve.nexxauth.dto.request.CreateOrganisationClientRequest;
 import com.nexxserve.nexxauth.dto.request.UpdateOrganisationClientRequest;
 import com.nexxserve.nexxauth.dto.response.OrganisationClientResponse;
 import com.nexxserve.nexxauth.entity.ClientType;
+import com.nexxserve.nexxauth.entity.LogCategory;
+import com.nexxserve.nexxauth.entity.LogLevel;
 import com.nexxserve.nexxauth.entity.Organisation;
 import com.nexxserve.nexxauth.entity.OrganisationClient;
 import com.nexxserve.nexxauth.entity.Platform;
@@ -43,17 +45,20 @@ public class OrganisationClientService {
     private final PlatformAccess platformAccess;
     private final OrganisationAccess organisationAccess;
     private final ObjectMapper objectMapper;
+    private final AuthAuditService audit;
 
     public OrganisationClientService(OrganisationClientRepository clientRepository,
                                      OrganisationClientMapper clientMapper,
                                      PlatformAccess platformAccess,
                                      OrganisationAccess organisationAccess,
-                                     ObjectMapper objectMapper) {
+                                     ObjectMapper objectMapper,
+                                     AuthAuditService audit) {
         this.clientRepository = clientRepository;
         this.clientMapper = clientMapper;
         this.platformAccess = platformAccess;
         this.organisationAccess = organisationAccess;
         this.objectMapper = objectMapper;
+        this.audit = audit;
     }
 
     @Transactional(readOnly = true)
@@ -99,7 +104,10 @@ public class OrganisationClientService {
             token = ClientTokens.generate();
             client.setTokenHash(ClientTokens.hash(token));
         }
-        return toResponse(clientRepository.save(client), token);
+        OrganisationClient saved = clientRepository.save(client);
+        audit.logPersisted(LogLevel.INFO, LogCategory.CONFIG, AuthAuditService.ORG_CLIENT_CREATED, null,
+                organisation.getSlug(), organisation.getId(), saved.getName());
+        return toResponse(saved, token);
     }
 
     @Transactional
@@ -150,13 +158,19 @@ public class OrganisationClientService {
         if (request.maxSessionsPerUser() != null) {
             client.setMaxSessionsPerUser(request.maxSessionsPerUser() > 0 ? request.maxSessionsPerUser() : null);
         }
-        return toResponse(clientRepository.save(client), newToken);
+        OrganisationClient saved = clientRepository.save(client);
+        audit.logPersisted(LogLevel.INFO, LogCategory.CONFIG, AuthAuditService.ORG_CLIENT_UPDATED, null,
+                organisation.getSlug(), organisation.getId(), saved.getName());
+        return toResponse(saved, newToken);
     }
 
     @Transactional
     public void delete(String platformSlug, Long organisationId, String clientKey, OrgActor requester) {
         Organisation organisation = resolve(platformSlug, organisationId, requester, true);
-        clientRepository.delete(findClientEntity(organisation, clientKey));
+        OrganisationClient client = findClientEntity(organisation, clientKey);
+        audit.logPersisted(LogLevel.INFO, LogCategory.CONFIG, AuthAuditService.ORG_CLIENT_DELETED, null,
+                organisation.getSlug(), organisation.getId(), client.getName());
+        clientRepository.delete(client);
     }
 
     @Transactional
@@ -169,7 +183,10 @@ public class OrganisationClientService {
         }
         String token = ClientTokens.generate();
         client.setTokenHash(ClientTokens.hash(token));
-        return toResponse(clientRepository.save(client), token);
+        OrganisationClient saved = clientRepository.save(client);
+        audit.logPersisted(LogLevel.INFO, LogCategory.SECURITY, AuthAuditService.ORG_CLIENT_TOKEN_ROTATED, null,
+                organisation.getSlug(), organisation.getId(), client.getName());
+        return toResponse(saved, token);
     }
 
     // --- type rules --------------------------------------------------------

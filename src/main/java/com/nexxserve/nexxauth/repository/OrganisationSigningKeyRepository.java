@@ -13,4 +13,6 @@ public interface OrganisationSigningKeyRepository extends JpaRepository<Organisa
     Optional<OrganisationSigningKey> findByOrganisationIdAndActiveTrue(Long organisationId);
 
     List<OrganisationSigningKey> findByOrganisationIdOrderByCreatedAtAsc(Long organisationId);
+
+    long countByOrganisationId(Long organisationId);
 }

@@ -36,4 +36,6 @@ public interface OrganisationUserRepository extends JpaRepository<OrganisationUs
     boolean existsByOrganisationIdAndEmail(Long organisationId, String email);
 
     boolean existsByOrganisationIdAndPhone(Long organisationId, String phone);
+
+    long countByOrganisationId(Long organisationId);
 }

@@ -1,6 +1,6 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   ORG_ACCESS_COOKIE,
@@ -36,7 +36,9 @@ export async function loginOrg(input: OrgLoginInput): Promise<OrgLoginResult> {
   }
   const { platformSlug, organisationId, identifier, password } = input;
 
-  const result = await serverOrgLogin(platformSlug, { organisationId, identifier, password });
+  const headerStore = await headers();
+  const userAgent = headerStore.get("user-agent") ?? undefined;
+  const result = await serverOrgLogin(platformSlug, { organisationId, identifier, password }, userAgent);
   if (!result.ok) return { ok: false, error: result.error };
 
   const cookieStore = await cookies();

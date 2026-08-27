@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { authApi } from "@/api/auth";
 import { organisationsApi } from "@/api/organisations";
+import { sessionsApi } from "@/api/sessions";
 import { platformApi } from "@/api/platform";
 import { queryKeys } from "@/lib/query-keys";
 import { selectPlatformSession, useAppSelector } from "@/store/store";
@@ -126,5 +127,15 @@ export function useOrgClients(organisationId: number) {
     queryKey: queryKeys.orgClients(organisationId),
     queryFn: () => organisationsApi.clients(platformSlug!, organisationId),
     enabled: !!platformSlug && !!organisationId,
+  });
+}
+
+export function useOrgSessions(organisationId: number, userId?: number, clientKey?: string) {
+  const platformSlug = usePlatformSlug();
+  return useQuery({
+    queryKey: [...queryKeys.orgSessions(organisationId, userId), clientKey ?? "all"],
+    queryFn: () => sessionsApi.list(platformSlug!, organisationId, userId, clientKey),
+    enabled: !!platformSlug && !!organisationId,
+    refetchInterval: 30_000, // auto-refresh every 30s
   });
 }

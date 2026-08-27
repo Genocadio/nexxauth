@@ -61,6 +61,8 @@ public class SecurityConfig {
                         // or org user); the fine-grained platform-role and
                         // org-permission gating happens at method level.
                         .requestMatchers("/*/organisations/**").authenticated()
+                        // Log endpoints (read-only access for platform members).
+                        .requestMatchers("/*/logs/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/users/**").hasAnyRole("SUPER_USER", "READ_ONLY")
                         .requestMatchers("/users/**").hasRole("SUPER_USER")
                         // Own-profile endpoints are open to any authenticated

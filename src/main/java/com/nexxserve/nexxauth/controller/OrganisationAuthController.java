@@ -5,7 +5,10 @@ import com.nexxserve.nexxauth.dto.request.OrgLoginRequest;
 import com.nexxserve.nexxauth.dto.request.OrgRegisterRequest;
 import com.nexxserve.nexxauth.dto.request.RefreshTokenRequest;
 import com.nexxserve.nexxauth.dto.response.OrgAuthResponse;
+import com.nexxserve.nexxauth.security.RateLimitProperties;
 import com.nexxserve.nexxauth.service.OrganisationAuthService;
+import com.nexxserve.nexxauth.util.ClientIps;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -34,30 +37,37 @@ public class OrganisationAuthController {
     static final String CLIENT_ID_HEADER = "X-Client-Id";
 
     private final OrganisationAuthService authService;
+    private final RateLimitProperties rateLimitProperties;
 
-    public OrganisationAuthController(OrganisationAuthService authService) {
+    public OrganisationAuthController(OrganisationAuthService authService,
+                                      RateLimitProperties rateLimitProperties) {
         this.authService = authService;
+        this.rateLimitProperties = rateLimitProperties;
     }
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
     public OrgAuthResponse register(@PathVariable String slug,
                                     @RequestHeader(value = CLIENT_ID_HEADER, required = false) String clientId,
-                                    @Valid @RequestBody OrgRegisterRequest request) {
-        return authService.register(slug, request, clientId);
+                                    @Valid @RequestBody OrgRegisterRequest request,
+                                    HttpServletRequest httpRequest) {
+        return authService.register(slug, request, clientId, resolveIp(httpRequest), httpRequest.getHeader("User-Agent"));
     }
 
     @PostMapping("/login")
     public OrgAuthResponse login(@PathVariable String slug,
                                  @RequestHeader(value = CLIENT_ID_HEADER, required = false) String clientId,
-                                 @Valid @RequestBody OrgLoginRequest request) {
-        return authService.login(slug, request, clientId);
+                                 @Valid @RequestBody OrgLoginRequest request,
+                                 HttpServletRequest httpRequest) {
+        return authService.login(slug, request, clientId, resolveIp(httpRequest), httpRequest.getHeader("User-Agent"));
     }
 
     @PostMapping("/refresh")
     public OrgAuthResponse refresh(@PathVariable String slug,
-                                   @Valid @RequestBody RefreshTokenRequest request) {
-        return authService.refresh(slug, request.refreshToken());
+                                   @Valid @RequestBody RefreshTokenRequest request,
+                                   HttpServletRequest httpRequest) {
+        return authService.refresh(slug, request.refreshToken(),
+                resolveIp(httpRequest), httpRequest.getHeader("User-Agent"));
     }
 
     @PostMapping("/logout")
@@ -66,5 +76,9 @@ public class OrganisationAuthController {
                                        @Valid @RequestBody LogoutRequest request) {
         authService.logout(slug, request.refreshToken());
         return ResponseEntity.noContent().build();
+    }
+
+    private String resolveIp(HttpServletRequest request) {
+        return ClientIps.resolve(request, rateLimitProperties.isUseForwardedFor());
     }
 }

@@ -1,5 +1,7 @@
 package com.nexxserve.nexxauth.service;
 
+import com.nexxserve.nexxauth.entity.LogCategory;
+import com.nexxserve.nexxauth.entity.LogLevel;
 import com.nexxserve.nexxauth.security.RateLimitProperties;
 import com.nexxserve.nexxauth.util.ClientIps;
 import jakarta.servlet.http.HttpServletRequest;
@@ -34,9 +36,11 @@ public class AuthAuditService {
     private static final Logger AUDIT = LoggerFactory.getLogger(LOGGER_NAME);
 
     private final RateLimitProperties rateLimitProperties;
+    private final LogService logService;
 
-    public AuthAuditService(RateLimitProperties rateLimitProperties) {
+    public AuthAuditService(RateLimitProperties rateLimitProperties, LogService logService) {
         this.rateLimitProperties = rateLimitProperties;
+        this.logService = logService;
     }
 
     /** Platform auth events. */
@@ -64,6 +68,36 @@ public class AuthAuditService {
     public static final String ORG_USER_FIELD_UPDATED = "ORG_USER_FIELD_UPDATED";
     public static final String ORG_USER_FIELD_DELETED = "ORG_USER_FIELD_DELETED";
 
+    /** User management events (platform + org). */
+    public static final String PLATFORM_USER_ADDED = "PLATFORM_USER_ADDED";
+    public static final String ORG_USER_CREATED = "ORG_USER_CREATED";
+    public static final String ORG_USER_UPDATED = "ORG_USER_UPDATED";
+    public static final String ORG_USER_DELETED = "ORG_USER_DELETED";
+
+    /** Organisation management events. */
+    public static final String ORG_CREATED = "ORG_CREATED";
+    public static final String ORG_UPDATED = "ORG_UPDATED";
+    public static final String ORG_DELETED = "ORG_DELETED";
+
+    /** Organisation role events. */
+    public static final String ORG_ROLE_CREATED = "ORG_ROLE_CREATED";
+    public static final String ORG_ROLE_UPDATED = "ORG_ROLE_UPDATED";
+    public static final String ORG_ROLE_DELETED = "ORG_ROLE_DELETED";
+
+    /** Organisation client events. */
+    public static final String ORG_CLIENT_CREATED = "ORG_CLIENT_CREATED";
+    public static final String ORG_CLIENT_UPDATED = "ORG_CLIENT_UPDATED";
+    public static final String ORG_CLIENT_DELETED = "ORG_CLIENT_DELETED";
+    public static final String ORG_CLIENT_TOKEN_ROTATED = "ORG_CLIENT_TOKEN_ROTATED";
+
+    /** Organisation session events. */
+    public static final String ORG_SESSION_REVOKED = "ORG_SESSION_REVOKED";
+    public static final String ORG_SESSIONS_REVOKED_ALL = "ORG_SESSIONS_REVOKED_ALL";
+
+    /** Risk / security events. */
+    public static final String RATE_LIMIT_EXCEEDED = "RATE_LIMIT_EXCEEDED";
+    public static final String CORS_ORIGIN_REJECTED = "CORS_ORIGIN_REJECTED";
+
     public void log(String event, String actor, String organisation) {
         log(event, actor, organisation, null);
     }
@@ -76,6 +110,49 @@ public class AuthAuditService {
         AUDIT.info("AUDIT event={} actor={} organisation={} detail={} ip={}",
                 event, sanitize(actor), organisation == null ? "-" : organisation,
                 sanitize(detail) == null ? "-" : sanitize(detail), ip);
+    }
+
+    /**
+     * Persist and broadcast a log entry to SSE clients, in addition to the
+     * console log line above. Organisation-scoped events pass the org id;
+     * platform-level events pass {@code null}.
+     */
+    public void logPersisted(LogLevel level, LogCategory category, String event, String actor,
+                             String organisationSlug, Long organisationId, String detail) {
+        // Still emit the console line with the slug (tests assert on this format)
+        HttpServletRequest request = currentRequest();
+        String ip = request != null
+                ? ClientIps.resolve(request, useForwardedFor(request))
+                : "-";
+        AUDIT.info("AUDIT event={} actor={} organisation={} detail={} ip={}",
+                event, sanitize(actor), organisationSlug == null ? "-" : organisationSlug,
+                sanitize(detail) == null ? "-" : sanitize(detail), ip);
+
+        // Persist to the log_entries table and broadcast via SSE
+        try {
+            logService.logEvent(level, category, event, sanitize(event),
+                    null, organisationId, sanitize(actor), sanitize(detail), null, null);
+        } catch (Exception e) {
+            // Never let logging break the caller
+            AUDIT.warn("Failed to persist log entry: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Log a risk event from a servlet filter where the request context may
+     * not be fully available. Accepts IP and domain explicitly.
+     */
+    public void logRisk(LogLevel level, String event, String ip, String domain, String detail) {
+        AUDIT.warn("AUDIT event={} ip={} domain={} detail={}",
+                event, ip == null ? "-" : ip,
+                domain == null ? "-" : domain,
+                sanitize(detail) == null ? "-" : sanitize(detail));
+        try {
+            logService.logEvent(level, LogCategory.SECURITY, event, sanitize(event),
+                    null, null, "system", sanitize(detail), null, domain);
+        } catch (Exception e) {
+            AUDIT.warn("Failed to persist risk log entry: {}", e.getMessage());
+        }
     }
 
     /** Strips control characters from attacker-controllable values (login

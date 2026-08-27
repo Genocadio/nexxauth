@@ -3,6 +3,8 @@ package com.nexxserve.nexxauth.service;
 import com.nexxserve.nexxauth.dto.request.CreateOrganisationRequest;
 import com.nexxserve.nexxauth.dto.request.UpdateOrganisationRequest;
 import com.nexxserve.nexxauth.dto.response.OrganisationResponse;
+import com.nexxserve.nexxauth.entity.LogCategory;
+import com.nexxserve.nexxauth.entity.LogLevel;
 import com.nexxserve.nexxauth.entity.Organisation;
 import com.nexxserve.nexxauth.entity.Platform;
 import com.nexxserve.nexxauth.exception.BadRequestException;
@@ -31,15 +33,17 @@ public class OrganisationService {
     private final OrganisationAccess organisationAccess;
     private final OrganisationMapper organisationMapper;
     private final OrgKeyService orgKeyService;
+    private final AuthAuditService audit;
 
     public OrganisationService(OrganisationRepository organisationRepository, PlatformAccess platformAccess,
                                OrganisationAccess organisationAccess, OrganisationMapper organisationMapper,
-                               OrgKeyService orgKeyService) {
+                               OrgKeyService orgKeyService, AuthAuditService audit) {
         this.organisationRepository = organisationRepository;
         this.platformAccess = platformAccess;
         this.organisationAccess = organisationAccess;
         this.organisationMapper = organisationMapper;
         this.orgKeyService = orgKeyService;
+        this.audit = audit;
     }
 
     @Transactional(readOnly = true)
@@ -87,8 +91,9 @@ public class OrganisationService {
         organisation.setPlatform(platform);
         organisation.setSlug(slug);
         Organisation saved = organisationRepository.save(organisation);
-        // Creating an organisation provisions the key pair that signs its tokens.
         orgKeyService.activeKey(saved);
+        audit.logPersisted(LogLevel.INFO, LogCategory.ORG_MANAGEMENT, AuthAuditService.ORG_CREATED, null,
+                saved.getSlug(), saved.getId(), saved.getName());
         return organisationMapper.toResponse(saved);
     }
 
@@ -141,7 +146,10 @@ public class OrganisationService {
             }
             organisation.setSlug(request.slug());
         }
-        return organisationMapper.toResponse(organisationRepository.save(organisation));
+        Organisation saved = organisationRepository.save(organisation);
+        audit.logPersisted(LogLevel.INFO, LogCategory.ORG_MANAGEMENT, AuthAuditService.ORG_UPDATED, null,
+                saved.getSlug(), saved.getId(), null);
+        return organisationMapper.toResponse(saved);
     }
 
     /** Legacy {@code useEmailAsUsername} switch mapped onto the per-identifier
@@ -160,6 +168,9 @@ public class OrganisationService {
     public void delete(String platformSlug, Long organisationId, OrgActor requester) {
         Platform platform = platformAccess.findPlatform(platformSlug);
         platformAccess.requireSuperUser(platform, requester);
-        organisationRepository.delete(organisationAccess.findOrganisationById(organisationId));
+        Organisation org = organisationAccess.findOrganisationById(organisationId);
+        audit.logPersisted(LogLevel.INFO, LogCategory.ORG_MANAGEMENT, AuthAuditService.ORG_DELETED, null,
+                org.getSlug(), org.getId(), org.getName());
+        organisationRepository.delete(org);
     }
 }

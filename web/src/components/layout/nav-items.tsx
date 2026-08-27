@@ -4,6 +4,8 @@ import { Suspense } from "react";
 import {
   AppWindow,
   BookOpen,
+  FileText,
+  Fingerprint,
   KeyRound,
   LayoutDashboard,
   Layers,
@@ -32,6 +34,7 @@ export interface OrgNavItem {
 export const CONSOLE_NAV: NavItem[] = [
   { href: "/console/overview", label: "Overview", icon: LayoutDashboard },
   { href: "/console/users", label: "Users", icon: Users },
+  { href: "/console/logs", label: "Logs", icon: FileText },
   { href: "/console/profile", label: "Profile & security", icon: Settings },
 ];
 
@@ -42,6 +45,7 @@ export const ORG_NAV: OrgNavItem[] = [
   { tab: "fields", label: "Fields", icon: Layers, section: "Configuration" },
   { tab: "keys", label: "Keys", icon: KeyRound, section: "Security" },
   { tab: "clients", label: "Clients", icon: AppWindow },
+  { tab: "sessions", label: "Sessions", icon: Fingerprint },
   { tab: "settings", label: "Settings", icon: Settings },
 ];
 

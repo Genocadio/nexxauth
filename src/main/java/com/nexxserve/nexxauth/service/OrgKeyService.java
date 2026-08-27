@@ -2,6 +2,8 @@ package com.nexxserve.nexxauth.service;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.nexxserve.nexxauth.entity.LogCategory;
+import com.nexxserve.nexxauth.entity.LogLevel;
 import com.nexxserve.nexxauth.entity.Organisation;
 import com.nexxserve.nexxauth.entity.OrganisationSigningKey;
 import com.nexxserve.nexxauth.exception.ResourceNotFoundException;
@@ -100,7 +102,7 @@ public class OrgKeyService {
                     keyRepository.save(key);
                 });
         OrganisationSigningKey key = save(generate(organisation));
-        audit.log(AuthAuditService.ORG_KEY_ROTATED, null, organisation.getSlug());
+        audit.logPersisted(LogLevel.INFO, LogCategory.SECURITY, AuthAuditService.ORG_KEY_ROTATED, null, organisation.getSlug(), organisation.getId(), null);
         return key;
     }
 

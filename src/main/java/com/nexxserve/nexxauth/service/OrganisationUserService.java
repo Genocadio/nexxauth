@@ -5,6 +5,8 @@ import com.nexxserve.nexxauth.dto.request.CreateOrganisationUserRequest;
 import com.nexxserve.nexxauth.dto.request.UpdateOrganisationUserRequest;
 import com.nexxserve.nexxauth.dto.request.UpdateOwnProfileRequest;
 import com.nexxserve.nexxauth.dto.response.OrganisationUserResponse;
+import com.nexxserve.nexxauth.entity.LogCategory;
+import com.nexxserve.nexxauth.entity.LogLevel;
 import com.nexxserve.nexxauth.entity.Organisation;
 import com.nexxserve.nexxauth.entity.OrganisationRole;
 import com.nexxserve.nexxauth.entity.OrganisationUser;
@@ -143,6 +145,8 @@ public class OrganisationUserService {
             // change it at first login (CHANGE_PASSWORD action).
             saved.setTemporaryPassword(Boolean.TRUE.equals(request.temporaryPassword()));
         }
+        audit.logPersisted(LogLevel.INFO, LogCategory.USER_MANAGEMENT, AuthAuditService.ORG_USER_CREATED,
+                identifierOf(saved), organisation.getSlug(), organisation.getId(), null);
         return userMapper.toResponse(saved, userFieldService.readMetadata(saved.getId()));
     }
 
@@ -219,13 +223,19 @@ public class OrganisationUserService {
         if (request.metadata() != null) {
             userFieldService.setMetadata(user, request.metadata());
         }
-        return userMapper.toResponse(userRepository.save(user), userFieldService.readMetadata(user.getId()));
+        OrganisationUser saved = userRepository.save(user);
+        audit.logPersisted(LogLevel.INFO, LogCategory.USER_MANAGEMENT, AuthAuditService.ORG_USER_UPDATED,
+                identifierOf(saved), organisation.getSlug(), organisation.getId(), null);
+        return userMapper.toResponse(saved, userFieldService.readMetadata(saved.getId()));
     }
 
     @Transactional
     public void delete(String platformSlug, Long organisationId, Long userId, OrgActor requester) {
         Organisation organisation = resolve(platformSlug, organisationId, requester, true, Permission.ORGANISATION_USER_DELETE);
-        userRepository.delete(findUser(organisation, userId));
+        OrganisationUser user = findUser(organisation, userId);
+        audit.logPersisted(LogLevel.INFO, LogCategory.USER_MANAGEMENT, AuthAuditService.ORG_USER_DELETED,
+                identifierOf(user), organisation.getSlug(), organisation.getId(), null);
+        userRepository.delete(user);
     }
 
     /** Self-service password change (any org user, regardless of permissions).
@@ -246,8 +256,8 @@ public class OrganisationUserService {
         // Force re-authentication: revoke every outstanding refresh token so no
         // session survives under the old password.
         refreshTokenService.revokeAllForUser(user.getId());
-        audit.log(AuthAuditService.ORG_PASSWORD_CHANGED,
-                identifierOf(user), user.getOrganisation().getSlug());
+        audit.logPersisted(LogLevel.INFO, LogCategory.AUTH, AuthAuditService.ORG_PASSWORD_CHANGED,
+                identifierOf(user), user.getOrganisation().getSlug(), user.getOrganisation().getId(), null);
     }
 
     /** Self-service partial profile update (any org user, regardless of

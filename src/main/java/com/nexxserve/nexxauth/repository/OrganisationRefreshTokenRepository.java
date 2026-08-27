@@ -36,4 +36,96 @@ public interface OrganisationRefreshTokenRepository extends JpaRepository<Organi
             update OrganisationRefreshToken rt set rt.revokedAt = :now
             where rt.organisationUser.id = :userId and rt.revokedAt is null""")
     void revokeAllForUser(@Param("userId") Long userId, @Param("now") Instant now);
+
+    // -------------------------------------------------------------------------
+    // Session management queries
+    // -------------------------------------------------------------------------
+
+    /** All tokens (any state) for a given session id. */
+    List<OrganisationRefreshToken> findBySessionId(String sessionId);
+
+    /** Active tokens for a given session id (not revoked, not evicted, not expired). */
+    @Query("""
+            select rt from OrganisationRefreshToken rt
+            where rt.sessionId = :sessionId and rt.revokedAt is null and rt.evictedAt is null
+              and rt.expiresAt > :now""")
+    List<OrganisationRefreshToken> findActiveBySessionId(@Param("sessionId") String sessionId,
+                                                         @Param("now") Instant now);
+
+    /** Find existing active session by user + IP + user-agent for dedup. */
+    @Query("""
+            select rt from OrganisationRefreshToken rt
+            where rt.organisationUser.id = :userId
+              and rt.ipAddress = :ipAddress
+              and rt.userAgent = :userAgent
+              and rt.sessionId is not null
+              and rt.revokedAt is null and rt.evictedAt is null
+              and rt.expiresAt > :now
+            order by rt.createdAt desc""")
+    List<OrganisationRefreshToken> findActiveByUserAndIpAndAgent(
+            @Param("userId") Long userId,
+            @Param("ipAddress") String ipAddress,
+            @Param("userAgent") String userAgent,
+            @Param("now") Instant now);
+
+    /** All active tokens for a user within an organisation. */
+    @Query("""
+            select rt from OrganisationRefreshToken rt
+            where rt.organisationUser.organisation.id = :organisationId
+              and rt.revokedAt is null and rt.evictedAt is null
+              and rt.expiresAt > :now
+            order by rt.sessionId, rt.expiresAt desc""")
+    List<OrganisationRefreshToken> findActiveByOrganisationId(@Param("organisationId") Long organisationId,
+                                                              @Param("now") Instant now);
+
+    /** All active tokens for a specific user within an organisation. */
+    @Query("""
+            select rt from OrganisationRefreshToken rt
+            where rt.organisationUser.organisation.id = :organisationId
+              and rt.organisationUser.id = :userId
+              and rt.revokedAt is null and rt.evictedAt is null
+              and rt.expiresAt > :now
+            order by rt.sessionId, rt.expiresAt desc""")
+    List<OrganisationRefreshToken> findActiveByOrganisationIdAndUserId(
+            @Param("organisationId") Long organisationId,
+            @Param("userId") Long userId,
+            @Param("now") Instant now);
+
+    /** Revoke all tokens for a session. */
+    @Modifying
+    @Query("""
+            update OrganisationRefreshToken rt set rt.revokedAt = :now
+            where rt.sessionId = :sessionId and rt.revokedAt is null""")
+    void revokeBySessionId(@Param("sessionId") String sessionId, @Param("now") Instant now);
+
+    /** Revoke all tokens for a session that belong to a specific user. */
+    @Modifying
+    @Query("""
+            update OrganisationRefreshToken rt set rt.revokedAt = :now
+            where rt.sessionId = :sessionId
+              and rt.organisationUser.id = :userId
+              and rt.revokedAt is null""")
+    void revokeBySessionIdAndUserId(@Param("sessionId") String sessionId,
+                                    @Param("userId") Long userId,
+                                    @Param("now") Instant now);
+
+    /** Count active sessions (distinct session_ids) for a user in an org. */
+    @Query("""
+            select count(distinct rt.sessionId) from OrganisationRefreshToken rt
+            where rt.organisationUser.id = :userId
+              and rt.sessionId is not null
+              and rt.revokedAt is null and rt.evictedAt is null
+              and rt.expiresAt > :now""")
+    long countActiveSessionsByUserId(@Param("userId") Long userId, @Param("now") Instant now);
+
+    /** All tokens for a session, including revoked/expired, ordered by creation. */
+    List<OrganisationRefreshToken> findBySessionIdOrderByCreatedAtAsc(String sessionId);
+
+    /** Count active tokens for an organisation (not revoked, not evicted, not expired). */
+    @Query("""
+            select count(rt) from OrganisationRefreshToken rt
+            where rt.organisationUser.organisation.id = :organisationId
+              and rt.revokedAt is null and rt.evictedAt is null
+              and rt.expiresAt > :now""")
+    long countActiveByOrganisationId(@Param("organisationId") Long organisationId, @Param("now") Instant now);
 }

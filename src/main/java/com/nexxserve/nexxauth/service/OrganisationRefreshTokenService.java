@@ -1,5 +1,7 @@
 package com.nexxserve.nexxauth.service;
 
+import com.nexxserve.nexxauth.entity.LogCategory;
+import com.nexxserve.nexxauth.entity.LogLevel;
 import com.nexxserve.nexxauth.entity.Organisation;
 import com.nexxserve.nexxauth.entity.OrganisationClient;
 import com.nexxserve.nexxauth.entity.OrganisationRefreshToken;
@@ -83,12 +85,37 @@ public class OrganisationRefreshTokenService
      */
     @Transactional
     public String issueWithClient(OrganisationUser subject, Duration ttl, String clientKey) {
+        return issueWithClient(subject, ttl, clientKey, null, null, null);
+    }
+
+    /**
+     * Issues a refresh token with full session context: client, IP, user-agent
+     * and session id. All parameters are nullable (backwards-compatible with
+     * the simpler overload above).
+     */
+    @Transactional
+    public String issueWithClient(OrganisationUser subject, Duration ttl, String clientKey,
+                                  String ipAddress, String userAgent, String sessionId) {
         String rawToken = RefreshTokens.generateRaw();
         OrganisationRefreshToken token = createToken(subject, RefreshTokens.hash(rawToken),
                 Instant.now().plus(ttl));
         token.setClientKey(clientKey);
+        token.setIpAddress(ipAddress);
+        token.setUserAgent(userAgent);
+        token.setSessionId(sessionId);
         save(token);
         return rawToken;
+    }
+
+    /**
+     * Look up the session id of an existing token (for carrying forward on
+     * rotation). Returns null for legacy tokens.
+     */
+    @Transactional(readOnly = true)
+    public String sessionIdOf(String rawToken) {
+        return refreshTokenRepository.findByTokenHash(RefreshTokens.hash(rawToken))
+                .map(OrganisationRefreshToken::getSessionId)
+                .orElse(null);
     }
 
     /** Returns the client that originally issued this token, or null. */
@@ -167,8 +194,8 @@ public class OrganisationRefreshTokenService
 
     @Override
     protected void onReuseDetected(OrganisationUser subject) {
-        audit.log(AuthAuditService.ORG_TOKEN_REUSE,
-                identifierOf(subject), subject.getOrganisation().getSlug());
+        audit.logPersisted(LogLevel.ERROR, LogCategory.SECURITY, AuthAuditService.ORG_TOKEN_REUSE,
+                identifierOf(subject), subject.getOrganisation().getSlug(), subject.getOrganisation().getId(), "token reuse detected");
     }
 
     private String identifierOf(OrganisationUser user) {

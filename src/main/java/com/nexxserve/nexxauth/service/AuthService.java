@@ -6,6 +6,8 @@ import com.nexxserve.nexxauth.dto.request.RegisterRequest;
 import com.nexxserve.nexxauth.dto.request.UpdateProfileRequest;
 import com.nexxserve.nexxauth.dto.response.AuthResponse;
 import com.nexxserve.nexxauth.dto.response.PlatformUserResponse;
+import com.nexxserve.nexxauth.entity.LogCategory;
+import com.nexxserve.nexxauth.entity.LogLevel;
 import com.nexxserve.nexxauth.entity.PlatformUser;
 import com.nexxserve.nexxauth.exception.ConflictException;
 import com.nexxserve.nexxauth.exception.InvalidCredentialsException;
@@ -49,9 +51,6 @@ public class AuthService {
         this.authTiming = authTiming;
     }
 
-    /**
-     * Signup: creates a new platform and registers the caller as its super user.
-     */
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         String email = Emails.normalize(request.email());
@@ -63,55 +62,49 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(request.password()));
         PlatformUser saved = platformService.createPlatformWithOwner(
                 request.platformName(), request.platformSlug(), user);
-        audit.log(AuthAuditService.PLATFORM_REGISTER, saved.getEmail(), saved.getPlatform().getSlug());
+        audit.logPersisted(LogLevel.INFO, LogCategory.AUTH, AuthAuditService.PLATFORM_REGISTER,
+                saved.getEmail(), null, null, null);
         return issueTokens(saved);
     }
 
-    /**
-     * Not read-only: login persists a fresh refresh token.
-     */
     @Transactional
     public AuthResponse login(LoginRequest request) {
         String email = Emails.normalize(request.email());
         PlatformUser user = platformUserRepository.findByEmail(email)
                 .orElseThrow(() -> {
-                    audit.log(AuthAuditService.PLATFORM_LOGIN_FAILURE, email, null);
-                    // Burn the same BCrypt cost as a real check so unknown and
-                    // known accounts answer in the same time.
+                    audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY, AuthAuditService.PLATFORM_LOGIN_FAILURE,
+                            email, null, null, "unknown_email");
                     authTiming.equalsUnknown(request.password());
                     return new InvalidCredentialsException();
                 });
         boolean passwordMatches = passwordEncoder.matches(request.password(), user.getPassword());
         if (!user.isEnabled() || !passwordMatches) {
-            audit.log(AuthAuditService.PLATFORM_LOGIN_FAILURE, email, user.getPlatform().getSlug());
+            audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY, AuthAuditService.PLATFORM_LOGIN_FAILURE,
+                    email, null, null, !user.isEnabled() ? "account_disabled" : "bad_password");
             if (!user.isEnabled()) {
-                audit.log(AuthAuditService.PLATFORM_DISABLED, email, user.getPlatform().getSlug());
+                audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY, AuthAuditService.PLATFORM_DISABLED,
+                        email, null, null, null);
             }
             throw new InvalidCredentialsException();
         }
-        audit.log(AuthAuditService.PLATFORM_LOGIN_SUCCESS, email, user.getPlatform().getSlug());
+        audit.logPersisted(LogLevel.INFO, LogCategory.AUTH, AuthAuditService.PLATFORM_LOGIN_SUCCESS,
+                email, null, null, null);
         return issueTokens(user);
     }
 
-    /**
-     * Rotates the refresh token and issues a fresh access token. The user is
-     * resolved before rotation since rotation revokes the presented token.
-     */
     @Transactional
     public AuthResponse refresh(String rawRefreshToken) {
         var rotation = refreshTokenService.rotateWithSubject(rawRefreshToken);
-        audit.log(AuthAuditService.PLATFORM_REFRESH,
-                rotation.subject().getEmail(), rotation.subject().getPlatform().getSlug());
+        audit.logPersisted(LogLevel.INFO, LogCategory.AUTH, AuthAuditService.PLATFORM_REFRESH,
+                rotation.subject().getEmail(), null, null, null);
         return issueTokens(rotation.subject(), rotation.newToken());
     }
 
     @Transactional
     public void logout(String rawRefreshToken) {
-        // Attribute first (revoking would make the token unresolvable), then
-        // revoke. Idempotent: an unknown/already-revoked token still logs out
-        // with a 204 and simply has no audit actor.
         refreshTokenService.findSubjectForAudit(rawRefreshToken).ifPresent(user ->
-                audit.log(AuthAuditService.PLATFORM_LOGOUT, user.getEmail(), user.getPlatform().getSlug()));
+                audit.logPersisted(LogLevel.INFO, LogCategory.AUTH, AuthAuditService.PLATFORM_LOGOUT,
+                        user.getEmail(), null, null, null));
         refreshTokenService.revoke(rawRefreshToken);
     }
 
@@ -124,15 +117,9 @@ public class AuthService {
     @Transactional
     public PlatformUserResponse updateProfile(AuthenticatedUser requester, UpdateProfileRequest request) {
         PlatformUser user = findById(requester.id());
-        if (request.firstName() != null) {
-            user.setFirstName(request.firstName());
-        }
-        if (request.lastName() != null) {
-            user.setLastName(request.lastName());
-        }
-        if (request.phone() != null) {
-            user.setPhone(request.phone());
-        }
+        if (request.firstName() != null) user.setFirstName(request.firstName());
+        if (request.lastName() != null) user.setLastName(request.lastName());
+        if (request.phone() != null) user.setPhone(request.phone());
         return platformUserMapper.toResponse(platformUserRepository.save(user));
     }
 
@@ -142,13 +129,11 @@ public class AuthService {
         if (!passwordEncoder.matches(request.currentPassword(), user.getPassword())) {
             throw new InvalidCredentialsException();
         }
-        // Force re-authentication everywhere: revoke every outstanding refresh
-        // token first, then update the password so the revoked-session state and
-        // the new password are both persisted.
         refreshTokenService.revokeAllForUser(user.getId());
         user.setPassword(passwordEncoder.encode(request.newPassword()));
         platformUserRepository.save(user);
-        audit.log(AuthAuditService.PLATFORM_PASSWORD_CHANGED, user.getEmail(), user.getPlatform().getSlug());
+        audit.logPersisted(LogLevel.INFO, LogCategory.AUTH, AuthAuditService.PLATFORM_PASSWORD_CHANGED,
+                user.getEmail(), null, null, null);
     }
 
     private AuthResponse issueTokens(PlatformUser user) {

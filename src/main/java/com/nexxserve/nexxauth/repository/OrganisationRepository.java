@@ -10,6 +10,8 @@ public interface OrganisationRepository extends JpaRepository<Organisation, Long
 
     List<Organisation> findByPlatformIdOrderByCreatedAtAsc(Long platformId);
 
+    List<Organisation> findByPlatformId(Long platformId);
+
     Optional<Organisation> findByPlatformIdAndSlug(Long platformId, String slug);
 
     boolean existsByPlatformIdAndSlug(Long platformId, String slug);

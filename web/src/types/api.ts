@@ -161,3 +161,63 @@ export interface OrganisationClientResponse {
 export function fullName(user: Pick<PlatformUserResponse | OrganisationUserResponse, "firstName" | "lastName">): string {
   return [user.firstName, user.lastName].filter(Boolean).join(" ");
 }
+
+// ---------------------------------------------------------------------------
+// Logs
+// ---------------------------------------------------------------------------
+
+export type LogLevel = "INFO" | "WARN" | "ERROR";
+
+export type LogCategory = "AUTH" | "USER_MANAGEMENT" | "ORG_MANAGEMENT" | "CONFIG" | "SECURITY";
+
+export interface LogEntryResponse {
+  id: number;
+  organisationId: number | null;
+  organisationSlug: string | null;
+  level: LogLevel;
+  category: LogCategory;
+  eventType: string;
+  message: string;
+  actor: string | null;
+  ip: string | null;
+  requestId: string | null;
+  detail: string | null;
+  clientKey: string | null;
+  domain: string | null;
+  createdAt: IsoDate;
+}
+
+export interface LogPage {
+  content: LogEntryResponse[];
+  totalElements: number;
+  totalPages: number;
+  size: number;
+  number: number;
+}
+
+// ---------------------------------------------------------------------------
+// Sessions
+// ---------------------------------------------------------------------------
+
+export interface OrganisationSessionResponse {
+  sessionId: string;
+  userId: number;
+  userIdentifier: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  clientKey: string | null;
+  createdAt: IsoDate;
+  lastActivityAt: IsoDate;
+  expiresAt: IsoDate;
+  active: boolean;
+  tokenCount: number;
+}
+
+export interface SessionTimelineEvent {
+  createdAt: IsoDate;
+  expiresAt: IsoDate;
+  revokedAt: IsoDate | null;
+  evictedAt: IsoDate | null;
+  active: boolean;
+  clientKey: string | null;
+}

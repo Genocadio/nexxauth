@@ -1,7 +1,9 @@
 package com.nexxserve.nexxauth.security;
 
+import com.nexxserve.nexxauth.entity.LogLevel;
 import com.nexxserve.nexxauth.entity.OrganisationClient;
 import com.nexxserve.nexxauth.repository.OrganisationClientRepository;
+import com.nexxserve.nexxauth.service.AuthAuditService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -44,9 +46,11 @@ public class ClientCorsFilter extends OncePerRequestFilter {
     private static final String EXPOSED_HEADERS = "X-Request-Id";
 
     private final OrganisationClientRepository clientRepository;
+    private final AuthAuditService audit;
 
-    public ClientCorsFilter(OrganisationClientRepository clientRepository) {
+    public ClientCorsFilter(OrganisationClientRepository clientRepository, AuthAuditService audit) {
         this.clientRepository = clientRepository;
+        this.audit = audit;
     }
 
     @Override
@@ -63,8 +67,12 @@ public class ClientCorsFilter extends OncePerRequestFilter {
         if (clientIdHeader != null) {
             OrganisationClient client = findEnabledClient(clientIdHeader);
             if (client == null || !allowedOrigins(client).contains(origin)) {
-                // Unknown/disabled client or untrusted origin: no per-client
-                // CORS; the global policy decides (normally none -> browser blocks).
+                // Unknown/disabled client or untrusted origin: log the rejection
+                String ip = com.nexxserve.nexxauth.util.ClientIps.resolve(request, false);
+                String domain = extractDomain(request);
+                audit.logRisk(LogLevel.WARN, AuthAuditService.CORS_ORIGIN_REJECTED,
+                        ip, domain,
+                        "origin=" + origin + " clientId=" + clientIdHeader);
                 filterChain.doFilter(request, response);
                 return;
             }
@@ -120,6 +128,13 @@ public class ClientCorsFilter extends OncePerRequestFilter {
         response.setHeader("Access-Control-Allow-Methods", ALLOWED_METHODS);
         response.setHeader("Access-Control-Allow-Headers", ALLOWED_HEADERS);
         response.setHeader("Access-Control-Max-Age", "3600");
+    }
+
+    private String extractDomain(HttpServletRequest request) {
+        String host = request.getHeader("Host");
+        if (host == null || host.isBlank()) return null;
+        int colon = host.lastIndexOf(":");
+        return colon > 0 ? host.substring(0, colon) : host;
     }
 
     private static boolean isPreflight(HttpServletRequest request) {

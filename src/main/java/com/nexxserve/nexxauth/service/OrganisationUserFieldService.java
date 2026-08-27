@@ -3,6 +3,8 @@ package com.nexxserve.nexxauth.service;
 import com.nexxserve.nexxauth.dto.request.CreateOrganisationUserFieldRequest;
 import com.nexxserve.nexxauth.dto.request.UpdateOrganisationUserFieldRequest;
 import com.nexxserve.nexxauth.dto.response.OrganisationUserFieldResponse;
+import com.nexxserve.nexxauth.entity.LogCategory;
+import com.nexxserve.nexxauth.entity.LogLevel;
 import com.nexxserve.nexxauth.entity.Organisation;
 import com.nexxserve.nexxauth.entity.OrganisationUser;
 import com.nexxserve.nexxauth.entity.OrganisationUserField;
@@ -106,7 +108,7 @@ public class OrganisationUserFieldService {
         field.setLoginEnabled(Boolean.TRUE.equals(request.loginEnabled()));
         field.setRequired(Boolean.TRUE.equals(request.required()));
         OrganisationUserFieldResponse response = toResponse(fieldRepository.save(field));
-        audit.log(AuthAuditService.ORG_USER_FIELD_CREATED, null, organisation.getSlug(), key);
+        audit.logPersisted(LogLevel.INFO, LogCategory.CONFIG, AuthAuditService.ORG_USER_FIELD_CREATED, null, organisation.getSlug(), organisation.getId(), key);
         return response;
     }
 
@@ -135,7 +137,7 @@ public class OrganisationUserFieldService {
             field.setRequired(request.required());
         }
         OrganisationUserFieldResponse response = toResponse(fieldRepository.save(field));
-        audit.log(AuthAuditService.ORG_USER_FIELD_UPDATED, null, organisation.getSlug(), field.getKey());
+        audit.logPersisted(LogLevel.INFO, LogCategory.CONFIG, AuthAuditService.ORG_USER_FIELD_UPDATED, null, organisation.getSlug(), organisation.getId(), field.getKey());
         return response;
     }
 
@@ -148,7 +150,7 @@ public class OrganisationUserFieldService {
                 .orElseThrow(() -> ResourceNotFoundException.of("Organisation user field", fieldId));
         valueRepository.deleteByOrganisationIdAndFieldKey(organisation.getId(), field.getKey());
         fieldRepository.delete(field);
-        audit.log(AuthAuditService.ORG_USER_FIELD_DELETED, null, organisation.getSlug(), field.getKey());
+        audit.logPersisted(LogLevel.INFO, LogCategory.CONFIG, AuthAuditService.ORG_USER_FIELD_DELETED, null, organisation.getSlug(), organisation.getId(), field.getKey());
     }
 
     // ------------------------------------------------------------------
