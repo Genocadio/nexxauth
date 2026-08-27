@@ -148,6 +148,9 @@ jobs:
       - name: Install Playwright browsers
         run: bunx playwright install --with-deps chromium
 
+      - name: Build backend
+        run: ./gradlew build -x test
+
       - name: Run end-to-end tests
         run: bun run test:e2e
 
