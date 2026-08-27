@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Building2, Menu, PanelLeftClose, PanelLeftOpen, ShieldCheck } from "lucide-react";
+import { Building2, Menu, ShieldCheck } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { NavContent } from "@/components/layout/nav-items";
 import { OrgSwitcher } from "@/components/layout/org-switcher";
@@ -70,7 +70,7 @@ export function ConsoleShell({ children }: { children: React.ReactNode }) {
     <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
       <div
         className={cn(
-          "min-h-dvh lg:grid transition-[grid-template-columns] duration-300 ease-in-out",
+          "h-dvh lg:grid transition-[grid-template-columns] duration-300 ease-in-out",
           collapsed ? "lg:grid-cols-[68px_1fr]" : "lg:grid-cols-[240px_1fr]",
         )}
       >
@@ -111,7 +111,7 @@ export function ConsoleShell({ children }: { children: React.ReactNode }) {
         </aside>
 
         {/* ── Main column ────────────────────────────────────────────── */}
-        <div className="flex min-w-0 flex-col">
+        <div className="flex min-w-0 flex-col lg:h-dvh lg:overflow-y-auto">
           <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b bg-background/80 px-4 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
             <div className="flex min-w-0 items-center gap-2">
               <SheetTrigger asChild className="lg:hidden">
@@ -131,8 +131,8 @@ export function ConsoleShell({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* ── Mobile navigation sheet ──────────────────────────────────── */}
-      <SheetContent side="left" className="w-72 p-0">
-        <SheetHeader className="px-5 py-4">
+      <SheetContent side="left" className="w-72 p-0 h-dvh flex flex-col">
+        <SheetHeader className="shrink-0 border-b px-5 py-4">
           <SheetTitle className="text-base">
             <div className="flex items-center gap-2.5">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-sm shadow-primary/20">
@@ -142,7 +142,7 @@ export function ConsoleShell({ children }: { children: React.ReactNode }) {
             </div>
           </SheetTitle>
         </SheetHeader>
-        <div className="flex flex-1 flex-col overflow-y-auto px-3 py-2">
+        <div className="flex-1 overflow-y-auto px-3 py-2" style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}>
           <NavContent
             mode={isOrg ? "org" : "platform"}
             organisationSlug={organisationSlug}
