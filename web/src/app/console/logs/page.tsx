@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -113,11 +113,6 @@ export default function LogsPage() {
   const [page, setPage] = useState(0);
   const [size] = useState(50);
 
-  // Historical data
-  const [historyData, setHistoryData] = useState<LogPage | null>(null);
-  const [historyLoading, setHistoryLoading] = useState(true);
-  const [historyError, setHistoryError] = useState<string | null>(null);
-
   // Real-time
   const orgIdNum = orgId !== "all" ? Number(orgId) : undefined;
   const { logs: realtimeLogs, connected, clearLogs } = useLogStream(orgIdNum);
@@ -139,29 +134,45 @@ export default function LogsPage() {
     [level, category, riskMode, eventType, clientFilter, domainFilter, orgId, from, to, page, size],
   );
 
-  // Fetch historical logs
-  const fetchLogs = useCallback(async () => {
+  // Historical data
+  const [historyData, setHistoryData] = useState<LogPage | null>(null);
+  const [loadedParamsKey, setLoadedParamsKey] = useState("");
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const historyLoading = loadedParamsKey !== JSON.stringify(queryParams);
+  const paramsKey = JSON.stringify(queryParams) + ":" + refreshKey;
+
+  // Fetch historical logs — no synchronous setState in the effect body
+  useEffect(() => {
     if (!platformSlug) return;
-    setHistoryLoading(true);
-    setHistoryError(null);
-    try {
-      const data = await logsApi.list(platformSlug, queryParams);
-      setHistoryData(data);
-    } catch (err) {
-      setHistoryError(getErrorMessage(err));
-    } finally {
-      setHistoryLoading(false);
-    }
-  }, [platformSlug, queryParams]);
+    let cancelled = false;
+    logsApi
+      .list(platformSlug, queryParams)
+      .then((data) => {
+        if (!cancelled) {
+          setHistoryData(data);
+          setHistoryError(null);
+          setLoadedParamsKey(paramsKey);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setHistoryError(getErrorMessage(err));
+          setLoadedParamsKey(paramsKey);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [platformSlug, queryParams, paramsKey]);
 
-  useEffect(() => {
-    fetchLogs();
-  }, [fetchLogs]);
-
-  // Reset page when filters change
-  useEffect(() => {
+  // Reset page when filters change — store previous filter key across renders
+  const filterKey = `${level}|${category}|${eventType}|${clientFilter}|${domainFilter}|${orgId}|${from}|${to}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (prevFilterKey !== filterKey) {
+    setPrevFilterKey(filterKey);
     setPage(0);
-  }, [level, category, eventType, clientFilter, domainFilter, orgId, from, to]);
+  }
 
   // Merge: realtime logs at the top, then historical page below
   const allLogs = useMemo(() => {
@@ -380,7 +391,7 @@ export default function LogsPage() {
               <div className="flex flex-col items-center gap-2 py-12 text-center">
                 <AlertTriangle className="h-8 w-8 text-destructive/60" />
                 <p className="text-sm text-destructive">{historyError}</p>
-                <Button variant="outline" size="sm" onClick={fetchLogs}>
+                <Button variant="outline" size="sm" onClick={() => setRefreshKey((k) => k + 1)}>
                   Try again
                 </Button>
               </div>

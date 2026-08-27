@@ -70,11 +70,11 @@ export function OrgOverviewTab({ platformSlug, organisationId }: OrgOverviewTabP
 
   // Session stats
   const [sessionStats, setSessionStats] = useState<{ active: number; total: number }>({ active: 0, total: 0 });
-  const [loadingSessions, setLoadingSessions] = useState(true);
+  const [sessionsLoaded, setSessionsLoaded] = useState(false);
+  const loadingSessions = !sessionsLoaded;
 
   useEffect(() => {
     let cancelled = false;
-    setLoadingSessions(true);
     sessionsApi
       .list(platformSlug, organisationId)
       .then((data) => {
@@ -87,7 +87,7 @@ export function OrgOverviewTab({ platformSlug, organisationId }: OrgOverviewTabP
       })
       .catch(() => {})
       .finally(() => {
-        if (!cancelled) setLoadingSessions(false);
+        if (!cancelled) setSessionsLoaded(true);
       });
     return () => { cancelled = true; };
   }, [platformSlug, organisationId]);

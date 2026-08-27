@@ -16,6 +16,7 @@ export function useLogStream(organisationId?: number) {
   const [logs, setLogs] = useState<LogEntryResponse[]>([]);
   const [connected, setConnected] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const connectRef = useRef<() => void>(() => {});
 
   const connect = useCallback(() => {
     if (!platformSlug || !session) return;
@@ -44,13 +45,18 @@ export function useLogStream(organisationId?: number) {
       // Reconnect after a short delay
       setTimeout(() => {
         if (eventSourceRef.current === es) {
-          connect();
+          connectRef.current();
         }
       }, 3000);
     };
 
     eventSourceRef.current = es;
   }, [platformSlug, session, organisationId]);
+
+  // Keep the ref fresh so the reconnect callback always calls the latest connect
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   useEffect(() => {
     connect();

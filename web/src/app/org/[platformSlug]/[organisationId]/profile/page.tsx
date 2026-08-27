@@ -134,7 +134,7 @@ function OrgProfile({
               My sessions
             </CardTitle>
             <CardDescription>
-              Active and recent sessions for your account. Revoke any session you don't recognise.
+              Active and recent sessions for your account. Revoke any session you don&apos;t recognise.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0">

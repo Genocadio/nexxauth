@@ -21,8 +21,9 @@ export function AnimatedCounter({
 
   useEffect(() => {
     if (target === 0) {
-      setDisplay(0);
-      return;
+      // Defer the setState to avoid calling it synchronously in the effect
+      rafRef.current = requestAnimationFrame(() => setDisplay(0));
+      return () => cancelAnimationFrame(rafRef.current);
     }
 
     startRef.current = performance.now();

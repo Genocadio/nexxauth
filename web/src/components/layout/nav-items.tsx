@@ -115,15 +115,13 @@ export function NavContent({
   onNavigate?: () => void;
 }) {
   if (mode === "org") {
-    let lastSection: string | undefined;
-
     return (
       <nav className="flex flex-col gap-0.5">
         <Suspense fallback={null}>
-          {ORG_NAV.map((item) => {
+          {ORG_NAV.map((item, idx) => {
             const href = `/console/organisations/${organisationSlug}?tab=${item.tab}`;
-            const showSection = item.section && item.section !== lastSection && !collapsed;
-            if (item.section) lastSection = item.section;
+            const prevSection = idx > 0 ? ORG_NAV[idx - 1].section : undefined;
+            const showSection = item.section && item.section !== prevSection && !collapsed;
 
             return (
               <div key={item.tab}>

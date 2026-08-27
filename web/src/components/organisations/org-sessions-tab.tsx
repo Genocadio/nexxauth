@@ -346,6 +346,10 @@ function SessionTimeline({
     staleTime: 30_000,
   });
 
+  // Capture "now" once via a lazy initializer to keep the render pure
+  // (must be before any early returns to satisfy hooks rules)
+  const [now] = useState(() => Date.now());
+
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">
@@ -357,18 +361,17 @@ function SessionTimeline({
 
   if (isError || !events || events.length === 0) {
     return (
-      <div className="py-2 text-xs text-muted-foreground">No timeline data.</div>
-    );
+      <div className="py-2 text-xs text-muted-foreground">No timeline data.</div>);
   }
 
   // Compute the full time span for proportional rendering
   const firstCreatedAt = new Date(events[0].createdAt).getTime();
   const lastEnd = Math.max(
     ...events.map((e) => {
-      const end = e.revokedAt ? new Date(e.revokedAt).getTime() : Date.now();
+      const end = e.revokedAt ? new Date(e.revokedAt).getTime() : now;
       return Math.max(end, new Date(e.expiresAt).getTime());
     }),
-    Date.now(),
+    now,
   );
   const totalSpan = lastEnd - firstCreatedAt || 1;
 
@@ -388,7 +391,7 @@ function SessionTimeline({
           const endMs = (event.revokedAt
             ? new Date(event.revokedAt).getTime()
             : event.active
-              ? Date.now()
+              ? now
               : new Date(event.expiresAt).getTime()) - firstCreatedAt;
           const left = (startMs / totalSpan) * 100;
           const width = Math.max(((endMs - startMs) / totalSpan) * 100, 0.5);
@@ -429,7 +432,7 @@ function SessionTimeline({
 
         {/* Now marker */}
         {(() => {
-          const nowOffset = ((Date.now() - firstCreatedAt) / totalSpan) * 100;
+          const nowOffset = ((now - firstCreatedAt) / totalSpan) * 100;
           if (nowOffset >= 0 && nowOffset <= 100) {
             return (
               <div

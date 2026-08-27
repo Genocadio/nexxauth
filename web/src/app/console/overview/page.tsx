@@ -345,24 +345,28 @@ const { accessToken, refreshToken } = await res.json();`
 
 function RecentLogsCard({ platformSlug }: { platformSlug: string }) {
   const [logs, setLogs] = useState<LogEntryResponse[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchLogs = useCallback(async () => {
-    if (!platformSlug) return;
-    setLoading(true);
-    try {
-      const data = await logsApi.list(platformSlug, { page: 0, size: 5 });
-      setLogs(data.content);
-    } catch {
-      // silently fail — logs are optional
-    } finally {
-      setLoading(false);
-    }
-  }, [platformSlug]);
+  const [loaded, setLoaded] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const loading = !loaded;
 
   useEffect(() => {
-    fetchLogs();
-  }, [fetchLogs]);
+    if (!platformSlug) return;
+    let cancelled = false;
+    logsApi
+      .list(platformSlug, { page: 0, size: 5 })
+      .then((data) => {
+        if (!cancelled) setLogs(data.content);
+      })
+      .catch(() => {
+        // silently fail — logs are optional
+      })
+      .finally(() => {
+        if (!cancelled) setLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [platformSlug, refreshKey]);
 
   const levelColors: Record<string, string> = {
     INFO: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
@@ -379,7 +383,7 @@ function RecentLogsCard({ platformSlug }: { platformSlug: string }) {
             Recent activity
           </CardTitle>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fetchLogs}>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setLoaded(false); setRefreshKey((k) => k + 1); }}>
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
             </Button>
             <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
