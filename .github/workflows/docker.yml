@@ -6,11 +6,22 @@ on:
     types: [completed]
     branches: [main]
 
+  workflow_dispatch:
+    inputs:
+      force_backend:
+        description: "Force rebuild backend image"
+        type: boolean
+        default: false
+      force_web:
+        description: "Force rebuild web image"
+        type: boolean
+        default: false
+
 jobs:
   changes:
     name: Detect changes
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') }}
 
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
@@ -20,24 +31,38 @@ jobs:
       - name: Checkout CI-validated commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 2
 
       - name: Detect changed areas
         id: filter
         shell: bash
         run: |
-          if git diff --quiet HEAD^ HEAD -- web; then
-            echo "web=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "web=true" >> "$GITHUB_OUTPUT"
+          # Start with force overrides
+          backend="${{ inputs.force_backend }}"
+          web="${{ inputs.force_web }}"
+
+          # If not forced, detect from git diff
+          if [ "$backend" != "true" ]; then
+            if git diff --quiet HEAD^ HEAD -- . ':!web'; then
+              backend="false"
+            else
+              backend="true"
+            fi
           fi
 
-          if git diff --quiet HEAD^ HEAD -- . ':!web'; then
-            echo "backend=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "backend=true" >> "$GITHUB_OUTPUT"
+          if [ "$web" != "true" ]; then
+            if git diff --quiet HEAD^ HEAD -- web; then
+              web="false"
+            else
+              web="true"
+            fi
           fi
+
+          echo "backend=$backend" >> "$GITHUB_OUTPUT"
+          echo "web=$web" >> "$GITHUB_OUTPUT"
+          echo "Backend changed: $backend"
+          echo "Web changed: $web"
 
   build-and-push:
     name: Build and push changed images
@@ -48,7 +73,7 @@ jobs:
       - name: Checkout CI-validated commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
