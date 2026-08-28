@@ -128,18 +128,31 @@ public class LogService {
                                         String eventType, String clientKey, String domain,
                                         Instant from, Instant to,
                                         Pageable pageable) {
-        Specification<LogEntry> spec = Specification
-                .where(hasPlatformId(platformId))
-                .and(hasOrganisationId(organisationId))
-                .and(hasLevel(level))
-                .and(hasCategory(category))
-                .and(hasEventType(eventType))
-                .and(hasClientKey(clientKey))
-                .and(hasDomain(domain))
-                .and(createdBetween(from, to));
+        Specification<LogEntry> spec = andAll(
+                hasPlatformId(platformId),
+                hasOrganisationId(organisationId),
+                hasLevel(level),
+                hasCategory(category),
+                hasEventType(eventType),
+                hasClientKey(clientKey),
+                hasDomain(domain),
+                createdBetween(from, to)
+        );
 
         Page<LogEntry> page = logEntryRepository.findAll(spec, pageable);
         return page.map(this::toResponse);
+    }
+
+    /** Safely combine multiple nullable specifications with AND. */
+    @SafeVarargs
+    private final Specification<LogEntry> andAll(Specification<LogEntry>... specs) {
+        Specification<LogEntry> result = null;
+        for (Specification<LogEntry> s : specs) {
+            if (s != null) {
+                result = result == null ? s : result.and(s);
+            }
+        }
+        return result;
     }
 
     // --- Specification helpers ---

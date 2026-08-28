@@ -3,6 +3,19 @@ import { clearPlatformSession, setPlatformSession } from "@/store/authSlice";
 import { API_BASE_URL } from "@/lib/constants";
 import type { AuthResponse } from "@/types/api";
 import { ApiError, type ErrorResponse } from "@/types/errors";
+import { queryClient } from "@/lib/query-client";
+
+/** Guard so multiple concurrent 401s only redirect once. */
+let isRedirectingToLogin = false;
+
+function forceLogout() {
+  if (isRedirectingToLogin) return;
+  isRedirectingToLogin = true;
+  store.dispatch(clearPlatformSession());
+  queryClient.clear();
+  // Use replace so the back button doesn't land on a stale protected page.
+  window.location.replace("/login");
+}
 
 /**
  * Which session a request authenticates with. Only the platform console uses
@@ -111,7 +124,14 @@ export async function request<T>(
   // One 401 → attempt a silent refresh and retry once.
   if (res.status === 401 && auth === "platform") {
     const refreshed = await tryRefresh();
-    if (refreshed) res = await send(getAccessToken());
+    if (refreshed) {
+      res = await send(getAccessToken());
+    }
+  }
+
+  // Still 401 after refresh attempt → force logout.
+  if (res.status === 401 && auth === "platform") {
+    forceLogout();
   }
 
   if (!res.ok) throw await toApiError(res);
