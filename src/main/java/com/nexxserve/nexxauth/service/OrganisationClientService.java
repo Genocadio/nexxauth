@@ -98,6 +98,10 @@ public class OrganisationClientService {
         client.setAccessTokenTtlSeconds(request.accessTokenTtlSeconds());
         client.setRefreshTokenTtlSeconds(request.refreshTokenTtlSeconds());
         client.setMaxSessionsPerUser(request.maxSessionsPerUser());
+        // Per-client login/register restrictions
+        client.setAllowRegister(request.allowRegister() == null || request.allowRegister());
+        client.setAllowLogin(request.allowLogin() == null || request.allowLogin());
+        client.setAllowedRoles(clientMapper.joinRoles(request.allowedRoles()));
 
         String token = null;
         if (requireAuth) {
@@ -157,6 +161,16 @@ public class OrganisationClientService {
         }
         if (request.maxSessionsPerUser() != null) {
             client.setMaxSessionsPerUser(request.maxSessionsPerUser() > 0 ? request.maxSessionsPerUser() : null);
+        }
+        // Per-client login/register restrictions
+        if (request.allowRegister() != null) {
+            client.setAllowRegister(request.allowRegister());
+        }
+        if (request.allowLogin() != null) {
+            client.setAllowLogin(request.allowLogin());
+        }
+        if (request.allowedRoles() != null) {
+            client.setAllowedRoles(clientMapper.joinRoles(request.allowedRoles()));
         }
         OrganisationClient saved = clientRepository.save(client);
         audit.logPersisted(LogLevel.INFO, LogCategory.CONFIG, AuthAuditService.ORG_CLIENT_UPDATED, null,
@@ -280,6 +294,8 @@ public class OrganisationClientService {
                 base.allowedOrigins(), base.enabled(), deserializeSettings(client.getSettings()),
                 base.createdAt(), token,
                 client.getAccessTokenTtlSeconds(), client.getRefreshTokenTtlSeconds(),
-                client.getMaxSessionsPerUser());
+                client.getMaxSessionsPerUser(),
+                client.isAllowRegister(), client.isAllowLogin(),
+                clientMapper.splitRoles(client.getAllowedRoles()));
     }
 }

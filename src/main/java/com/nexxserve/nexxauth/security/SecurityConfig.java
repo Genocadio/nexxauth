@@ -30,6 +30,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter jwtFilter,
                                                    OrgJwtAuthenticationFilter orgJwtFilter,
                                                    ClientTokenFilter clientTokenFilter,
+                                                   OrganisationIdFilter orgIdFilter,
                                                    CorsConfigurationSource corsConfigurationSource,
                                                    ErrorResponseWriter errorResponseWriter) throws Exception {
         http
@@ -55,8 +56,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/slug-suggestions").permitAll()
                         // Public verification keys for an organisation's tokens
                         .requestMatchers(HttpMethod.GET, "/*/organisations/*/keys").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/*/organisations/keys").permitAll()
                         // Public documentation context for context-aware API docs
                         .requestMatchers(HttpMethod.GET, "/*/organisations/*/docs/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/*/organisations/docs/**").permitAll()
                         // Organisation endpoints: any authenticated token (platform
                         // or org user); the fine-grained platform-role and
                         // org-permission gating happens at method level.
@@ -75,6 +78,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/*/**").hasAnyRole("SUPER_USER", "READ_ONLY")
                         .requestMatchers("/*/**").hasRole("SUPER_USER")
                         .anyRequest().authenticated())
+                .addFilterBefore(orgIdFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(orgJwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 // Last of the three: a present X-Client-Id always wins over a

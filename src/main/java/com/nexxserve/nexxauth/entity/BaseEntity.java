@@ -2,18 +2,19 @@ package com.nexxserve.nexxauth.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.GenericGenerator;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
 
 /**
  * Common persistence fields shared by every entity (avoids repetition).
+ * Uses a random non-sequential ID generator to prevent enumeration attacks.
  */
 @Getter
 @Setter
@@ -21,7 +22,8 @@ import java.time.Instant;
 public abstract class BaseEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(generator = "random_id")
+    @GenericGenerator(name = "random_id", type = RandomLongIdGenerator.class)
     private Long id;
 
     @CreationTimestamp

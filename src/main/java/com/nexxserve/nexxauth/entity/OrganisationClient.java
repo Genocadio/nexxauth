@@ -57,6 +57,21 @@ public class OrganisationClient extends BaseEntity {
     @Column(name = "settings", length = 4000)
     private String settings;
 
+    // --- per-client login/register restrictions ---
+
+    /** When false, registration via this client is blocked. */
+    @Column(name = "allow_register", nullable = false)
+    private boolean allowRegister = true;
+
+    /** When false, login via this client is blocked. */
+    @Column(name = "allow_login", nullable = false)
+    private boolean allowLogin = true;
+
+    /** Comma-separated role names; when non-null only users holding at least
+     *  one of these roles may login/register via this client. Null = no restriction. */
+    @Column(name = "allowed_roles", length = 500)
+    private String allowedRoles;
+
     // --- session overrides (null = use organisation defaults) ---
 
     /** Override for access-token lifetime (seconds). Null falls back to org default. */

@@ -155,6 +155,11 @@ export interface OrganisationClientResponse {
   accessTokenTtlSeconds: number | null;
   refreshTokenTtlSeconds: number | null;
   maxSessionsPerUser: number | null;
+  /** Per-client login/register restrictions. */
+  allowRegister: boolean;
+  allowLogin: boolean;
+  /** Set of allowed role names; empty means no restriction. */
+  allowedRoles: string[];
 }
 
 /** Full display name of a person. */

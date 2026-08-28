@@ -7,7 +7,10 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Maps clients between entity and DTO. {@code allowedOrigins} is stored
@@ -41,5 +44,20 @@ public interface OrganisationClientMapper {
             return null;
         }
         return String.join(",", origins);
+    }
+
+    default Set<String> splitRoles(String roles) {
+        if (roles == null || roles.isBlank()) {
+            return Set.of();
+        }
+        return Arrays.stream(roles.split(",")).map(String::trim)
+                .filter(s -> !s.isEmpty()).collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    default String joinRoles(Set<String> roles) {
+        if (roles == null || roles.isEmpty()) {
+            return null;
+        }
+        return String.join(",", roles);
     }
 }

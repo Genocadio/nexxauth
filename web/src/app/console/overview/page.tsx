@@ -1,43 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  ArrowRight,
-  BookOpen,
-  Building2,
-  CalendarDays,
-  FileText,
-  Globe,
-  KeyRound,
-  Lightbulb,
-  Plus,
-  RefreshCw,
-  Server,
-  ShieldCheck,
-  ShieldAlert,
-  Terminal,
-  TrendingDown,
-  TrendingUp,
-  Users,
-  Wifi,
-} from "lucide-react";
+import { useState } from "react";
+import { Building2, CalendarDays, FileText, Globe, Plus, Server, Users } from "lucide-react";
 import Link from "next/link";
 import { FadeIn } from "@/components/shared/fade-in";
 import { AnimatedCounter } from "@/components/shared/animated-counter";
-import { CardsSkeleton, TableSkeleton } from "@/components/shared/loading";
+import { TableSkeleton } from "@/components/shared/loading";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { CopyButton } from "@/components/shared/copy-button";
-import { logsApi } from "@/api/logs";
-import { organisationsHealthApi, type OrganisationHealth } from "@/api/organisations-health";
 import { useOrganisations, usePlatform, usePlatformSlug, usePlatformUsers } from "@/hooks/queries";
 import { resolvePlatformApiUrl } from "@/lib/api-url";
 import { useBackendOrigin } from "@/lib/backend-url";
 import { formatDate } from "@/lib/constants";
-import { ROLE_META } from "@/types/enums";
-import type { LogEntryResponse } from "@/types/api";
 
 export default function OverviewPage() {
   const platform = usePlatform();
@@ -47,7 +23,6 @@ export default function OverviewPage() {
   const platformSlug = usePlatformSlug() ?? "";
 
   const loading = platform.isLoading || users.isLoading || organisations.isLoading;
-  const error = platform.error ?? users.error ?? organisations.error;
 
   const platformData = platform.data;
   const userCount = platformData?.userCount ?? users.data?.length ?? 0;
@@ -56,53 +31,15 @@ export default function OverviewPage() {
     ? resolvePlatformApiUrl(platformData.apiBaseUrl, platformData.slug, backendOrigin)
     : null;
 
-  // Aggregate health stats from all orgs
-  const [healthData, setHealthData] = useState<OrganisationHealth[]>([]);
-  const [healthLoaded, setHealthLoaded] = useState(false);
-
-  useEffect(() => {
-    if (!platformSlug) return;
-    let cancelled = false;
-    organisationsHealthApi
-      .list(platformSlug)
-      .then((data) => {
-        if (!cancelled) {
-          setHealthData(data);
-          setHealthLoaded(true);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setHealthLoaded(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [platformSlug]);
-
-  const aggregates = useMemo(() => {
-    const totalSessions = healthData.reduce((sum, h) => sum + h.activeSessions, 0);
-    const totalKeys = healthData.reduce((sum, h) => sum + h.signingKeys, 0);
-    const totalClients = healthData.reduce((sum, h) => sum + h.apiClients, 0);
-    const totalOrgUsers = healthData.reduce((sum, h) => sum + h.userCount, 0);
-    const avgScore =
-      healthData.length > 0
-        ? Math.round(healthData.reduce((sum, h) => sum + h.score, 0) / healthData.length)
-        : 0;
-    return { totalSessions, totalKeys, totalClients, totalOrgUsers, avgScore };
-  }, [healthData]);
-
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Hero Section */}
       <FadeIn>
         <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-br from-background via-background to-muted/30 p-6 sm:p-8 dark:from-background dark:via-background dark:to-zinc-900/50">
-          {/* Background decoration */}
           <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-primary/5 blur-3xl" />
           <div className="absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-blue-500/5 blur-3xl" />
-          <div className="absolute right-1/4 top-1/2 h-32 w-32 -translate-y-1/2 rounded-full bg-violet-500/5 blur-2xl dark:bg-violet-500/10" />
 
           <div className="relative">
-            {/* Title row */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
@@ -110,8 +47,7 @@ export default function OverviewPage() {
                 </h1>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {platformData
-                    ? `${platformData.slug} · Created ${formatDate(platformData.createdAt)}
-                    · API ${projectUrl ? "ready" : "not configured"}`
+                    ? `${platformData.slug} · Created ${formatDate(platformData.createdAt)}${projectUrl ? " · API ready" : ""}`
                     : "Your platform overview"}
                 </p>
               </div>
@@ -123,8 +59,7 @@ export default function OverviewPage() {
               </Button>
             </div>
 
-            {/* Animated stats */}
-            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
               <HeroStat
                 icon={<Building2 className="h-5 w-5" />}
                 label="Organisations"
@@ -134,17 +69,10 @@ export default function OverviewPage() {
               />
               <HeroStat
                 icon={<Users className="h-5 w-5" />}
-                label="Org users"
-                value={aggregates.totalOrgUsers || userCount}
+                label="Platform users"
+                value={userCount}
                 color="text-emerald-600 dark:text-emerald-400"
                 bg="bg-emerald-500/10"
-              />
-              <HeroStat
-                icon={<Wifi className="h-5 w-5" />}
-                label="Active sessions"
-                value={aggregates.totalSessions}
-                color="text-violet-600 dark:text-violet-400"
-                bg="bg-violet-500/10"
               />
               <Link href="/console/logs" className="group">
                 <HeroStat
@@ -161,12 +89,7 @@ export default function OverviewPage() {
         </div>
       </FadeIn>
 
-      {/* Quick Connect + Recent Activity */}
-      {loading && <CardsSkeleton />}
-      {error && !loading && (
-        <p className="text-sm text-destructive">Couldn&apos;t load the overview.</p>
-      )}
-
+      {/* Quick Connect + Organisations */}
       <div className="grid gap-6 lg:grid-cols-5">
         {/* Quick Connect — 2 cols */}
         <div className="lg:col-span-2">
@@ -175,398 +98,64 @@ export default function OverviewPage() {
           </FadeIn>
         </div>
 
-        {/* Recent Logs — 3 cols */}
+        {/* Organisations — 3 cols */}
         <div className="lg:col-span-3">
           <FadeIn delay={0.15}>
-            <RecentLogsCard platformSlug={platformSlug} />
-          </FadeIn>
-        </div>
-      </div>
-
-      {/* Platform Health + Security Summary */}
-      {healthLoaded && healthData.length > 0 && (
-        <div className="grid gap-6 lg:grid-cols-2">
-          <FadeIn delay={0.2}>
-            <PlatformHealthCard healthData={healthData} aggregates={aggregates} />
-          </FadeIn>
-          <FadeIn delay={0.25}>
-            <SecuritySummaryCard platformSlug={platformSlug} />
-          </FadeIn>
-        </div>
-      )}
-
-      {/* Quick Actions + Org List */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Quick Actions */}
-        <FadeIn delay={0.3}>
-          <Card className="h-full">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Terminal className="h-4 w-4" />
-                Quick actions
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <QuickAction
-                href="/console/organisations"
-                icon={<Building2 className="h-4 w-4" />}
-                label="Create organisation"
-                description="Set up a new tenant"
-              />
-              <QuickAction
-                href="/console/users"
-                icon={<Users className="h-4 w-4" />}
-                label="Manage users"
-                description="Add team members"
-              />
-              <QuickAction
-                href="/console/logs"
-                icon={<FileText className="h-4 w-4" />}
-                label="View audit logs"
-                description="Security & activity trail"
-              />
-              <QuickAction
-                href="/docs"
-                icon={<BookOpen className="h-4 w-4" />}
-                label="API documentation"
-                description="Integration guides"
-              />
-            </CardContent>
-          </Card>
-        </FadeIn>
-
-        {/* Recent Organisations */}
-        <FadeIn delay={0.35}>
-          <Card className="lg:col-span-2 h-full">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Recent organisations</CardTitle>
-                {orgCount > 0 && (
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href="/console/organisations">
-                      View all
-                      <ArrowRight className="ml-1 h-3.5 w-3.5" />
-                    </Link>
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <TableSkeleton rows={3} columns={2} />
-              ) : organisations.data && organisations.data.length > 0 ? (
-                <ul className="divide-y">
-                  {organisations.data.slice(0, 5).map((org) => (
-                    <li key={org.id}>
-                      <Link
-                        href={`/console/organisations/${org.slug}`}
-                        className="group flex items-center justify-between gap-3 py-3 transition-colors hover:text-primary"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium group-hover:text-primary transition-colors">{org.name}</p>
-                          <p className="truncate text-xs text-muted-foreground">{org.slug}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-[10px]">
-                            {org.useEmailAsUsername ? "Email" : "Username"}
-                          </Badge>
-                          <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
-                            <CalendarDays className="h-3.5 w-3.5" />
-                            {formatDate(org.createdAt)}
-                          </span>
-                        </div>
+            <Card className="h-full">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">Organisations</CardTitle>
+                  {orgCount > 0 && (
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link href="/console/organisations">
+                        View all
                       </Link>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="flex flex-col items-center gap-3 py-8 text-center">
-                  <Building2 className="h-8 w-8 text-muted-foreground/40" />
-                  <p className="text-sm text-muted-foreground">No organisations yet</p>
-                  <Button asChild size="sm">
-                    <Link href="/console/organisations">Create your first org</Link>
-                  </Button>
+                    </Button>
+                  )}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </FadeIn>
-      </div>
-
-      {/* Tips */}
-      <FadeIn delay={0.4}>
-        <TipsCard orgCount={orgCount} userCount={userCount} />
-      </FadeIn>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Platform Health Card
-// ---------------------------------------------------------------------------
-
-function PlatformHealthCard({
-  healthData,
-  aggregates,
-}: {
-  healthData: OrganisationHealth[];
-  aggregates: {
-    totalSessions: number;
-    totalKeys: number;
-    totalClients: number;
-    totalOrgUsers: number;
-    avgScore: number;
-  };
-}) {
-  const scoreColor =
-    aggregates.avgScore >= 75
-      ? "text-emerald-600 dark:text-emerald-400"
-      : aggregates.avgScore >= 50
-        ? "text-blue-600 dark:text-blue-400"
-        : aggregates.avgScore >= 25
-          ? "text-amber-600 dark:text-amber-400"
-          : "text-red-500";
-
-  const scoreBg =
-    aggregates.avgScore >= 75
-      ? "bg-emerald-500/10"
-      : aggregates.avgScore >= 50
-        ? "bg-blue-500/10"
-        : aggregates.avgScore >= 25
-          ? "bg-amber-500/10"
-          : "bg-red-500/10";
-
-  return (
-    <Card className="h-full">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <ShieldCheck className="h-4 w-4" />
-          Platform health
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-5">
-        {/* Average score */}
-        <div className="flex items-center gap-4">
-          <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-xl ${scoreBg}`}>
-            <span className={`text-2xl font-bold ${scoreColor}`}>{aggregates.avgScore}</span>
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium">Average health score</p>
-            <Progress value={aggregates.avgScore} className="mt-1.5 h-1.5" />
-            <p className="mt-1 text-xs text-muted-foreground">
-              Across {healthData.length} organisation{healthData.length !== 1 ? "s" : ""}
-            </p>
-          </div>
-        </div>
-
-        {/* Aggregate stats */}
-        <div className="grid grid-cols-3 gap-3">
-          <HealthStat icon={<Wifi className="h-3.5 w-3.5" />} label="Sessions" value={aggregates.totalSessions} />
-          <HealthStat icon={<KeyRound className="h-3.5 w-3.5" />} label="Signing keys" value={aggregates.totalKeys} />
-          <HealthStat icon={<ShieldCheck className="h-3.5 w-3.5" />} label="API clients" value={aggregates.totalClients} />
-        </div>
-
-        {/* Per-org breakdown */}
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">Per organisation</p>
-          {healthData.slice(0, 5).map((h) => {
-            const org = healthData.find((x) => x.organisationId === h.organisationId);
-            if (!org) return null;
-            const barColor =
-              org.score >= 75
-                ? "bg-emerald-500"
-                : org.score >= 50
-                  ? "bg-blue-500"
-                  : org.score >= 25
-                    ? "bg-amber-500"
-                    : "bg-red-400";
-            return (
-              <div key={h.organisationId} className="flex items-center gap-3">
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                  <div
-                    className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-                    style={{ width: `${org.score}%` }}
-                  />
-                </div>
-                <span className="shrink-0 text-[10px] font-medium text-muted-foreground w-8 text-right">
-                  {org.score}%
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function HealthStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
-  return (
-    <div className="rounded-lg bg-muted/50 p-3 text-center">
-      <div className="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-md bg-background text-muted-foreground">
-        {icon}
-      </div>
-      <div className="text-lg font-bold">
-        <AnimatedCounter target={value} durationMs={800} />
-      </div>
-      <p className="text-[10px] text-muted-foreground">{label}</p>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Security Summary Card
-// ---------------------------------------------------------------------------
-
-function SecuritySummaryCard({ platformSlug }: { platformSlug: string }) {
-  const [logs, setLogs] = useState<LogEntryResponse[]>([]);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    if (!platformSlug) return;
-    let cancelled = false;
-    logsApi
-      .list(platformSlug, { category: "SECURITY", size: 10 })
-      .then((data) => {
-        if (!cancelled) setLogs(data.content);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setLoaded(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [platformSlug]);
-
-  const securityStats = useMemo(() => {
-    const total = logs.length;
-    const tokenReuse = logs.filter((l) => l.eventType.includes("TOKEN_REUSE")).length;
-    const loginFailures = logs.filter((l) => l.eventType.includes("LOGIN_FAILURE")).length;
-    const disabled = logs.filter((l) => l.eventType.includes("DISABLED")).length;
-    return { total, tokenReuse, loginFailures, disabled };
-  }, [logs]);
-
-  const levelColors: Record<string, string> = {
-    INFO: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-    WARN: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-    ERROR: "bg-red-500/10 text-red-600 dark:text-red-400",
-  };
-
-  return (
-    <Card className="h-full">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <ShieldAlert className="h-4 w-4" />
-            Security summary
-          </CardTitle>
-          <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
-            <Link href="/console/logs">
-              View all
-              <ArrowRight className="ml-1 h-3 w-3" />
-            </Link>
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {!loaded ? (
-          <TableSkeleton rows={3} columns={2} />
-        ) : (
-          <>
-            {/* Security stats */}
-            <div className="grid grid-cols-3 gap-3">
-              <SecurityStat
-                label="Token reuse"
-                value={securityStats.tokenReuse}
-                icon={<KeyRound className="h-3.5 w-3.5" />}
-                tone={securityStats.tokenReuse > 0 ? "warning" : "default"}
-              />
-              <SecurityStat
-                label="Login failures"
-                value={securityStats.loginFailures}
-                icon={<ShieldAlert className="h-3.5 w-3.5" />}
-                tone={securityStats.loginFailures > 0 ? "warning" : "default"}
-              />
-              <SecurityStat
-                label="Disabled"
-                value={securityStats.disabled}
-                icon={<Users className="h-3.5 w-3.5" />}
-                tone={securityStats.disabled > 0 ? "warning" : "default"}
-              />
-            </div>
-
-            {/* Recent security events */}
-            {logs.length > 0 ? (
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground">Recent events</p>
-                {logs.slice(0, 5).map((log) => (
-                  <div
-                    key={log.id}
-                    className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-muted/50"
-                  >
-                    <span className={`inline-flex h-5 shrink-0 items-center rounded px-1.5 text-[10px] font-medium ${levelColors[log.level] ?? "bg-muted"}`}>
-                      {log.level}
-                    </span>
-                    <span className="flex-1 truncate font-mono text-muted-foreground/70">
-                      {log.eventType.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}
-                    </span>
-                    {log.organisationSlug && (
-                      <span className="hidden sm:inline rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                        {log.organisationSlug}
-                      </span>
-                    )}
-                    <span className="shrink-0 text-[10px] text-muted-foreground/50">
-                      {new Date(log.createdAt).toLocaleTimeString()}
-                    </span>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <TableSkeleton rows={3} columns={2} />
+                ) : organisations.data && organisations.data.length > 0 ? (
+                  <ul className="divide-y">
+                    {organisations.data.slice(0, 5).map((org) => (
+                      <li key={org.id}>
+                        <Link
+                          href={`/console/organisations/${org.slug}`}
+                          className="group flex items-center justify-between gap-3 py-3 transition-colors hover:text-primary"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium group-hover:text-primary transition-colors">{org.name}</p>
+                            <p className="truncate text-xs text-muted-foreground">{org.slug}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-[10px]">
+                              {org.useEmailAsUsername ? "Email" : "Username"}
+                            </Badge>
+                            <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+                              <CalendarDays className="h-3.5 w-3.5" />
+                              {formatDate(org.createdAt)}
+                            </span>
+                          </div>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="flex flex-col items-center gap-3 py-8 text-center">
+                    <Building2 className="h-8 w-8 text-muted-foreground/40" />
+                    <p className="text-sm text-muted-foreground">No organisations yet</p>
+                    <Button asChild size="sm">
+                      <Link href="/console/organisations">Create your first org</Link>
+                    </Button>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-2 py-6 text-center">
-                <ShieldCheck className="h-6 w-6 text-emerald-500/40" />
-                <p className="text-xs text-muted-foreground">No security events — all clear</p>
-              </div>
-            )}
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function SecurityStat({
-  label,
-  value,
-  icon,
-  tone,
-}: {
-  label: string;
-  value: number;
-  icon: React.ReactNode;
-  tone: "default" | "warning";
-}) {
-  return (
-    <div
-      className={`rounded-lg p-3 text-center transition-colors ${
-        tone === "warning"
-          ? "bg-amber-500/10 border border-amber-500/20"
-          : "bg-muted/50"
-      }`}
-    >
-      <div
-        className={`mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-md ${
-          tone === "warning"
-            ? "bg-amber-500/20 text-amber-600 dark:text-amber-400"
-            : "bg-background text-muted-foreground"
-        }`}
-      >
-        {icon}
+                )}
+              </CardContent>
+            </Card>
+          </FadeIn>
+        </div>
       </div>
-      <div className={`text-lg font-bold ${tone === "warning" ? "text-amber-600 dark:text-amber-400" : ""}`}>
-        {value}
-      </div>
-      <p className="text-[10px] text-muted-foreground">{label}</p>
     </div>
   );
 }
@@ -658,100 +247,6 @@ const { accessToken, refreshToken } = await res.json();`
 }
 
 // ---------------------------------------------------------------------------
-// Recent Logs Card
-// ---------------------------------------------------------------------------
-
-function RecentLogsCard({ platformSlug }: { platformSlug: string }) {
-  const [logs, setLogs] = useState<LogEntryResponse[]>([]);
-  const [loaded, setLoaded] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const loading = !loaded;
-
-  useEffect(() => {
-    if (!platformSlug) return;
-    let cancelled = false;
-    logsApi
-      .list(platformSlug, { page: 0, size: 5 })
-      .then((data) => {
-        if (!cancelled) setLogs(data.content);
-      })
-      .catch(() => {
-        // silently fail — logs are optional
-      })
-      .finally(() => {
-        if (!cancelled) setLoaded(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [platformSlug, refreshKey]);
-
-  const levelColors: Record<string, string> = {
-    INFO: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-    WARN: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-    ERROR: "bg-red-500/10 text-red-600 dark:text-red-400",
-  };
-
-  return (
-    <Card className="h-full">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <FileText className="h-4 w-4" />
-            Recent activity
-          </CardTitle>
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setLoaded(false); setRefreshKey((k) => k + 1); }}>
-              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-            </Button>
-            <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
-              <Link href="/console/logs">
-                View all
-                <ArrowRight className="ml-1 h-3 w-3" />
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {loading && logs.length === 0 ? (
-          <TableSkeleton rows={5} columns={3} />
-        ) : logs.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-8 text-center">
-            <FileText className="h-6 w-6 text-muted-foreground/40" />
-            <p className="text-xs text-muted-foreground">No log entries yet</p>
-          </div>
-        ) : (
-          <div className="space-y-1">
-            {logs.map((log) => (
-              <div
-                key={log.id}
-                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-muted/50"
-              >
-                <span className={`inline-flex h-5 items-center rounded px-1.5 text-[10px] font-medium ${levelColors[log.level] ?? "bg-muted"}`}>
-                  {log.level}
-                </span>
-                <span className="flex-1 truncate font-mono text-muted-foreground/70">
-                  {log.eventType}
-                </span>
-                {log.organisationSlug && (
-                  <span className="hidden sm:inline rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                    {log.organisationSlug}
-                  </span>
-                )}
-                <span className="shrink-0 text-[10px] text-muted-foreground/50">
-                  {new Date(log.createdAt).toLocaleTimeString()}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Hero Stat
 // ---------------------------------------------------------------------------
 
@@ -790,91 +285,5 @@ function HeroStat({
       </div>
       <p className="mt-0.5 text-xs text-muted-foreground">{label}</p>
     </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Quick Action
-// ---------------------------------------------------------------------------
-
-function QuickAction({
-  href,
-  icon,
-  label,
-  description,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  label: string;
-  description: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-muted/50"
-    >
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors group-hover:bg-primary/10 group-hover:text-primary">
-        {icon}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium">{label}</p>
-        <p className="text-xs text-muted-foreground">{description}</p>
-      </div>
-      <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
-    </Link>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Tips Card
-// ---------------------------------------------------------------------------
-
-function TipsCard({ orgCount, userCount }: { orgCount: number; userCount: number }) {
-  const tips: { text: string; href?: string }[] = [];
-
-  if (orgCount === 0) {
-    tips.push({
-      text: "Create your first organisation to start authenticating users.",
-      href: "/console/organisations",
-    });
-  }
-  if (orgCount > 0 && userCount <= 1) {
-    tips.push({
-      text: "Add team members so others can manage your organisations.",
-      href: "/console/users",
-    });
-  }
-  tips.push({
-    text: "Each organisation gets its own signing keys, session settings, and API clients.",
-  });
-  tips.push({
-    text: "Use the docs for integration guides — cURL, JavaScript, Python examples.",
-    href: "/docs",
-  });
-
-  return (
-    <Card className="border-dashed">
-      <CardContent className="flex items-start gap-3 p-4">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
-          <Lightbulb className="h-4 w-4" />
-        </div>
-        <div className="space-y-1.5">
-          <p className="text-sm font-medium">Tips</p>
-          <ul className="space-y-1">
-            {tips.map((tip, i) => (
-              <li key={i} className="text-xs text-muted-foreground">
-                {tip.href ? (
-                  <Link href={tip.href} className="text-primary hover:underline">
-                    {tip.text}
-                  </Link>
-                ) : (
-                  tip.text
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </CardContent>
-    </Card>
   );
 }

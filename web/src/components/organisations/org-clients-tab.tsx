@@ -37,6 +37,14 @@ function authLabel(client: OrganisationClientResponse): { label: string; tone: B
     : { label: "Sign-in only", tone: "secondary" };
 }
 
+function restrictionBadges(client: OrganisationClientResponse): string[] {
+  const badges: string[] = [];
+  if (!client.allowLogin) badges.push("No login");
+  if (!client.allowRegister) badges.push("No register");
+  if (client.allowedRoles.length > 0) badges.push(`${client.allowedRoles.length} role${client.allowedRoles.length === 1 ? "" : "s"}`);
+  return badges;
+}
+
 export function OrgClientsTab({ platformSlug, organisationId }: OrgClientsTabProps) {
   const clients = useOrgClients(organisationId);
   const deleteMutation = useDeleteOrgClient(platformSlug, organisationId);
@@ -106,7 +114,12 @@ export function OrgClientsTab({ platformSlug, organisationId }: OrgClientsTabPro
                         </ToneBadge>
                       </TableCell>
                       <TableCell>
-                        <ToneBadge tone={auth.tone}>{auth.label}</ToneBadge>
+                        <div className="flex flex-wrap gap-1">
+                          <ToneBadge tone={auth.tone}>{auth.label}</ToneBadge>
+                          {restrictionBadges(client).map((badge) => (
+                            <ToneBadge key={badge} tone="warning">{badge}</ToneBadge>
+                          ))}
+                        </div>
                       </TableCell>
                       <TableCell className="hidden max-w-[180px] truncate text-sm text-muted-foreground lg:table-cell">
                         {client.allowedOrigins.length > 0 ? client.allowedOrigins.join(", ") : "None"}

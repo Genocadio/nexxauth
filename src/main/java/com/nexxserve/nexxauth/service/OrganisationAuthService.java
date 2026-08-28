@@ -20,6 +20,7 @@ import com.nexxserve.nexxauth.exception.InvalidCredentialsException;
 import com.nexxserve.nexxauth.exception.PasswordExpiredException;
 import com.nexxserve.nexxauth.exception.RefreshTokenException;
 import com.nexxserve.nexxauth.exception.ResourceNotFoundException;
+import com.nexxserve.nexxauth.mapper.OrganisationClientMapper;
 import com.nexxserve.nexxauth.mapper.OrganisationUserMapper;
 import com.nexxserve.nexxauth.repository.OrganisationClientRepository;
 import com.nexxserve.nexxauth.repository.OrganisationRepository;
@@ -37,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class OrganisationAuthService {
@@ -51,6 +53,7 @@ public class OrganisationAuthService {
     private final OrgKeyService orgKeyService;
     private final PasswordEncoder passwordEncoder;
     private final OrganisationUserMapper userMapper;
+    private final OrganisationClientMapper clientMapper;
     private final AuthAuditService audit;
     private final OrganisationAuthConfigService authConfigService;
     private final OrganisationSessionSettingsService sessionSettingsService;
@@ -66,6 +69,7 @@ public class OrganisationAuthService {
                                    OrganisationRefreshTokenService refreshTokenService, OrgJwtService orgJwtService,
                                    OrgKeyService orgKeyService,
                                    PasswordEncoder passwordEncoder, OrganisationUserMapper userMapper,
+                                   OrganisationClientMapper clientMapper,
                                    AuthAuditService audit, OrganisationAuthConfigService authConfigService,
                                    OrganisationSessionSettingsService sessionSettingsService,
                                    AuthTiming authTiming, OrganisationUserFieldService userFieldService,
@@ -78,8 +82,9 @@ public class OrganisationAuthService {
         this.refreshTokenService = refreshTokenService;
         this.orgJwtService = orgJwtService;
         this.orgKeyService = orgKeyService;
-        this.passwordEncoder = passwordEncoder;
-        this.userMapper = userMapper;
+        this.passwordEncoder = passwordEncoder;        this.userMapper = userMapper;
+        this.clientMapper = clientMapper;
+
         this.audit = audit;
         this.authConfigService = authConfigService;
         this.sessionSettingsService = sessionSettingsService;
@@ -93,6 +98,7 @@ public class OrganisationAuthService {
     public OrgAuthResponse register(String platformSlug, OrgRegisterRequest request, String clientId,
                                      String ipAddress, String userAgent) {
         OrganisationClient client = resolveClient(clientId);
+        enforceClientRestrictions(client, "register");
         Organisation organisation = resolveOrganisation(platformSlug, request.organisationId(), client);
         String email = normalizedEmail(request.email());
         String username = cleanedUsername(request.username());
@@ -123,6 +129,9 @@ public class OrganisationAuthService {
         OrganisationUser saved = userRepository.save(user);
         applyRegisterMetadata(request, saved);
         assignDefaultRoles(organisation, saved);
+        // Re-fetch with roles loaded for the role restriction check
+        OrganisationUser userWithRoles = userRepository.findById(saved.getId()).orElse(saved);
+        enforceRoleRestrictions(client, userWithRoles);
         audit.logPersisted(LogLevel.INFO, LogCategory.AUTH, AuthAuditService.ORG_REGISTER, identifierOf(saved),
                 organisation.getSlug(), organisation.getId(), null);
         return issueTokens(saved, client, ipAddress, userAgent);
@@ -132,6 +141,7 @@ public class OrganisationAuthService {
     public OrgAuthResponse login(String platformSlug, OrgLoginRequest request, String clientId,
                                   String ipAddress, String userAgent) {
         OrganisationClient client = resolveClient(clientId);
+        enforceClientRestrictions(client, "login");
         Organisation organisation = resolveOrganisation(platformSlug, request.organisationId(), client);
         AuthType method = request.authType() != null ? request.authType() : AuthType.PASSWORD;
         return switch (method) {
@@ -175,6 +185,7 @@ public class OrganisationAuthService {
         }
         audit.logPersisted(LogLevel.INFO, LogCategory.AUTH, AuthAuditService.ORG_LOGIN_SUCCESS, identifier,
                 organisation.getSlug(), organisation.getId(), null);
+        enforceRoleRestrictions(client, user);
         return issueTokens(user, client, ipAddress, userAgent);
     }
 
@@ -251,6 +262,45 @@ public class OrganisationAuthService {
         if (o.isEmailCanLogin()) { var u = userRepository.findWithRolesByOrganisationIdAndEmail(o.getId(), Emails.normalize(id)); if (u.isPresent()) return u; }
         if (o.isPhoneCanLogin()) { var u = userRepository.findWithRolesByOrganisationIdAndPhone(o.getId(), Phones.normalize(id)); if (u.isPresent()) return u; }
         return java.util.Optional.empty();
+    }
+
+    /**
+     * Enforce per-client login/register restrictions. Called before the
+     * organisation is resolved so we fail fast with a clear message.
+     */
+    private void enforceClientRestrictions(OrganisationClient client, String action) {
+        if (client == null) return;
+        if ("register".equals(action) && !client.isAllowRegister()) {
+            audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY, AuthAuditService.ORG_REGISTER_FAILURE,
+                    null, client.getOrganisation().getSlug(), client.getOrganisation().getId(),
+                    "client_blocked_register");
+            throw new BadRequestException("Registration is not allowed from this client");
+        }
+        if ("login".equals(action) && !client.isAllowLogin()) {
+            audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY, AuthAuditService.ORG_LOGIN_FAILURE,
+                    null, client.getOrganisation().getSlug(), client.getOrganisation().getId(),
+                    "client_blocked_login");
+            throw new BadRequestException("Login is not allowed from this client");
+        }
+    }
+
+    /**
+     * Enforce role-based restrictions. After the user is known, check
+     * whether the client restricts which roles may login/register.
+     */
+    private void enforceRoleRestrictions(OrganisationClient client, OrganisationUser user) {
+        if (client == null || client.getAllowedRoles() == null || client.getAllowedRoles().isBlank()) return;
+        Set<String> allowed = clientMapper.splitRoles(client.getAllowedRoles());
+        if (allowed.isEmpty()) return;
+        boolean hasAllowedRole = user.getRoles().stream()
+                .anyMatch(role -> allowed.contains(role.getName()));
+        if (!hasAllowedRole) {
+            Organisation organisation = user.getOrganisation();
+            audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY, AuthAuditService.ORG_LOGIN_FAILURE,
+                    identifierOf(user), organisation.getSlug(), organisation.getId(),
+                    "role_not_allowed");
+            throw new BadRequestException("Your role is not permitted to authenticate from this client");
+        }
     }
 
     private OrganisationClient resolveClient(String clientId) {

@@ -114,9 +114,12 @@ These endpoints are public — a browser app calls them **with** `X-Client-Id` +
 > **Which organisation?** When the request carries an `X-Client-Id` header the
 > organisation is identified through the client — the client's organisation is
 > authoritative and **no `organisationId` is needed in the body** (any body id
-> is ignored). Without a client header (server-side scripts, the admin console)
-> the body's `organisationId` is **required**. The `organisationId` is a
-> platform-internal id and never appears in the client-facing payloads below.
+> is ignored). External apps should **never send `organisationId`** — it is a
+> platform-internal detail resolved automatically from the client.
+>
+> Without a client header (server-side scripts only), the body's
+> `organisationId` is **required**. This path is for platform users and is not
+> documented for external consumption.
 
 ### 4.1 Register an organisation user
 
@@ -135,9 +138,6 @@ Content-Type: application/json
   "metadata": { "department": "engineering" }
 }
 ```
-
-Without `X-Client-Id` (server-side/platform-user flow) add
-`"organisationId": 7` to the body.
 
 `username`, `email` and `phone` are optional identifiers, unique per
 organisation. Which ones are **required** on users and which can be used for
@@ -176,7 +176,6 @@ Content-Type: application/json
 - `authType` selects the authentication method and **defaults to `PASSWORD`**
   when omitted; today only `PASSWORD` exists, so `password` is always sent.
   Future methods (passkey, OTP, ...) will extend this field.
-- Without `X-Client-Id` add `"organisationId": 7` to the body.
 
 ### 4.3 Response shape (register, login, refresh)
 
@@ -238,16 +237,20 @@ Content-Type: application/json
 Authenticated org API base path:
 
 ```
-/organisations/{organisationId}/...
+/organisations/...
 ```
 
-Call it with the **access token**:
+Call it with the **access token** and your **client id**:
 
 ```http
-GET /organisations/{organisationId}/users/me
+GET /organisations/users/me
 X-Client-Id: cli_AbCdEfGhIjKlMnOpQrStUvWxYz1234567890_ab
 Authorization: Bearer eyJhbGciOiJSUzI1NiIs...
 ```
+
+> **No `organisationId` in the URL.** When you send `X-Client-Id`, the
+> organisation is resolved automatically from the client. The numeric id is a
+> platform-internal detail — external apps never need to know or use it.
 
 Access is controlled server-side. Three actor kinds reach the org API, all
 scoped to the organisation in the path:
@@ -260,7 +263,9 @@ scoped to the organisation in the path:
 
 ### 5.1 Endpoint reference
 
-All paths below are relative to `/organisations/{organisationId}`.
+All paths below are relative to `/organisations/` (external clients) or
+`/organisations/{organisationId}/` (platform users). External clients should
+always use the shorter form with `X-Client-Id`.
 Reads marked *read* are open to platform members (`SUPER_USER`/`READ_ONLY`) and
 org users holding the listed permission; writes are `SUPER_USER` (or the listed
 org permission). The `/me` endpoints are self-service — any org user may call
@@ -273,8 +278,8 @@ endpoints below.
 
 | Method & path | Purpose | Access |
 |---|---|---|
-| `GET /organisations/{organisationId}` | read the org itself | org users of the org (no permission) |
-| `PATCH /organisations/{organisationId}` | update identifier flags etc. | `SUPER_USER` |
+| `GET /organisations` | read the org itself (resolved from client) | org users of the org (no permission) |
+| `PATCH /organisations` | update identifier flags etc. | `SUPER_USER` |
 | `GET /users` | list users | read · `PERM_ORGANISATION_USER_READ` |
 | `POST /users` | create a user (optional `temporaryPassword`, `password`) | `SUPER_USER` · `PERM_ORGANISATION_USER_CREATE` |
 | `GET /users/me` | own profile | any org user |

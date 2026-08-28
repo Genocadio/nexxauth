@@ -188,35 +188,32 @@ public class OrganisationUserService {
             user.setPhone(phone);
         }
 
-        if (request.enabled() != null) {
+        if (request.enabled() != null && request.enabled() != user.isEnabled()) {
             user.setEnabled(request.enabled());
             if (!request.enabled()) {
-                // A disabled account must not be able to refresh sessions.
                 refreshTokenService.revokeAllForUser(user.getId());
             }
+            audit.logPersisted(LogLevel.INFO, LogCategory.USER_MANAGEMENT,
+                    request.enabled() ? AuthAuditService.ORG_USER_ENABLED : AuthAuditService.ORG_USER_DISABLED,
+                    identifierOf(user), organisation.getSlug(), organisation.getId(), null);
         }
+        Set<Long> previousRoleIds = user.getRoles().stream().map(OrganisationRole::getId).collect(java.util.stream.Collectors.toSet());
         if (request.roleIds() != null) {
             user.setRoles(resolveRoles(organisation, request.roleIds()));
         }
         if (request.password() != null) {
             if (request.password().isBlank()) {
-                // Empty string clears auth: the user can no longer log in.
                 authConfigService.clearAuth(user);
             } else {
                 authConfigService.setPassword(user, request.password());
             }
-            // An admin password change (reset) must force re-authentication:
-            // revoke every outstanding refresh token so existing sessions die
-            // with the old password.
             refreshTokenService.revokeAllForUser(user.getId());
+            audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY, AuthAuditService.ORG_USER_PASSWORD_RESET,
+                    identifierOf(user), organisation.getSlug(), organisation.getId(), null);
         }
         if (request.temporaryPassword() != null) {
             user.setTemporaryPassword(request.temporaryPassword());
             if (request.temporaryPassword()) {
-                // Triggering a forced password change kills existing sessions so
-                // the user re-authenticates into the gated action flow (fixed
-                // 5-minute access, no refresh, only the change-password endpoint)
-                // and cannot keep working under the old password.
                 refreshTokenService.revokeAllForUser(user.getId());
             }
         }
@@ -224,6 +221,12 @@ public class OrganisationUserService {
             userFieldService.setMetadata(user, request.metadata());
         }
         OrganisationUser saved = userRepository.save(user);
+        Set<Long> newRoleIds = saved.getRoles().stream().map(OrganisationRole::getId).collect(java.util.stream.Collectors.toSet());
+        if (!previousRoleIds.equals(newRoleIds)) {
+            audit.logPersisted(LogLevel.INFO, LogCategory.USER_MANAGEMENT, AuthAuditService.ORG_USER_ROLES_CHANGED,
+                    identifierOf(saved), organisation.getSlug(), organisation.getId(),
+                    "roles=" + newRoleIds);
+        }
         audit.logPersisted(LogLevel.INFO, LogCategory.USER_MANAGEMENT, AuthAuditService.ORG_USER_UPDATED,
                 identifierOf(saved), organisation.getSlug(), organisation.getId(), null);
         return userMapper.toResponse(saved, userFieldService.readMetadata(saved.getId()));

@@ -173,7 +173,6 @@ POST /auth/register
 X-Client-Id: cli_...            # when present, its organisation is authoritative
 
 { username?, email?, phone?, password?, firstName, lastName?, metadata? }
-# without X-Client-Id the body must carry: { organisationId, ... } (server-side)
 ```
 
 1. **Rate limit** — `org-register` bucket (separate from the platform bucket).
@@ -181,10 +180,9 @@ X-Client-Id: cli_...            # when present, its organisation is authoritativ
    password ≤ 72 (the detailed rules come from the org's auth-config). `firstName`
    is required (≤ 100); `lastName` is optional — omit it or pass an empty string
    for users without one (stored as null).
-3. **Organisation identified** — from the `X-Client-Id` client when present (the
-   client's organisation is authoritative; a body `organisationId` is ignored,
-   even a mismatched one); without a client header the body's `organisationId`
-   is **required** (server-side/platform-user flows) — else 400.
+3. **Organisation identified** — from the `X-Client-Id` client when present
+   (the client's organisation is authoritative; no `organisationId` is needed
+   or documented for external use).
 4. **OrganisationAuthService.register**:
    - org must exist **under this platform** → else 404.
    - **sign-in identifier configuration** — email, username and phone each have
@@ -227,13 +225,11 @@ POST /auth/login
 X-Client-Id: cli_...            # when present, its organisation is authoritative
 
 { identifier, identifierType?, authType?, password }   # authType defaults to PASSWORD
-# without X-Client-Id the body must carry: { organisationId, identifier, ... }
 ```
 
 1. **Rate limit** — `org-login` bucket.
-2. **Organisation identified** — same rule as register: from the `X-Client-Id`
-   client when present (body `organisationId` ignored), else the body's
-   `organisationId` (required — else 400).
+2. **Organisation identified** — from the `X-Client-Id` client when present
+   (the client's organisation is authoritative; no `organisationId` needed).
 3. **Authentication method** — `authType` selects it; `PASSWORD` is the default
    and today the only implemented method (the enum is the extension point for
    passkey, OTP, ... — adding one forces a new case in the service switch). For
@@ -324,6 +320,11 @@ keypair):
 
 When a request carries a valid token, access is decided in three layers:
 
+0. **URL rewriting** (`OrganisationIdFilter`) — external clients sending
+   `X-Client-Id` can call `/organisations/...` without the numeric id in the
+   path. The filter resolves the organisation from the client and rewrites
+   the URL to include the id before it reaches the controllers. Platform users
+   (console) always include the id in the path and are unaffected.
 1. **URL rules** (`SecurityConfig`) — e.g. org paths require *some* authenticated
    token; platform writes require `ROLE_SUPER_USER`; actuator is open.
 2. **Method rules** — `@PreAuthorize("hasRole('SUPER_USER')")` /

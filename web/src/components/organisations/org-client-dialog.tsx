@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, ShieldCheck } from "lucide-react";
 import { FormField } from "@/components/shared/form-field";
 import { ToneBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,13 @@ export function OrgClientDialog({
   const update = useUpdateOrgClient(platformSlug, organisationId);
   const pending = create.isPending || update.isPending;
 
+  const [useRoleRestrictions, setUseRoleRestrictions] = useState(
+    !!(client?.allowedRoles && client.allowedRoles.length > 0),
+  );
+  const [allowedRolesInput, setAllowedRolesInput] = useState(
+    client?.allowedRoles?.join(", ") ?? "",
+  );
+
   const [useSessionOverrides, setUseSessionOverrides] = useState(
     !!(client?.accessTokenTtlSeconds || client?.refreshTokenTtlSeconds || client?.maxSessionsPerUser),
   );
@@ -75,6 +82,8 @@ export function OrgClientDialog({
     requireAuthentication: client?.requireAuthentication ?? false,
     allowedOrigins: client?.allowedOrigins.join("\n") ?? "",
     enabled: client?.enabled ?? true,
+    allowRegister: client?.allowRegister ?? true,
+    allowLogin: client?.allowLogin ?? true,
   });
 
   // NOTE: this component must be keyed by the client (see OrgClientsTab).
@@ -101,6 +110,11 @@ export function OrgClientDialog({
       ? { accessTokenTtlSeconds: accessTokenTtl, refreshTokenTtlSeconds: refreshTokenTtl, maxSessionsPerUser: maxSessions }
       : {};
 
+    // Parse allowed roles
+    const allowedRoles = useRoleRestrictions && allowedRolesInput.trim()
+      ? new Set(allowedRolesInput.split(",").map(r => r.trim()).filter(Boolean))
+      : null; // null = clear restrictions
+
     if (isEdit && client) {
       await update.mutateAsync({
         clientKey: client.clientKey,
@@ -111,6 +125,9 @@ export function OrgClientDialog({
           ...(authOptional ? { requireAuthentication: data.requireAuthentication } : {}),
           // When overrides disabled, send -1 to clear back to org defaults.
           ...(useSessionOverrides ? sessionPayload : { accessTokenTtlSeconds: -1, refreshTokenTtlSeconds: -1, maxSessionsPerUser: -1 }),
+          allowRegister: data.allowRegister,
+          allowLogin: data.allowLogin,
+          allowedRoles: useRoleRestrictions ? allowedRoles : new Set(),
         },
       });
       onOpenChange(false);
@@ -122,6 +139,9 @@ export function OrgClientDialog({
         allowedOrigins,
         ...(authOptional ? { requireAuthentication: data.requireAuthentication } : {}),
         ...(useSessionOverrides ? sessionPayload : {}),
+        allowRegister: data.allowRegister,
+        allowLogin: data.allowLogin,
+        allowedRoles: useRoleRestrictions ? allowedRoles : undefined,
       });
       onCreated?.(created);
       onOpenChange(false);
@@ -257,6 +277,61 @@ export function OrgClientDialog({
                 </FormField>
               </div>
             ) : null}
+          </div>
+
+          <div className="rounded-lg border p-3 space-y-3">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium">Access restrictions</p>
+                <p className="text-xs text-muted-foreground">
+                  Control what this client can do and which roles may use it.
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <FormField label="Allow registration" hint="When off, users cannot register via this client.">
+                <div className="flex items-center justify-between rounded-md border px-3 py-2">
+                  <span className="text-sm">{form.values.allowRegister ? "Allowed" : "Blocked"}</span>
+                  <Switch
+                    checked={form.values.allowRegister}
+                    onCheckedChange={(checked) => form.setValue("allowRegister", checked)}
+                  />
+                </div>
+              </FormField>
+              <FormField label="Allow login" hint="When off, users cannot login via this client.">
+                <div className="flex items-center justify-between rounded-md border px-3 py-2">
+                  <span className="text-sm">{form.values.allowLogin ? "Allowed" : "Blocked"}</span>
+                  <Switch
+                    checked={form.values.allowLogin}
+                    onCheckedChange={(checked) => form.setValue("allowLogin", checked)}
+                  />
+                </div>
+              </FormField>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium">Role restrictions</p>
+                  <p className="text-xs text-muted-foreground">
+                    Only allow specific roles to authenticate via this client.
+                  </p>
+                </div>
+                <Switch
+                  checked={useRoleRestrictions}
+                  onCheckedChange={setUseRoleRestrictions}
+                />
+              </div>
+              {useRoleRestrictions ? (
+                <FormField
+                  label="Allowed roles"
+                  hint="Comma-separated role names. Users without one of these roles will be rejected."
+                >
+                  <Input
+                    placeholder="e.g. ADMIN, SUPPORT, USER"
+                    value={allowedRolesInput}
+                    onChange={(e) => setAllowedRolesInput(e.target.value)}
+                  />
+                </FormField>
+              ) : null}
+            </div>
           </div>
 
           {form.submitError ? (

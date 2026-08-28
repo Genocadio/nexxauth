@@ -5,6 +5,7 @@ import com.nexxserve.nexxauth.entity.ClientType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * A client's configuration. {@code clientKey} is the opaque identifier apps
@@ -25,6 +26,11 @@ public record OrganisationClientResponse(
         // --- session overrides (null = using org defaults) ---
         Long accessTokenTtlSeconds,
         Long refreshTokenTtlSeconds,
-        Integer maxSessionsPerUser
+        Integer maxSessionsPerUser,
+        // --- per-client login/register restrictions ---
+        boolean allowRegister,
+        boolean allowLogin,
+        /** Parsed set of allowed role names; empty means no restriction. */
+        Set<String> allowedRoles
 ) {
 }

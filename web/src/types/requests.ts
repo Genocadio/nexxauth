@@ -228,6 +228,9 @@ export interface CreateOrganisationClientRequest {
   accessTokenTtlSeconds?: number | null;
   refreshTokenTtlSeconds?: number | null;
   maxSessionsPerUser?: number | null;
+  allowRegister?: boolean;
+  allowLogin?: boolean;
+  allowedRoles?: Set<string> | null;
 }
 
 export interface UpdateOrganisationClientRequest {
@@ -240,4 +243,7 @@ export interface UpdateOrganisationClientRequest {
   accessTokenTtlSeconds?: number | null;
   refreshTokenTtlSeconds?: number | null;
   maxSessionsPerUser?: number | null;
+  allowRegister?: boolean;
+  allowLogin?: boolean;
+  allowedRoles?: Set<string> | null;
 }

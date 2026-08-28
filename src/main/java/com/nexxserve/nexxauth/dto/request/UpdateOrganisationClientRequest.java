@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Size;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Update a client. The type cannot be changed. Turning {@code requireAuthentication}
@@ -31,6 +32,15 @@ public record UpdateOrganisationClientRequest(
 
         Long refreshTokenTtlSeconds,
 
-        Integer maxSessionsPerUser
+        Integer maxSessionsPerUser,
+
+        // --- per-client login/register restrictions ---
+
+        Boolean allowRegister,
+
+        Boolean allowLogin,
+
+        @Size(max = 50, message = "At most 50 allowed roles")
+        Set<@NotBlank(message = "Role name must not be blank") String> allowedRoles
 ) {
 }

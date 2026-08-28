@@ -55,6 +55,7 @@ public class AuthAuditService {
 
     /** Organisation auth events. */
     public static final String ORG_REGISTER = "ORG_REGISTER";
+    public static final String ORG_REGISTER_FAILURE = "ORG_REGISTER_FAILURE";
     public static final String ORG_LOGIN_SUCCESS = "ORG_LOGIN_SUCCESS";
     public static final String ORG_LOGIN_FAILURE = "ORG_LOGIN_FAILURE";
     public static final String ORG_REFRESH = "ORG_REFRESH";
@@ -70,9 +71,15 @@ public class AuthAuditService {
 
     /** User management events (platform + org). */
     public static final String PLATFORM_USER_ADDED = "PLATFORM_USER_ADDED";
+    public static final String PLATFORM_USER_REMOVED = "PLATFORM_USER_REMOVED";
+    public static final String PLATFORM_USER_ROLE_CHANGED = "PLATFORM_USER_ROLE_CHANGED";
     public static final String ORG_USER_CREATED = "ORG_USER_CREATED";
     public static final String ORG_USER_UPDATED = "ORG_USER_UPDATED";
     public static final String ORG_USER_DELETED = "ORG_USER_DELETED";
+    public static final String ORG_USER_ENABLED = "ORG_USER_ENABLED";
+    public static final String ORG_USER_DISABLED = "ORG_USER_DISABLED";
+    public static final String ORG_USER_PASSWORD_RESET = "ORG_USER_PASSWORD_RESET";
+    public static final String ORG_USER_ROLES_CHANGED = "ORG_USER_ROLES_CHANGED";
 
     /** Organisation management events. */
     public static final String ORG_CREATED = "ORG_CREATED";
