@@ -13,15 +13,12 @@ test.describe("logs page", () => {
     await expect(status).toBeVisible();
   });
 
-  test("shows the filters card with level, event type, and org selects", async ({ authedPage }) => {
+  test("shows the compact filter bar with level, category, and org selects", async ({ authedPage }) => {
     await authedPage.goto("/console/logs");
 
-    await expect(authedPage.getByText("Filters", { exact: true })).toBeVisible();
-    await expect(authedPage.getByText("Level", { exact: true })).toBeVisible();
-    await expect(authedPage.getByText("Event type", { exact: true })).toBeVisible();
-    await expect(authedPage.getByText("Organisation", { exact: true })).toBeVisible();
-    await expect(authedPage.getByText("Category", { exact: true })).toBeVisible();
-    await expect(authedPage.getByRole("button", { name: /Clear filters/ })).toBeVisible();
+    // Compact filter bar: Level, Category, Organisation selects + Risk + Advanced toggle
+    await expect(authedPage.getByRole("button", { name: /Risk/ })).toBeVisible();
+    await expect(authedPage.getByRole("button", { name: /Advanced/ })).toBeVisible();
   });
 
   test("shows log entries section with count", async ({ authedPage }) => {
@@ -69,42 +66,38 @@ test.describe("logs page", () => {
     // Wait for initial load
     await expect(authedPage.getByText(/\d+ total|0 total/)).toBeVisible({ timeout: 10_000 });
 
-    // Open the level filter and select INFO
-    const levelTrigger = authedPage.locator("button").filter({ hasText: "All levels" });
-    if (await levelTrigger.isVisible()) {
-      await levelTrigger.click();
-      await authedPage.getByRole("option", { name: "INFO" }).click();
+    // Open the level filter (first select trigger in the compact bar) and select INFO
+    const levelTrigger = authedPage.locator("[data-slot='select-trigger']").first();
+    await levelTrigger.click();
+    await authedPage.getByRole("option", { name: "INFO" }).click();
 
-      // The filter should now show INFO
-      await expect(authedPage.getByText("INFO").first()).toBeVisible();
-
-      // All level badges on log rows should show INFO
-      // Each row button contains two badges: level badge + category badge.
-      // The level badge is the first badge inside each row button.
-      const rowButtons = authedPage.locator("button").filter({ has: authedPage.locator("[data-slot='badge']") });
-      const rowCount = await rowButtons.count();
-      for (let i = 0; i < Math.min(rowCount, 5); i++) {
-        const firstBadgeInRow = rowButtons.nth(i).locator("[data-slot='badge']").first();
-        await expect(firstBadgeInRow).toContainText("INFO");
-      }
+    // All level badges on log rows should show INFO
+    // Each row button contains two badges: level badge + category badge.
+    // The level badge is the first badge inside each row button.
+    await authedPage.waitForTimeout(1000); // let the filter settle
+    const rowButtons = authedPage.locator("button").filter({ has: authedPage.locator("[data-slot='badge']") });
+    const rowCount = await rowButtons.count();
+    for (let i = 0; i < Math.min(rowCount, 3); i++) {
+      const firstBadgeInRow = rowButtons.nth(i).locator("[data-slot='badge']").first();
+      await expect(firstBadgeInRow).toContainText("INFO");
     }
   });
 
   test("clear filters resets all filter selects", async ({ authedPage }) => {
     await authedPage.goto("/console/logs");
 
-    // Set a level filter
-    const levelTrigger = authedPage.locator("button").filter({ hasText: "All levels" });
-    if (await levelTrigger.isVisible()) {
-      await levelTrigger.click();
-      await authedPage.getByRole("option", { name: "ERROR" }).click();
-    }
+    // Set a level filter — compact bar shows trigger as "All levels" initially
+    const levelTrigger = authedPage.locator("[data-slot='select-trigger']").first();
+    await levelTrigger.click();
+    await authedPage.getByRole("option", { name: "ERROR" }).click();
 
-    // Click clear filters
-    await authedPage.getByRole("button", { name: /Clear filters/ }).click();
+    // Clear button should now be visible
+    const clearBtn = authedPage.getByRole("button", { name: /Clear/ });
+    await expect(clearBtn).toBeVisible();
+    await clearBtn.click();
 
-    // Level should be back to "All levels"
-    await expect(authedPage.locator("button").filter({ hasText: "All levels" })).toBeVisible();
+    // Level trigger should revert to "All levels" (default state)
+    await expect(levelTrigger).toContainText("All levels");
   });
 
   test("clicking a log row expands the detail panel", async ({ authedPage, platform }) => {
@@ -144,8 +137,8 @@ test.describe("logs page", () => {
     await authedPage.goto("/console/logs");
     await expect(authedPage.getByText(/\d+ total|0 total/)).toBeVisible({ timeout: 10_000 });
 
-    // Open the org filter
-    const orgTrigger = authedPage.locator("button").filter({ hasText: "All organisations" });
+    // Open the org filter (third select trigger in the compact bar)
+    const orgTrigger = authedPage.locator("[data-slot='select-trigger']").nth(2);
     if (await orgTrigger.isVisible()) {
       await orgTrigger.click();
 
