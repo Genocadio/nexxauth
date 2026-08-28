@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useUpdateOrgClient } from "@/hooks/mutations";
+import { useOrgRoles } from "@/hooks/queries";
 import { DEFAULT_SESSION_SETTINGS, formatDuration } from "@/lib/constants";
 import type { OrganisationClientResponse } from "@/types/api";
 
@@ -34,6 +35,7 @@ export function OrgClientSettingsDialog({
   client,
 }: OrgClientSettingsDialogProps) {
   const update = useUpdateOrgClient(platformSlug, organisationId);
+  const roles = useOrgRoles(organisationId);
   const pending = update.isPending;
 
   const [enabled, setEnabled] = useState(client.enabled);
@@ -42,8 +44,8 @@ export function OrgClientSettingsDialog({
   const [useRoleRestrictions, setUseRoleRestrictions] = useState(
     !!(client.allowedRoles && client.allowedRoles.length > 0),
   );
-  const [allowedRolesInput, setAllowedRolesInput] = useState(
-    client.allowedRoles?.join(", ") ?? "",
+  const [selectedRoles, setSelectedRoles] = useState<Set<string>>(
+    new Set(client.allowedRoles ?? []),
   );
   const [useSessionOverrides, setUseSessionOverrides] = useState(
     !!(client.accessTokenTtlSeconds || client.refreshTokenTtlSeconds || client.maxSessionsPerUser),
@@ -58,13 +60,25 @@ export function OrgClientSettingsDialog({
     client.maxSessionsPerUser ?? DEFAULT_SESSION_SETTINGS.maxSessionsPerUser,
   );
 
+  const toggleRole = (roleName: string) => {
+    setSelectedRoles((prev) => {
+      const next = new Set(prev);
+      if (next.has(roleName)) {
+        next.delete(roleName);
+      } else {
+        next.add(roleName);
+      }
+      return next;
+    });
+  };
+
   const submit = async () => {
     const sessionPayload = useSessionOverrides
       ? { accessTokenTtlSeconds: accessTokenTtl, refreshTokenTtlSeconds: refreshTokenTtl, maxSessionsPerUser: maxSessions }
       : { accessTokenTtlSeconds: -1, refreshTokenTtlSeconds: -1, maxSessionsPerUser: -1 };
 
-    const allowedRoles = useRoleRestrictions && allowedRolesInput.trim()
-      ? new Set(allowedRolesInput.split(",").map(r => r.trim()).filter(Boolean))
+    const allowedRoles = useRoleRestrictions && selectedRoles.size > 0
+      ? selectedRoles
       : new Set<string>();
 
     await update.mutateAsync({
@@ -81,6 +95,8 @@ export function OrgClientSettingsDialog({
     });
     onOpenChange(false);
   };
+
+  const availableRoles = roles.data ?? [];
 
   return (
     <Dialog open={open} onOpenChange={(next) => !pending && onOpenChange(next)}>
@@ -116,6 +132,8 @@ export function OrgClientSettingsDialog({
                 <Switch checked={allowLogin} onCheckedChange={setAllowLogin} />
               </div>
             </FormField>
+
+            {/* Role restrictions */}
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-sm font-medium">Role restrictions</p>
@@ -126,16 +144,45 @@ export function OrgClientSettingsDialog({
               <Switch checked={useRoleRestrictions} onCheckedChange={setUseRoleRestrictions} />
             </div>
             {useRoleRestrictions ? (
-              <FormField
-                label="Allowed roles"
-                hint="Comma-separated role names. Users without one of these roles will be rejected."
-              >
-                <Input
-                  placeholder="e.g. ADMIN, SUPPORT, USER"
-                  value={allowedRolesInput}
-                  onChange={(e) => setAllowedRolesInput(e.target.value)}
-                />
-              </FormField>
+              <div className="space-y-2">
+                {availableRoles.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic">
+                    No roles created yet. Create roles first to restrict access.
+                  </p>
+                ) : (
+                  <div className="rounded-md border divide-y">
+                    {availableRoles.map((role) => (
+                      <label
+                        key={role.id}
+                        className="flex items-center justify-between gap-3 px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="min-w-0">
+                          <span className="text-sm font-medium">{role.name}</span>
+                          {role.isDefault && (
+                            <span className="ml-2 text-[10px] text-muted-foreground">(default)</span>
+                          )}
+                          {role.permissions.length > 0 && (
+                            <p className="text-[11px] text-muted-foreground truncate">
+                              {role.permissions.length} permission{role.permissions.length !== 1 ? "s" : ""}
+                            </p>
+                          )}
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={selectedRoles.has(role.name)}
+                          onChange={() => toggleRole(role.name)}
+                          className="h-4 w-4 rounded border-input accent-primary shrink-0"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {selectedRoles.size > 0 && (
+                  <p className="text-[11px] text-muted-foreground">
+                    {selectedRoles.size} role{selectedRoles.size !== 1 ? "s" : ""} allowed
+                  </p>
+                )}
+              </div>
             ) : null}
           </div>
 
