@@ -78,11 +78,14 @@ test.describe("logs page", () => {
       // The filter should now show INFO
       await expect(authedPage.getByText("INFO").first()).toBeVisible();
 
-      // All visible badges should be INFO level
-      const badges = authedPage.locator("[data-slot='badge']");
-      const count = await badges.count();
-      for (let i = 0; i < Math.min(count, 5); i++) {
-        await expect(badges.nth(i)).toContainText("INFO");
+      // All level badges on log rows should show INFO
+      // Each row button contains two badges: level badge + category badge.
+      // The level badge is the first badge inside each row button.
+      const rowButtons = authedPage.locator("button").filter({ has: authedPage.locator("[data-slot='badge']") });
+      const rowCount = await rowButtons.count();
+      for (let i = 0; i < Math.min(rowCount, 5); i++) {
+        const firstBadgeInRow = rowButtons.nth(i).locator("[data-slot='badge']").first();
+        await expect(firstBadgeInRow).toContainText("INFO");
       }
     }
   });
@@ -128,8 +131,8 @@ test.describe("logs page", () => {
       // Click again to collapse
       await firstRow.click();
 
-      // Detail panel should be hidden
-      await expect(authedPage.getByText("Event type").first()).not.toBeVisible();
+      // Detail panel should be hidden — the 'Log entry ID' label only exists in the detail panel
+      await expect(firstRow.locator("text=Log entry ID")).not.toBeVisible();
     }
   });
 
