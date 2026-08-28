@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { AppWindow, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { AppWindow, Pencil, Plus, RefreshCw, Settings, Trash2 } from "lucide-react";
 import { ClientTokenDialog } from "@/components/organisations/client-token-dialog";
 import { OrgClientDialog } from "@/components/organisations/org-client-dialog";
+import { OrgClientSettingsDialog } from "@/components/organisations/org-client-settings-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { CopyButton } from "@/components/shared/copy-button";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -52,6 +53,7 @@ export function OrgClientsTab({ platformSlug, organisationId }: OrgClientsTabPro
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<OrganisationClientResponse | null>(null);
+  const [settingsClient, setSettingsClient] = useState<OrganisationClientResponse | null>(null);
   const [deleting, setDeleting] = useState<OrganisationClientResponse | null>(null);
   const [rotating, setRotating] = useState<OrganisationClientResponse | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -87,7 +89,7 @@ export function OrgClientsTab({ platformSlug, organisationId }: OrgClientsTabPro
                   <TableHead className="hidden lg:table-cell">Origins</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="hidden md:table-cell">Created</TableHead>
-                  <TableHead className="w-28" />
+                  <TableHead className="w-32" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -140,6 +142,14 @@ export function OrgClientsTab({ platformSlug, organisationId }: OrgClientsTabPro
                           >
                             <Pencil />
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`Settings for ${client.name}`}
+                            onClick={() => setSettingsClient(client)}
+                          >
+                            <Settings />
+                          </Button>
                           {client.requireAuthentication ? (
                             <Button
                               variant="ghost"
@@ -182,8 +192,7 @@ export function OrgClientsTab({ platformSlug, organisationId }: OrgClientsTabPro
         </CardContent>
       </Card>
 
-      {/* Keyed so each opened client remounts the dialog with its data
-          (form state initialises only on mount). */}
+      {/* Create dialog */}
       <OrgClientDialog
         key="create"
         platformSlug={platformSlug}
@@ -195,6 +204,7 @@ export function OrgClientsTab({ platformSlug, organisationId }: OrgClientsTabPro
         }}
       />
 
+      {/* Edit dialog */}
       <OrgClientDialog
         key={editing?.clientKey ?? "edit"}
         platformSlug={platformSlug}
@@ -204,6 +214,19 @@ export function OrgClientsTab({ platformSlug, organisationId }: OrgClientsTabPro
         client={editing ?? undefined}
       />
 
+      {/* Settings dialog */}
+      {settingsClient ? (
+        <OrgClientSettingsDialog
+          key={settingsClient.clientKey}
+          platformSlug={platformSlug}
+          organisationId={organisationId}
+          open={!!settingsClient}
+          onOpenChange={(open) => !open && setSettingsClient(null)}
+          client={settingsClient}
+        />
+      ) : null}
+
+      {/* Delete confirm */}
       <ConfirmDialog
         open={!!deleting}
         onOpenChange={(open) => !open && setDeleting(null)}
@@ -217,6 +240,7 @@ export function OrgClientsTab({ platformSlug, organisationId }: OrgClientsTabPro
         }}
       />
 
+      {/* Rotate token confirm */}
       <ConfirmDialog
         open={!!rotating}
         onOpenChange={(open) => !open && setRotating(null)}
@@ -233,6 +257,7 @@ export function OrgClientsTab({ platformSlug, organisationId }: OrgClientsTabPro
         }}
       />
 
+      {/* Token display */}
       <ClientTokenDialog
         open={!!token}
         onOpenChange={(open) => !open && setToken(null)}

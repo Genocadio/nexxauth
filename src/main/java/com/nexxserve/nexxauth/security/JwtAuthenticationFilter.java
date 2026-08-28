@@ -1,7 +1,11 @@
 package com.nexxserve.nexxauth.security;
 
+import com.nexxserve.nexxauth.entity.LogCategory;
+import com.nexxserve.nexxauth.entity.LogLevel;
 import com.nexxserve.nexxauth.entity.PlatformUser;
 import com.nexxserve.nexxauth.repository.PlatformUserRepository;
+import com.nexxserve.nexxauth.service.AuthAuditService;
+import com.nexxserve.nexxauth.service.LogService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -32,10 +36,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final PlatformUserRepository platformUserRepository;
+    private final LogService logService;
 
-    public JwtAuthenticationFilter(JwtService jwtService, PlatformUserRepository platformUserRepository) {
+    public JwtAuthenticationFilter(JwtService jwtService, PlatformUserRepository platformUserRepository, LogService logService) {
         this.jwtService = jwtService;
         this.platformUserRepository = platformUserRepository;
+        this.logService = logService;
     }
 
     @Override
@@ -57,8 +63,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                             List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name())));
                             SecurityContextHolder.getContext().setAuthentication(authentication);
                         });
-            } catch (JwtException | IllegalArgumentException ignored) {
-                // leave unauthenticated -> entry point answers 401
+            } catch (JwtException | IllegalArgumentException e) {
+                // Log invalid/expired JWT token — leave unauthenticated -> entry point answers 401
+                try {
+                    logService.logEvent(LogLevel.WARN, LogCategory.SECURITY,
+                            AuthAuditService.PLATFORM_LOGIN_FAILURE, "Invalid or expired JWT token",
+                            null, null, null, e.getMessage(), null, null);
+                } catch (Exception ignored) {
+                    // Never let logging break the filter
+                }
             }
         }
         filterChain.doFilter(request, response);

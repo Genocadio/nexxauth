@@ -1,8 +1,12 @@
 package com.nexxserve.nexxauth.security;
 
+import com.nexxserve.nexxauth.entity.LogCategory;
+import com.nexxserve.nexxauth.entity.LogLevel;
 import com.nexxserve.nexxauth.entity.OrganisationUser;
 import com.nexxserve.nexxauth.entity.Permission;
 import com.nexxserve.nexxauth.repository.OrganisationUserRepository;
+import com.nexxserve.nexxauth.service.AuthAuditService;
+import com.nexxserve.nexxauth.service.LogService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -42,11 +46,14 @@ public class OrgJwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final OrgJwtService orgJwtService;
     private final OrganisationUserRepository organisationUserRepository;
+    private final LogService logService;
 
     public OrgJwtAuthenticationFilter(OrgJwtService orgJwtService,
-                                      OrganisationUserRepository organisationUserRepository) {
+                                      OrganisationUserRepository organisationUserRepository,
+                                      LogService logService) {
         this.orgJwtService = orgJwtService;
         this.organisationUserRepository = organisationUserRepository;
+        this.logService = logService;
     }
 
     @Override
@@ -92,8 +99,15 @@ public class OrgJwtAuthenticationFilter extends OncePerRequestFilter {
                                     new UsernamePasswordAuthenticationToken(principal, null, authorities);
                             SecurityContextHolder.getContext().setAuthentication(authentication);
                         });
-            } catch (JwtException | IllegalArgumentException ignored) {
-                // leave unauthenticated -> entry point answers 401
+            } catch (JwtException | IllegalArgumentException e) {
+                // Log invalid/expired org JWT — leave unauthenticated -> entry point answers 401
+                try {
+                    logService.logEvent(LogLevel.WARN, LogCategory.SECURITY,
+                            AuthAuditService.ORG_LOGIN_FAILURE, "Invalid or expired org JWT token",
+                            null, null, null, e.getMessage(), null, null);
+                } catch (Exception ignored) {
+                    // Never let logging break the filter
+                }
             }
         }
         filterChain.doFilter(request, response);

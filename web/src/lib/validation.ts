@@ -218,8 +218,6 @@ export const orgClientFormSchema = z.object({
   requireAuthentication: z.boolean(),
   allowedOrigins: z.string(),
   enabled: z.boolean(),
-  allowRegister: z.boolean(),
-  allowLogin: z.boolean(),
 });
 
 export type PermissionsInput = Permission[];

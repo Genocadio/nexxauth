@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   AlertTriangle,
+  ChevronDown,
   CircleDot,
   Filter,
   Info,
@@ -15,7 +16,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { CardsSkeleton, TableSkeleton } from "@/components/shared/loading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -87,6 +88,8 @@ const EVENT_TYPES = [
   "ORG_USER_FIELD_CREATED",
   "ORG_USER_FIELD_UPDATED",
   "ORG_USER_FIELD_DELETED",
+  "UNAUTHENTICATED_ACCESS",
+  "UNAUTHORIZED_ACCESS",
 ] as const;
 
 const LEVEL_STYLES: Record<string, string> = {
@@ -117,6 +120,7 @@ export default function LogsPage() {
   const [to, setTo] = useState<string>("");
   const [page, setPage] = useState(0);
   const [size] = useState(50);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Real-time
   const orgIdNum = orgId !== "all" ? Number(orgId) : undefined;
@@ -188,8 +192,25 @@ export default function LogsPage() {
 
   const totalPages = historyData?.totalPages ?? 0;
 
+  const activeFilterCount = [level, category, eventType, clientFilter, domainFilter, orgId, from, to]
+    .filter((v) => v !== "all" && v !== "" && v !== undefined).length + (riskMode ? 1 : 0);
+
+  const clearAll = () => {
+    setLevel("all");
+    setCategory("all");
+    setRiskMode(false);
+    setEventType("all");
+    setOrgId("all");
+    setFrom("");
+    setTo("");
+    setClientFilter("all");
+    setDomainFilter("all");
+    clearLogs();
+    setPage(0);
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title="Logs"
         description="Real-time and historical log entries across your platform and organisations."
@@ -205,89 +226,105 @@ export default function LogsPage() {
         </div>
       </FadeIn>
 
-      {/* Filters */}
+      {/* Compact filter bar */}
       <FadeIn delay={0.1}>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm font-medium">
-              <Filter className="h-4 w-4" />
-              Filters
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Level</label>
-                <Select value={level} onValueChange={setLevel}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All levels" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All levels</SelectItem>
-                    {LEVEL_OPTIONS.map((l) => (
-                      <SelectItem key={l} value={l}>
-                        {l}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+        <div className="rounded-lg border bg-card p-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Filter className="h-3.5 w-3.5" />
+              {activeFilterCount > 0 && (
+                <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                  {activeFilterCount}
+                </Badge>
+              )}
+            </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Category</label>
-                <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All categories" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All categories</SelectItem>
-                    {CATEGORY_OPTIONS.map((c) => (
-                      <SelectItem key={c.value} value={c.value}>
-                        {c.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <Select value={level} onValueChange={setLevel}>
+              <SelectTrigger className="h-8 w-[110px] text-xs">
+                <SelectValue placeholder="Level" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All levels</SelectItem>
+                {LEVEL_OPTIONS.map((l) => (
+                  <SelectItem key={l} value={l}>{l}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger className="h-8 w-[110px] text-xs">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                {CATEGORY_OPTIONS.map((c) => (
+                  <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={orgId} onValueChange={setOrgId}>
+              <SelectTrigger className="h-8 w-[130px] text-xs">
+                <SelectValue placeholder="Organisation" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All orgs</SelectItem>
+                {(organisations.data ?? []).map((org) => (
+                  <SelectItem key={org.id} value={String(org.id)}>{org.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Button
+              variant={riskMode ? "default" : "outline"}
+              size="sm"
+              className="h-8 px-2 text-xs"
+              onClick={() => { setRiskMode((v) => !v); setPage(0); }}
+            >
+              <ShieldAlert className="mr-1 h-3 w-3" />
+              Risk
+            </Button>
+
+            {activeFilterCount > 0 && (
+              <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={clearAll}>
+                <XCircle className="mr-1 h-3 w-3" />
+                Clear
+              </Button>
+            )}
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-xs ml-auto"
+              onClick={() => setShowAdvanced((v) => !v)}
+            >
+              Advanced
+              <ChevronDown className={`ml-1 h-3 w-3 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+            </Button>
+          </div>
+
+          {/* Expandable advanced filters */}
+          {showAdvanced && (
+            <div className="mt-2 flex flex-wrap items-end gap-2 border-t pt-2">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Event type</label>
+                <label className="text-[10px] font-medium text-muted-foreground">Event type</label>
                 <Select value={eventType} onValueChange={setEventType}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-8 w-[160px] text-xs">
                     <SelectValue placeholder="All events" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All events</SelectItem>
                     {EVENT_TYPES.map((e) => (
-                      <SelectItem key={e} value={e}>
-                        {e}
-                      </SelectItem>
+                      <SelectItem key={e} value={e}>{e}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Organisation</label>
-                <Select value={orgId} onValueChange={setOrgId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All organisations" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All organisations</SelectItem>
-                    {(organisations.data ?? []).map((org) => (
-                      <SelectItem key={org.id} value={String(org.id)}>
-                        {org.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Client</label>
+                <label className="text-[10px] font-medium text-muted-foreground">Client</label>
                 <Select value={clientFilter} onValueChange={setClientFilter}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-8 w-[120px] text-xs">
                     <SelectValue placeholder="All clients" />
                   </SelectTrigger>
                   <SelectContent>
@@ -301,9 +338,9 @@ export default function LogsPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Domain</label>
+                <label className="text-[10px] font-medium text-muted-foreground">Domain</label>
                 <Select value={domainFilter} onValueChange={setDomainFilter}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-8 w-[120px] text-xs">
                     <SelectValue placeholder="All domains" />
                   </SelectTrigger>
                   <SelectContent>
@@ -317,76 +354,32 @@ export default function LogsPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">From</label>
+                <label className="text-[10px] font-medium text-muted-foreground">From</label>
                 <Input
                   type="datetime-local"
                   value={from}
                   onChange={(e) => setFrom(e.target.value)}
-                  className="text-xs"
+                  className="h-8 w-[160px] text-xs"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">To</label>
+                <label className="text-[10px] font-medium text-muted-foreground">To</label>
                 <Input
                   type="datetime-local"
                   value={to}
                   onChange={(e) => setTo(e.target.value)}
-                  className="text-xs"
+                  className="h-8 w-[160px] text-xs"
                 />
               </div>
-
-              <div className="flex items-end gap-2">
-                <Button
-                  variant={riskMode ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setRiskMode((v) => !v);
-                    setPage(0);
-                  }}
-                  className={riskMode ? "bg-amber-500/20 text-amber-700 hover:bg-amber-500/30 dark:text-amber-400" : ""}
-                >
-                  <ShieldAlert className="mr-1 h-3.5 w-3.5" />
-                  Risk
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setLevel("all");
-                    setCategory("all");
-                    setRiskMode(false);
-                    setEventType("all");
-                    setOrgId("all");
-                    setFrom("");
-                    setTo("");
-                    setClientFilter("all");
-                    setDomainFilter("all");
-                    clearLogs();
-                    setPage(0);
-                  }}
-                  className="flex-1 sm:flex-none"
-                >
-                  <XCircle className="mr-1 h-3.5 w-3.5" />
-                  Clear filters
-                </Button>
-              </div>
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </div>
       </FadeIn>
 
       {/* Log entries */}
       <FadeIn delay={0.15}>
         <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium">Entries</CardTitle>
-              <span className="text-xs text-muted-foreground">
-                {historyData?.totalElements ?? allLogs.length} total
-              </span>
-            </div>
-          </CardHeader>
           <CardContent className="p-0">
             {historyLoading && !allLogs.length ? (
               <div className="p-4">
@@ -406,11 +399,19 @@ export default function LogsPage() {
                 <p className="text-sm text-muted-foreground">No log entries yet.</p>
               </div>
             ) : (
-              <div className="divide-y overflow-hidden">
-                {allLogs.map((entry) => (
-                  <LogRow key={entry.id} entry={entry} />
-                ))}
-              </div>
+              <>
+                <div className="flex items-center justify-between border-b px-4 py-2">
+                  <span className="text-xs font-medium text-muted-foreground">Entries</span>
+                  <span className="text-xs text-muted-foreground">
+                    {historyData?.totalElements ?? allLogs.length} total
+                  </span>
+                </div>
+                <div className="divide-y overflow-hidden">
+                  {allLogs.map((entry) => (
+                    <LogRow key={entry.id} entry={entry} />
+                  ))}
+                </div>
+              </>
             )}
           </CardContent>
         </Card>

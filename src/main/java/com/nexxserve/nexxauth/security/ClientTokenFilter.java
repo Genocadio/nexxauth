@@ -1,9 +1,13 @@
 package com.nexxserve.nexxauth.security;
 
+import com.nexxserve.nexxauth.entity.LogCategory;
+import com.nexxserve.nexxauth.entity.LogLevel;
 import com.nexxserve.nexxauth.entity.OrganisationClient;
 import com.nexxserve.nexxauth.entity.Permission;
 import com.nexxserve.nexxauth.exception.ErrorResponseWriter;
 import com.nexxserve.nexxauth.repository.OrganisationClientRepository;
+import com.nexxserve.nexxauth.service.AuthAuditService;
+import com.nexxserve.nexxauth.service.LogService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -61,10 +65,12 @@ public class ClientTokenFilter extends OncePerRequestFilter {
 
     private final OrganisationClientRepository clientRepository;
     private final ErrorResponseWriter errorResponseWriter;
+    private final LogService logService;
 
-    public ClientTokenFilter(OrganisationClientRepository clientRepository, ErrorResponseWriter errorResponseWriter) {
+    public ClientTokenFilter(OrganisationClientRepository clientRepository, ErrorResponseWriter errorResponseWriter, LogService logService) {
         this.clientRepository = clientRepository;
         this.errorResponseWriter = errorResponseWriter;
+        this.logService = logService;
     }
 
     @Override
@@ -88,10 +94,12 @@ public class ClientTokenFilter extends OncePerRequestFilter {
 
         OrganisationClient client = clientRepository.findByClientKey(clientIdHeader.trim()).orElse(null);
         if (client == null) {
+            logFailure(request, null, clientIdHeader.trim(), "Unknown client");
             write(response, HttpStatus.UNAUTHORIZED, "Unknown client", request.getRequestURI());
             return;
         }
         if (!client.isEnabled()) {
+            logFailure(request, client, client.getClientKey(), "Client is disabled");
             write(response, HttpStatus.FORBIDDEN, "Client is disabled", request.getRequestURI());
             return;
         }
@@ -102,6 +110,7 @@ public class ClientTokenFilter extends OncePerRequestFilter {
                     ? header.substring(BEARER_PREFIX.length())
                     : null;
             if (token == null || !ClientTokens.matches(token, client.getTokenHash())) {
+                logFailure(request, client, client.getClientKey(), "Invalid client token");
                 write(response, HttpStatus.UNAUTHORIZED, "Invalid client token", request.getRequestURI());
                 return;
             }
@@ -123,6 +132,8 @@ public class ClientTokenFilter extends OncePerRequestFilter {
         }
 
         if (!ORG_AUTH_PATH.matcher(request.getRequestURI()).matches()) {
+            logFailure(request, client, client.getClientKey(),
+                    "Client cannot access this endpoint: " + request.getRequestURI());
             write(response, HttpStatus.FORBIDDEN,
                     "This client type can only access the organisation login and register endpoints",
                     request.getRequestURI());
@@ -161,6 +172,17 @@ public class ClientTokenFilter extends OncePerRequestFilter {
         String portSuffix = (scheme.equals("https") && port == 443) || (scheme.equals("http") && port == 80)
                 ? "" : ":" + port;
         return scheme + "://" + host + portSuffix;
+    }
+
+    private void logFailure(HttpServletRequest request, OrganisationClient client, String clientKey, String detail) {
+        Long orgId = client != null && client.getOrganisation() != null ? client.getOrganisation().getId() : null;
+        try {
+            logService.logEvent(LogLevel.WARN, LogCategory.SECURITY,
+                    AuthAuditService.ORG_LOGIN_FAILURE, detail,
+                    null, orgId, null, detail, clientKey, null);
+        } catch (Exception ignored) {
+            // Never let logging break the filter
+        }
     }
 
     private void write(HttpServletResponse response, HttpStatus status, String message, String path)

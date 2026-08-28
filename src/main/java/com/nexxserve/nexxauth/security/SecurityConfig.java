@@ -1,6 +1,9 @@
 package com.nexxserve.nexxauth.security;
 
+import com.nexxserve.nexxauth.entity.LogCategory;
+import com.nexxserve.nexxauth.entity.LogLevel;
 import com.nexxserve.nexxauth.exception.ErrorResponseWriter;
+import com.nexxserve.nexxauth.service.LogService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -32,14 +35,15 @@ public class SecurityConfig {
                                                    ClientTokenFilter clientTokenFilter,
                                                    OrganisationIdFilter orgIdFilter,
                                                    CorsConfigurationSource corsConfigurationSource,
-                                                   ErrorResponseWriter errorResponseWriter) throws Exception {
+                                                   ErrorResponseWriter errorResponseWriter,
+                                                   LogService logService) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(handling -> handling
-                        .authenticationEntryPoint(entryPoint(errorResponseWriter))
-                        .accessDeniedHandler(accessDeniedHandler(errorResponseWriter)))
+                        .authenticationEntryPoint(entryPoint(errorResponseWriter, logService))
+                        .accessDeniedHandler(accessDeniedHandler(errorResponseWriter, logService)))
                 .authorizeHttpRequests(auth -> auth
                         // Actuator health/info: open so monitoring probes need no token.
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
@@ -92,13 +96,35 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    private org.springframework.security.web.AuthenticationEntryPoint entryPoint(ErrorResponseWriter writer) {
-        return (request, response, authException) -> writer.write(response,
-                org.springframework.http.HttpStatus.UNAUTHORIZED, "Authentication required", request.getRequestURI());
+    private org.springframework.security.web.AuthenticationEntryPoint entryPoint(ErrorResponseWriter writer, LogService logService) {
+        return (request, response, authException) -> {
+            try {
+                String path = request.getRequestURI();
+                logService.logEvent(LogLevel.WARN, LogCategory.SECURITY,
+                        "UNAUTHENTICATED_ACCESS", "Authentication required",
+                        null, null, null, "Path: " + path + " Reason: " + authException.getMessage(),
+                        null, null);
+            } catch (Exception ignored) {
+                // Never let logging break the response
+            }
+            writer.write(response, org.springframework.http.HttpStatus.UNAUTHORIZED,
+                    "Authentication required", request.getRequestURI());
+        };
     }
 
-    private org.springframework.security.web.access.AccessDeniedHandler accessDeniedHandler(ErrorResponseWriter writer) {
-        return (request, response, accessDeniedException) -> writer.write(response,
-                org.springframework.http.HttpStatus.FORBIDDEN, "Insufficient permissions", request.getRequestURI());
+    private org.springframework.security.web.access.AccessDeniedHandler accessDeniedHandler(ErrorResponseWriter writer, LogService logService) {
+        return (request, response, accessDeniedException) -> {
+            try {
+                String path = request.getRequestURI();
+                logService.logEvent(LogLevel.WARN, LogCategory.SECURITY,
+                        "UNAUTHORIZED_ACCESS", "Insufficient permissions",
+                        null, null, null, "Path: " + path + " Reason: " + accessDeniedException.getMessage(),
+                        null, null);
+            } catch (Exception ignored) {
+                // Never let logging break the response
+            }
+            writer.write(response, org.springframework.http.HttpStatus.FORBIDDEN,
+                    "Insufficient permissions", request.getRequestURI());
+        };
     }
 }
