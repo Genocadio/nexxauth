@@ -82,7 +82,8 @@ class OrganisationSessionSettingsIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessTokenTtlSeconds").value(120));
 
-        OrgTokens tokens = registerOrgUser(boss, platform, orgId, "ttluser", "pass1234");
+        String clientKey = createClient(boss, platform + "/organisations/" + orgId, "Test Client");
+        OrgTokens tokens = registerOrgUser(boss, platform, clientKey, "ttluser", "pass1234");
         // the login response reports the org-specific lifetime...
         org.junit.jupiter.api.Assertions.assertEquals(120, tokens.expiresInSeconds());
         // ...and the token itself is actually signed with it
@@ -104,7 +105,8 @@ class OrganisationSessionSettingsIntegrationTest {
                         .content(json(Map.of("refreshTokenTtlSeconds", 3600))))
                 .andExpect(status().isOk());
 
-        OrgTokens tokens = registerOrgUser(boss, platform, refttlOrgId, "refttluser", "pass1234");
+        String clientKey = createClient(boss, platform + "/organisations/" + refttlOrgId, "Test Client");
+        OrgTokens tokens = registerOrgUser(boss, platform, clientKey, "refttluser", "pass1234");
         List<com.nexxserve.nexxauth.entity.OrganisationRefreshToken> active =
                 refreshTokenRepository.findActiveByUserIdOrderByExpiresAtAsc(tokens.userId(), Instant.now());
         org.junit.jupiter.api.Assertions.assertEquals(1, active.size());
@@ -128,8 +130,9 @@ class OrganisationSessionSettingsIntegrationTest {
                         .content(json(Map.of("maxSessionsPerUser", 1))))
                 .andExpect(status().isOk());
 
-        OrgTokens first = registerOrgUser(boss, platform, orgId, "maxuser", "pass1234");
-        OrgTokens second = loginOrg(orgAuth, orgId, "maxuser", "pass1234");
+        String clientKey = createClient(boss, platform + "/organisations/" + orgId, "Test Client");
+        OrgTokens first = registerOrgUser(boss, platform, clientKey, "maxuser", "pass1234");
+        OrgTokens second = loginOrg(orgAuth, clientKey, "maxuser", "pass1234");
 
         // the second login evicted the first session: its refresh token is dead
         mockMvc.perform(post(orgAuth + "/refresh")
@@ -149,8 +152,8 @@ class OrganisationSessionSettingsIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("maxSessionsPerUser", 2))))
                 .andExpect(status().isOk());
-        OrgTokens third = registerOrgUser(boss, platform, orgId, "maxuser2", "pass1234");
-        OrgTokens fourth = loginOrg(orgAuth, orgId, "maxuser2", "pass1234");
+        OrgTokens third = registerOrgUser(boss, platform, clientKey, "maxuser2", "pass1234");
+        OrgTokens fourth = loginOrg(orgAuth, clientKey, "maxuser2", "pass1234");
         mockMvc.perform(post(orgAuth + "/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("refreshToken", third.refreshToken()))))
@@ -180,7 +183,8 @@ class OrganisationSessionSettingsIntegrationTest {
                 .andExpect(status().isForbidden());
 
         // an org user can read the org's settings but not change them
-        OrgTokens orgUser = registerOrgUser(boss, platform, orgId, "acluser", "pass1234");
+        String clientKey = createClient(boss, platform + "/organisations/" + orgId, "Test Client");
+        OrgTokens orgUser = registerOrgUser(boss, platform, clientKey, "acluser", "pass1234");
         mockMvc.perform(get(settingsPath).header("Authorization", bearer(orgUser.accessToken())))
                 .andExpect(status().isOk());
         mockMvc.perform(patch(settingsPath)
@@ -191,6 +195,7 @@ class OrganisationSessionSettingsIntegrationTest {
 
         // org auth itself is untouched by all of this
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "acluser", "password", "pass1234"))))
                 .andExpect(status().isOk());
@@ -380,22 +385,34 @@ class OrganisationSessionSettingsIntegrationTest {
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
     }
 
-    private OrgTokens registerOrgUser(String boss, String platform, long orgId, String identifier,
+    private String createClient(String boss, String org, String name) throws Exception {
+        MvcResult result = mockMvc.perform(post(org + "/clients")
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("name", name, "type", "WEB"))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("clientKey").asText();
+    }
+
+    private OrgTokens registerOrgUser(String boss, String platform, String clientKey, String identifier,
                                       String password) throws Exception {
         MvcResult result = mockMvc.perform(post(platform + "/auth/register")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
-                                "organisationId", orgId, "username", identifier,
+                                "username", identifier,
                                 "password", password, "firstName", "F", "lastName", "L"))))
                 .andExpect(status().isCreated())
                 .andReturn();
         return toTokens(result.getResponse().getContentAsString());
     }
 
-    private OrgTokens loginOrg(String orgAuth, long orgId, String identifier, String password) throws Exception {
+    private OrgTokens loginOrg(String orgAuth, String clientKey, String identifier, String password) throws Exception {
         MvcResult result = mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", identifier, "password", password))))
+                        .content(json(Map.of("identifier", identifier, "password", password))))
                 .andExpect(status().isOk())
                 .andReturn();
         return toTokens(result.getResponse().getContentAsString());

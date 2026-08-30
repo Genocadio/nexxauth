@@ -59,7 +59,6 @@ export default function LoginPage() {
         auth="Public (with X-Client-Id header)"
         request={JSON.stringify(
           {
-            organisationId: docs.organisation.id,
             identifier: "johndoe",
             identifierType: "USERNAME",
             password: "securePassword123",

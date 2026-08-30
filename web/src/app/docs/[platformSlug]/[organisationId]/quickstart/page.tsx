@@ -47,7 +47,6 @@ export default function QuickStartPage() {
   -H "X-Client-Id: cli_your_client_key" \\
   -d '${JSON.stringify(
     {
-      organisationId: docs.organisation.id,
       firstName: "John",
       lastName: "Doe",
       password: "securePassword123",
@@ -73,7 +72,6 @@ export default function QuickStartPage() {
   -H "X-Client-Id: cli_your_client_key" \\
   -d '${JSON.stringify(
     {
-      organisationId: docs.organisation.id,
       identifier: "johndoe",
       identifierType: "USERNAME",
       password: "securePassword123",
@@ -94,7 +92,7 @@ export default function QuickStartPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <CodeBlock
-            code={`curl -X GET ${baseUrl}/organisations/${docs.organisation.id}/users/me \\
+            code={`curl -X GET ${baseUrl}/organisations/users/me \\
   -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIs..." \\
   -H "X-Client-Id: cli_your_client_key"`}
             language="bash"

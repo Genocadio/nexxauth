@@ -65,7 +65,6 @@ export default function RegisterPage() {
         auth="Public (with X-Client-Id header)"
         request={JSON.stringify(
           {
-            organisationId: docs.organisation.id,
             firstName: "John",
             lastName: "Doe",
             ...(docs.identifiers.usernameRequired && { username: "johndoe" }),
@@ -124,7 +123,6 @@ export default function RegisterPage() {
   -H "X-Client-Id: cli_your_client_key" \\
   -d '${JSON.stringify(
     {
-      organisationId: docs.organisation.id,
       firstName: "John",
       lastName: "Doe",
       password: "securePassword123",

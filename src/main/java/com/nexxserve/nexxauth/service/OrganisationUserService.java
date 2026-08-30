@@ -137,6 +137,7 @@ public class OrganisationUserService {
         if (request.metadata() != null) {
             userFieldService.setMetadata(saved, request.metadata());
         }
+        saved.bumpDataHash();
         if (request.password() != null && !request.password().isBlank()) {
             // A user created with a password gets the org's default auth type
             // (PASSWORD) and can log in; without one they have no auth yet.
@@ -220,6 +221,7 @@ public class OrganisationUserService {
         if (request.metadata() != null) {
             userFieldService.setMetadata(user, request.metadata());
         }
+        user.bumpDataHash();
         OrganisationUser saved = userRepository.save(user);
         Set<Long> newRoleIds = saved.getRoles().stream().map(OrganisationRole::getId).collect(java.util.stream.Collectors.toSet());
         if (!previousRoleIds.equals(newRoleIds)) {
@@ -280,6 +282,7 @@ public class OrganisationUserService {
         if (request.metadata() != null) {
             userFieldService.setMetadata(user, request.metadata());
         }
+        user.bumpDataHash();
         return userMapper.toResponse(userRepository.save(user), userFieldService.readMetadata(user.getId()));
     }
 

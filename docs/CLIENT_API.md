@@ -56,9 +56,10 @@ Every request uses JSON (`Content-Type: application/json`).
 >
 > That base URL is fixed for your project — every endpoint below is relative to
 > it (org auth at `/auth/*`, the org API at
-> `/organisations/{organisationId}/*`, keys at
-> `/organisations/{organisationId}/keys`). Organisations are addressed by their
-> numeric id — organisation slugs are not used anywhere in the API.
+> `/organisations/*`, keys at `/organisations/keys`). With an `X-Client-Id`
+> header the organisation is resolved automatically — external clients never
+> need to know the numeric id. Platform users include `{organisationId}` in
+> the path.
 >
 > The backend returns the value as `apiBaseUrl`; when neither the backend nor
 > the web app knows the public origin, the dashboards omit the row — they never
@@ -346,7 +347,8 @@ served openly so any service can verify.
 ### 6.1 Fetch the public keys
 
 ```http
-GET /organisations/{organisationId}/keys
+GET /organisations/keys
+X-Client-Id: cli_AbCdEfGhIjKlMnOpQrStUvWxYz1234567890_ab
 ```
 
 Public — no authentication needed. Returns an array ordered oldest → newest:
@@ -393,6 +395,7 @@ Payload claims:
 | `orgId` | number | organisation id |
 | `orgSlug` | string | organisation slug |
 | `roles` | string[] | **role names** the user holds, e.g. `["admin","support"]` |
+| `dataHash` | string | opaque UUID that changes on every non-password user mutation — external APIs compare this to detect stale data without hitting the database |
 | `type` | string | always `org-access` |
 | `iss.*nexxauth` |
 | `iat` | number | issued-at (Unix seconds) |
@@ -407,14 +410,15 @@ Payload claims:
 
 ```bash
 BASE="<your project base URL from the console>"
-ORG_ID={organisationId}
 TOKEN="<paste org access token>"
 
 # 1. keys are public
-curl -s "$BASE/organisations/$ORG_ID/keys"
+curl -s "$BASE/organisations/keys" \
+  -H "X-Client-Id: cli_..."
 
 # 2. save the active key as a PEM file
-curl -s "$BASE/organisations/$ORG_ID/keys" \
+curl -s "$BASE/organisations/keys" \
+  -H "X-Client-Id: cli_..." \
   | jq -r '.[] | select(.active == true) | .publicKey' \
   | base64 -d > /tmp/pub.der
 openssl pkey -inform DER -pubin -in /tmp/pub.der -out /tmp/pub.pem
@@ -448,13 +452,13 @@ function spkiDerToPem(derB64) {
   return `-----BEGIN PUBLIC KEY-----\n${wrapped}\n-----END PUBLIC KEY-----`;
 }
 
-async function verifyOrgToken(token, organisationId) {
+async function verifyOrgToken(token) {
   const header = JSON.parse(
     Buffer.from(token.split(".")[0], "base64url").toString("utf8")
   );
 
   const keys = await fetch(
-    `https://your-api-domain.com/organisations/${organisationId}/keys`
+    `https://your-api-domain.com/organisations/keys`
   ).then((r) => r.json());
 
   const key = keys.find((k) => k.kid === header.kid);
@@ -483,9 +487,9 @@ def spki_der_to_pem(der_b64: str) -> str:
     body = "\n".join(b64[i:i + 64] for i in range(0, len(b64), 64))
     return f"-----BEGIN PUBLIC KEY-----\n{body}\n-----END PUBLIC KEY-----"
 
-def verify_org_token(token: str, organisation_id: int) -> dict:
+def verify_org_token(token: str) -> dict:
     header = json.loads(base64.urlsafe_b64decode(token.split(".")[0] + "=="))
-    url = f"https://your-api-domain.com/organisations/{organisation_id}/keys"
+    url = "https://your-api-domain.com/organisations/keys"
     with urllib.request.urlopen(url) as r:
         keys = json.load(r)
     key = next(k for k in keys if k["kid"] == header["kid"])
@@ -503,6 +507,7 @@ The decoded payload already carries the role names:
   "orgId": 7,
   "orgSlug": "acme",
   "roles": ["admin", "support"],
+  "dataHash": "a1b2c3d4-...",
   "type": "org-access",
   "iss.*nexxauth",
   "iat": 1730000000,

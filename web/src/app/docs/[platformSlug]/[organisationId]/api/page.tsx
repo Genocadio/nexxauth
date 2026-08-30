@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 export default function ApiReferencePage() {
   const docs = useDocs();
   const baseUrl = useDocsApiBaseUrl(docs.organisation.platformSlug);
-  const basePath = `/organisations/${docs.organisation.id}`;
+  const basePath = "/organisations";
 
   return (
     <div className="space-y-8">

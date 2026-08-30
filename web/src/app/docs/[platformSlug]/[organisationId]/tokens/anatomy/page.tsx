@@ -41,6 +41,7 @@ export default function AnatomyPage() {
   "exp": 1704068100,             // Expires at (Unix timestamp)
   "kid": "key-1",               // Key ID for verification
   "roles": ["User", "Admin"],   // Role names (NOT permissions)
+  "dataHash": "uuid",           // Changes on every user data mutation
   "orgId": ${docs.organisation.id}                  // Organisation ID
 }`}
             language="json"
@@ -113,6 +114,18 @@ export default function AnatomyPage() {
               <p className="text-sm text-muted-foreground">
                 Role names assigned to the user. <strong>Not permissions</strong> — permissions
                 are resolved server-side from the database.
+              </p>
+            </div>
+
+            <div className="border rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-1">
+                <code className="text-sm font-mono">dataHash</code>
+                <span className="text-xs text-muted-foreground">— string</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Opaque UUID that changes every time user data is mutated (profile,
+                roles, metadata, enabled). External APIs compare this to the JWT
+                claim to detect stale data without hitting the database.
               </p>
             </div>
 

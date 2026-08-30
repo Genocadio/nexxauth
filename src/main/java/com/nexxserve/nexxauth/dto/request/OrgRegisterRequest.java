@@ -9,16 +9,12 @@ import java.util.Map;
 /**
  * Org-level signup: creates an org user (no roles by default) and returns
  * organisation access tokens. The organisation is identified by the
- * {@code X-Client-Id} header when the request comes from a registered client
- * (the client's organisation is authoritative); otherwise {@code organisationId}
- * is required (server-side/platform-user flows). Username, email and phone are
- * optional identifiers, unique per organisation; each is required or
- * login-enabled per the organisation's sign-in identifier configuration.
+ * {@code X-Client-Id} header — the client's organisation is authoritative.
+ * Username, email and phone are optional identifiers, unique per organisation;
+ * each is required or login-enabled per the organisation's sign-in identifier
+ * configuration.
  */
 public record OrgRegisterRequest(
-
-        /** Required only when no {@code X-Client-Id} header is present. */
-        Long organisationId,
 
         @Size(max = 100, message = "Username must be at most 100 characters")
         String username,

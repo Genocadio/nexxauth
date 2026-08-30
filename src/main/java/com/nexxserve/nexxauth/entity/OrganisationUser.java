@@ -15,6 +15,7 @@ import lombok.Setter;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * A user within an organisation. Purely managed data - no authentication. The
@@ -77,4 +78,24 @@ public class OrganisationUser extends BaseEntity {
             joinColumns = @JoinColumn(name = "organisation_user_id"),
             inverseJoinColumns = @JoinColumn(name = "organisation_role_id"))
     private Set<OrganisationRole> roles = new HashSet<>();
+
+    /** Opaque token that changes every time user data (profile, roles,
+     * metadata, enabled) is mutated. Included in the JWT so external APIs
+     * can detect stale data without hitting the database. Never exposed in
+     * JSON responses — set via {@link #bumpDataHash()}. */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @Column(name = "data_hash", nullable = false, length = 36)
+    private String dataHash;
+
+    @jakarta.persistence.PrePersist
+    void prePersist() {
+        if (dataHash == null) dataHash = UUID.randomUUID().toString();
+    }
+
+    /** Regenerate the data hash. Call after every non-password mutation
+     * (profile, roles, metadata, enabled). Password changes must NOT call
+     * this — the hash represents user *data*, not credentials. */
+    public void bumpDataHash() {
+        this.dataHash = UUID.randomUUID().toString();
+    }
 }

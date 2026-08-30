@@ -68,6 +68,7 @@ class OrganisationAuthConfigIntegrationTest {
         String boss = registerPlatform("ac-min-boss@nexx.io", SLUGS[1]);
         long orgId = createOrganisation(boss, platform, "Min Org", "min-org");
         String orgAuth = platform + "/auth";
+        String clientKey = createClient(boss, platform + "/organisations/" + orgId, "Test Client");
 
         // tighten the minimum length to 10
         mockMvc.perform(patch(platform + "/organisations/" + orgId + "/auth-config")
@@ -79,6 +80,7 @@ class OrganisationAuthConfigIntegrationTest {
 
         // an 8-char password now violates the org rule
         mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId, "username", "shorty",
@@ -87,6 +89,7 @@ class OrganisationAuthConfigIntegrationTest {
 
         // a 12-char password passes
         MvcResult reg = mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId, "username", "longer",
@@ -106,6 +109,7 @@ class OrganisationAuthConfigIntegrationTest {
         long orgId = createOrganisation(boss, platform, "NoAuth Org", "noauth-org");
         String org = platform + "/organisations/" + orgId;
         String orgAuth = platform + "/auth";
+        String clientKey = createClient(boss, org, "Test Client");
 
         // create a user WITHOUT a password: no auth configured, authTypes empty
         MvcResult created = mockMvc.perform(post(org + "/users")
@@ -119,6 +123,7 @@ class OrganisationAuthConfigIntegrationTest {
 
         // cannot log in yet
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "nobody", "password", "whatever"))))
                 .andExpect(status().isUnauthorized());
@@ -131,6 +136,7 @@ class OrganisationAuthConfigIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.authTypes[0]").value("PASSWORD"));
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "nobody", "password", "newpass123"))))
                 .andExpect(status().isOk());
@@ -143,6 +149,7 @@ class OrganisationAuthConfigIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.authTypes").isEmpty());
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "nobody", "password", "newpass123"))))
                 .andExpect(status().isUnauthorized());
@@ -155,6 +162,7 @@ class OrganisationAuthConfigIntegrationTest {
         long orgId = createOrganisation(boss, platform, "Hist Org", "hist-org");
         String org = platform + "/organisations/" + orgId;
         String orgAuth = platform + "/auth";
+        String clientKey = createClient(boss, org, "Test Client");
 
         // enable history (keep last 2)
         mockMvc.perform(patch(platform + "/organisations/" + orgId + "/auth-config")
@@ -164,6 +172,7 @@ class OrganisationAuthConfigIntegrationTest {
                 .andExpect(status().isOk());
 
         MvcResult reg = mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId, "username", "cycler",
@@ -193,8 +202,10 @@ class OrganisationAuthConfigIntegrationTest {
         String boss = registerPlatform("ac-exp-boss@nexx.io", SLUGS[4]);
         long orgId = createOrganisation(boss, platform, "Exp Org", "exp-org");
         String orgAuth = platform + "/auth";
+        String clientKey = createClient(boss, platform + "/organisations/" + orgId, "Test Client");
 
         mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
 "organisationId", orgId, "username", "aged",
@@ -208,6 +219,7 @@ class OrganisationAuthConfigIntegrationTest {
                         .content(json(Map.of("passwordExpirationDays", 1))))
                 .andExpect(status().isOk());
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "aged", "password", "oldpass12"))))
                 .andExpect(status().isOk());
@@ -243,6 +255,16 @@ class OrganisationAuthConfigIntegrationTest {
     }
 
     // --- helpers ---
+
+    private String createClient(String boss, String org, String name) throws Exception {
+        MvcResult result = mockMvc.perform(post(org + "/clients")
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("name", name, "type", "WEB"))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("clientKey").asText();
+    }
 
     private String registerPlatform(String email, String slug) throws Exception {
         MvcResult result = mockMvc.perform(post("/auth/register")

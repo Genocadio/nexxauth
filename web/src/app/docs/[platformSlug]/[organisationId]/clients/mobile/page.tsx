@@ -59,7 +59,6 @@ export default function MobileClientPage() {
   -H "X-Client-Id: cli_your_client_key" \\
   -d '${JSON.stringify(
     {
-      organisationId: docs.organisation.id,
       identifier: "johndoe",
       identifierType: "USERNAME",
       password: "securePassword123",
@@ -81,7 +80,7 @@ export default function MobileClientPage() {
             Full API access with both headers:
           </p>
           <CodeBlock
-            code={`curl -X GET ${baseUrl}/organisations/${docs.organisation.id}/users \\
+            code={`curl -X GET ${baseUrl}/organisations/users \\
   -H "X-Client-Id: cli_your_client_key" \\
   -H "Authorization: Bearer nx_your_static_token"`}
             language="bash"

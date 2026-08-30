@@ -98,8 +98,6 @@ export interface UpdateOrganisationRequest {
 // ---------------------------------------------------------------------------
 
 export interface OrgRegisterRequest {
-  /** Only required when the request carries no X-Client-Id header. */
-  organisationId?: number;
   username?: string;
   email?: string;
   phone?: string;
@@ -113,8 +111,6 @@ export interface OrgRegisterRequest {
 export type OrgIdentifierType = "USERNAME" | "EMAIL" | "PHONE";
 
 export interface OrgLoginRequest {
-  /** Only required when the request carries no X-Client-Id header. */
-  organisationId?: number;
   identifier: string;
   /** What kind of identifier is being sent; omit for auto-detection. */
   identifierType?: OrgIdentifierType;

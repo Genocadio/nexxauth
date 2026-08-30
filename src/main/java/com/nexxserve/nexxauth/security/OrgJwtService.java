@@ -33,6 +33,7 @@ public class OrgJwtService {
     public static final String CLAIM_ORG_ID = "orgId";
     public static final String CLAIM_ORG_SLUG = "orgSlug";
     public static final String CLAIM_ROLES = "roles";
+    public static final String CLAIM_DATA_HASH = "dataHash";
 
     private final JwtProperties properties;
     private final OrgKeyService orgKeyService;
@@ -54,6 +55,7 @@ public class OrgJwtService {
                 .claim(CLAIM_ORG_ID, user.getOrganisation().getId())
                 .claim(CLAIM_ORG_SLUG, user.getOrganisation().getSlug())
                 .claim(CLAIM_ROLES, user.getRoles().stream().map(role -> role.getName()).toList())
+                .claim(CLAIM_DATA_HASH, user.getDataHash())
                 .claim(CLAIM_TYPE, TYPE_ORG_ACCESS)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plus(accessTokenTtl)))

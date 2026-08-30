@@ -66,10 +66,11 @@ class HardeningIntegrationTest {
 
     @Test
     void wrongJsonTypesAre400Never500() throws Exception {
-        // string where number expected
+        // string where number expected (organisationId is no longer in the DTO;
+        // a bogus field is silently ignored, so test with a missing required field)
         mockMvc.perform(post("/" + SLUGS[0] + "/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", "abc", "username", "u",
+                        .content(json(Map.of("username", "u",
                                 "password", "password1", "firstName", "F", "lastName", "L"))))
                 .andExpect(status().isBadRequest());
         // object where string expected (objects can never coerce to String)
@@ -279,17 +280,14 @@ class HardeningIntegrationTest {
         createOrganisation(boss, SLUGS[5], "Id Org", "id-org");
         String orgAuth = "/" + SLUGS[5] + "/auth";
 
-        // negative / zero / unknown organisation ids -> 404, never 500
-        for (long id : List.of(-1L, 0L, 999999L)) {
-            mockMvc.perform(post(orgAuth + "/login")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(json(Map.of("organisationId", id, "identifier", "x", "password", "y"))))
-                    .andExpect(status().isNotFound());
-        }
-        // oversize password (1000 chars) -> DTO bound, never 500
+        // without X-Client-Id, the org cannot be resolved -> 400, never 500
+        mockMvc.perform(post(orgAuth + "/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("identifier", "x", "password", "y"))))
+                .andExpect(status().isBadRequest());
         mockMvc.perform(post(orgAuth + "/register")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", 1L, "username", "u",
+                        .content(json(Map.of("username", "u",
                                 "password", "p".repeat(1000), "firstName", "F", "lastName", "L"))))
                 .andExpect(status().isBadRequest());
     }

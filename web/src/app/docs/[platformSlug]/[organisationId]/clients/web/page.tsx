@@ -51,7 +51,6 @@ export default function WebClientPage() {
         auth="X-Client-Id header only (no static token)"
         request={JSON.stringify(
           {
-            organisationId: docs.organisation.id,
             identifier: "johndoe",
             identifierType: "USERNAME",
             password: "securePassword123",

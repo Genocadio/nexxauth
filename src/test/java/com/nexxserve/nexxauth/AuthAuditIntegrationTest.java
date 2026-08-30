@@ -125,17 +125,21 @@ class AuthAuditIntegrationTest {
                         .content(json(Map.of("key", "badge", "fieldType", "STRING"))))
                 .andExpect(status().isCreated());
 
+        String clientKey = createClient(boss, platform + "/organisations/" + orgId, "Test Client");
         mockMvc.perform(post(platform + "/auth/register")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId, "username", "gary",
                                 "password", "orgpass1", "firstName", "G", "lastName", "R"))))
                 .andExpect(status().isCreated());
         mockMvc.perform(post(platform + "/auth/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "gary", "password", "wrong"))))
                 .andExpect(status().isUnauthorized());
         MvcResult login = mockMvc.perform(post(platform + "/auth/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "gary", "password", "orgpass1"))))
                 .andExpect(status().isOk())
@@ -178,13 +182,16 @@ class AuthAuditIntegrationTest {
                 .andReturn();
         long orgId = objectMapper.readTree(orgResult.getResponse().getContentAsString()).get("id").asLong();
 
+        String clientKey = createClient(boss, platform + "/organisations/" + orgId, "Test Client");
         mockMvc.perform(post(platform + "/auth/register")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId, "username", "heidi",
                                 "password", "orgpass1", "firstName", "H", "lastName", "I"))))
                 .andExpect(status().isCreated());
         MvcResult login = mockMvc.perform(post(platform + "/auth/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "heidi", "password", "orgpass1"))))
                 .andExpect(status().isOk())
@@ -209,6 +216,16 @@ class AuthAuditIntegrationTest {
 
     private List<String> messages() {
         return appender.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
+    }
+
+    private String createClient(String boss, String org, String name) throws Exception {
+        MvcResult result = mockMvc.perform(post(org + "/clients")
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("name", name, "type", "WEB"))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("clientKey").asText();
     }
 
     private String registerPlatform(String email, String slug) throws Exception {

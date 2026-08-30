@@ -55,12 +55,13 @@ class OrganisationAuthIntegrationTest {
         String boss = registerPlatform("orgauth-boss@nexx.io", SLUGS[0]);
         long orgId = createOrganisation(boss, platform);
         String org = platform + "/organisations/" + orgId;
+        String clientKey = createClient(boss, org, "Test Client");
 
-        // register an org user (public endpoint, no platform token needed)
+        // register an org user (public endpoint, identified via X-Client-Id)
         MvcResult reg = mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
-                                "organisationId", orgId,
                                 "username", "jane",
                                 "password", "orgpass1",
                                 "firstName", "Jane",
@@ -80,17 +81,15 @@ class OrganisationAuthIntegrationTest {
 
         // login with the same identifier + password
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "jane", "password", "orgpass1"))))
+                        .content(json(Map.of("identifier", "jane", "password", "orgpass1"))))
                 .andExpect(status().isOk());
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "jane", "password", "wrong"))))
+                        .content(json(Map.of("identifier", "jane", "password", "wrong"))))
                 .andExpect(status().isUnauthorized());
-        mockMvc.perform(post(orgAuth + "/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", 999999L, "identifier", "jane", "password", "orgpass1"))))
-                .andExpect(status().isNotFound());
 
         // every org user can read their own profile regardless of permissions
         mockMvc.perform(get(org + "/users/me").header("Authorization", bearer(token)))
@@ -108,9 +107,9 @@ class OrganisationAuthIntegrationTest {
 
         // duplicate identifier on register conflicts
         mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
-                                "organisationId", orgId,
                                 "username", "jane",
                                 "password", "orgpass1",
                                 "firstName", "J", "lastName", "D"))))
@@ -125,6 +124,7 @@ class OrganisationAuthIntegrationTest {
         String boss = registerPlatform("orgauth-role-boss@nexx.io", SLUGS[1]);
         long orgId = createOrganisation(boss, platform);
         String org = platform + "/organisations/" + orgId;
+        String clientKey = createClient(boss, org, "Test Client");
 
         // boss creates a role with READ + CREATE and one with no permissions
         long adminRole = createRole(boss, org, "Admin",
@@ -132,15 +132,15 @@ class OrganisationAuthIntegrationTest {
         long viewerRole = createRole(boss, org, "Viewer");
 
         // register two org users
-        long jane = registerOrgUser(orgAuth, orgId, "jane", "orgpass1");
-        long mark = registerOrgUser(orgAuth, orgId, "mark", "orgpass1");
+        long jane = registerOrgUser(orgAuth, clientKey, "jane", "orgpass1");
+        long mark = registerOrgUser(orgAuth, clientKey, "mark", "orgpass1");
 
         // boss assigns roles (platform super user path, unchanged)
         patchOrgUser(boss, org, jane, Map.of("roleIds", List.of(adminRole)));
         patchOrgUser(boss, org, mark, Map.of("roleIds", List.of(viewerRole)));
 
-        String janeToken = loginOrg(orgAuth, orgId, "jane", "orgpass1");
-        String markToken = loginOrg(orgAuth, orgId, "mark", "orgpass1");
+        String janeToken = loginOrg(orgAuth, clientKey, "jane", "orgpass1");
+        String markToken = loginOrg(orgAuth, clientKey, "mark", "orgpass1");
 
         // claims carry roles only - permissions are internal, never in the token
         JsonNode janeClaims = decodeClaims(janeToken);
@@ -181,20 +181,21 @@ class OrganisationAuthIntegrationTest {
         String boss = registerPlatform("orgauth-crud-boss@nexx.io", SLUGS[6]);
         long orgId = createOrganisation(boss, platform);
         String org = platform + "/organisations/" + orgId;
+        String clientKey = createClient(boss, org, "Test Client");
 
         // one role with UPDATE+DELETE, one with only READ
         long adminRole = createRole(boss, org, "Admins",
                 "ORGANISATION_USER_UPDATE", "ORGANISATION_USER_DELETE");
         long viewerRole = createRole(boss, org, "Viewers", "ORGANISATION_USER_READ");
 
-        long admin = registerOrgUser(orgAuth, orgId, "carol", "orgpass1");
-        long viewer = registerOrgUser(orgAuth, orgId, "dave", "orgpass1");
-        long target = registerOrgUser(orgAuth, orgId, "erin", "orgpass1");
+        long admin = registerOrgUser(orgAuth, clientKey, "carol", "orgpass1");
+        long viewer = registerOrgUser(orgAuth, clientKey, "dave", "orgpass1");
+        long target = registerOrgUser(orgAuth, clientKey, "erin", "orgpass1");
         patchOrgUser(boss, org, admin, Map.of("roleIds", List.of(adminRole)));
         patchOrgUser(boss, org, viewer, Map.of("roleIds", List.of(viewerRole)));
 
-        String adminToken = loginOrg(orgAuth, orgId, "carol", "orgpass1");
-        String viewerToken = loginOrg(orgAuth, orgId, "dave", "orgpass1");
+        String adminToken = loginOrg(orgAuth, clientKey, "carol", "orgpass1");
+        String viewerToken = loginOrg(orgAuth, clientKey, "dave", "orgpass1");
 
         // UPDATE permission allows patching others; READ-only is rejected
         mockMvc.perform(patch(org + "/users/" + target)
@@ -232,8 +233,9 @@ class OrganisationAuthIntegrationTest {
         String boss = registerPlatform("orgauth-orgread-boss@nexx.io", SLUGS[7]);
         long orgId = createOrganisation(boss, platform);
         String org = platform + "/organisations/" + orgId;
-        registerOrgUser(orgAuth, orgId, "frank", "orgpass1");
-        String frankToken = loginOrg(orgAuth, orgId, "frank", "orgpass1");
+        String clientKey = createClient(boss, org, "Test Client");
+        registerOrgUser(orgAuth, clientKey, "frank", "orgpass1");
+        String frankToken = loginOrg(orgAuth, clientKey, "frank", "orgpass1");
 
         // every org user reads their own org context by default (no permission)
         mockMvc.perform(get(org).header("Authorization", bearer(frankToken)))
@@ -264,8 +266,9 @@ class OrganisationAuthIntegrationTest {
         String boss = registerPlatform("orgauth-iso-boss@nexx.io", SLUGS[2]);
         long orgId = createOrganisation(boss, platform);
         String org = platform + "/organisations/" + orgId;
-        registerOrgUser(orgAuth, orgId, "alice", "orgpass1");
-        String aliceToken = loginOrg(orgAuth, orgId, "alice", "orgpass1");
+        String clientKey = createClient(boss, org, "Test Client");
+        registerOrgUser(orgAuth, clientKey, "alice", "orgpass1");
+        String aliceToken = loginOrg(orgAuth, clientKey, "alice", "orgpass1");
 
         // a second organisation in the same platform
         MvcResult otherOrgResult = mockMvc.perform(post(platform + "/organisations")
@@ -300,8 +303,9 @@ class OrganisationAuthIntegrationTest {
         String boss = registerPlatform("orgauth-key-boss@nexx.io", SLUGS[3]);
         long orgId = createOrganisation(boss, platform);
         String org = platform + "/organisations/" + orgId;
-        registerOrgUser(orgAuth, orgId, "karen", "orgpass1");
-        String karenToken = loginOrg(orgAuth, orgId, "karen", "orgpass1");
+        String clientKey = createClient(boss, org, "Test Client");
+        registerOrgUser(orgAuth, clientKey, "karen", "orgpass1");
+        String karenToken = loginOrg(orgAuth, clientKey, "karen", "orgpass1");
 
         // public keys endpoint (no auth)
         MvcResult keys = mockMvc.perform(get(org + "/keys"))
@@ -348,9 +352,12 @@ class OrganisationAuthIntegrationTest {
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-refresh-boss@nexx.io", SLUGS[4]);
         long orgId = createOrganisation(boss, platform);
-        registerOrgUser(orgAuth, orgId, "nora", "orgpass1");
+        String org = platform + "/organisations/" + orgId;
+        String clientKey = createClient(boss, org, "Test Client");
+        registerOrgUser(orgAuth, clientKey, "nora", "orgpass1");
 
         MvcResult login = mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "nora", "password", "orgpass1"))))
                 .andExpect(status().isOk())
@@ -384,9 +391,11 @@ class OrganisationAuthIntegrationTest {
         String boss = registerPlatform("orgauth-case-boss@nexx.io", SLUGS[8]);
         long orgId = createOrganisation(boss, platform);
         String org = platform + "/organisations/" + orgId;
+        String clientKey = createClient(boss, org, "Test Client");
 
         // registering "MixedCase" stores it lowercase, so Bob/bob are one account
-        MvcResult reg = mockMvc.perform(post(orgAuth + "/register")
+        MvcResult reg =        mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId,
@@ -401,16 +410,19 @@ class OrganisationAuthIntegrationTest {
 
         // login matches case-insensitively in both directions
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "MIXEDCASE", "password", "orgpass1"))))
                 .andExpect(status().isOk());
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "mixedcase", "password", "orgpass1"))))
                 .andExpect(status().isOk());
 
         // a differently-cased spelling of the same name cannot be registered twice
         mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId,
@@ -428,6 +440,7 @@ class OrganisationAuthIntegrationTest {
         String boss = registerPlatform("orgauth-default-boss@nexx.io", SLUGS[16]);
         long orgId = createOrganisation(boss, platform);
         String org = platform + "/organisations/" + orgId;
+        String clientKey = createClient(boss, org, "Test Client");
 
         // boss marks "Member" as default (with READ) and leaves "Support" unmarked
         createRole(boss, org, "Member", true,
@@ -443,6 +456,7 @@ class OrganisationAuthIntegrationTest {
 
         // a registered user inherits the default role automatically
         MvcResult reg = mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId,
@@ -540,7 +554,7 @@ class OrganisationAuthIntegrationTest {
         long orgId = createOrganisation(boss, platform);
         String org = platform + "/organisations/" + orgId;
 
-        // without a client header the body organisationId is required
+        // without a client header the X-Client-Id is required
         mockMvc.perform(post(orgAuth + "/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("identifier", "jane", "password", "orgpass1"))))
@@ -552,16 +566,6 @@ class OrganisationAuthIntegrationTest {
                                 "password", "orgpass1",
                                 "firstName", "N", "lastName", "C"))))
                 .andExpect(status().isBadRequest());
-
-        // ... but it still works when provided (backwards compatible)
-        mockMvc.perform(post(orgAuth + "/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of(
-                                "organisationId", orgId,
-                                "username", "noclient",
-                                "password", "orgpass1",
-                                "firstName", "N", "lastName", "C"))))
-                .andExpect(status().isCreated());
     }
 
     @Test
@@ -572,6 +576,7 @@ class OrganisationAuthIntegrationTest {
         String boss = registerPlatform("orgauth-phone-boss@nexx.io", SLUGS[12]);
         long orgId = createOrganisation(boss, platform);
         String org = platform + "/organisations/" + orgId;
+        String clientKey = createClient(boss, org, "Test Client");
 
         // email + phone are the login identifiers; username is stored but not login-capable
         mockMvc.perform(patch(org)
@@ -585,6 +590,7 @@ class OrganisationAuthIntegrationTest {
                 .andExpect(jsonPath("$.phoneCanLogin").value(true));
 
         mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId,
@@ -598,18 +604,21 @@ class OrganisationAuthIntegrationTest {
 
         // explicit identifier types: phone and email work, username is not enabled
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId,
                                 "identifierType", "PHONE", "identifier", "+1 (555) 123-4567",
                                 "password", "orgpass1"))))
                 .andExpect(status().isOk());
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId,
                                 "identifierType", "EMAIL", "identifier", "PH@nexx.io",
                                 "password", "orgpass1"))))
                 .andExpect(status().isOk());
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId,
                                 "identifierType", "USERNAME", "identifier", "phuser",
@@ -618,6 +627,7 @@ class OrganisationAuthIntegrationTest {
 
         // phone uniqueness per org, even after normalization
         mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId,
@@ -636,6 +646,7 @@ class OrganisationAuthIntegrationTest {
         String boss = registerPlatform("orgauth-req-boss@nexx.io", SLUGS[13]);
         long orgId = createOrganisation(boss, platform);
         String org = platform + "/organisations/" + orgId;
+        String clientKey = createClient(boss, org, "Test Client");
 
         // phone is required + login-enabled
         mockMvc.perform(patch(org)
@@ -646,6 +657,7 @@ class OrganisationAuthIntegrationTest {
 
         // register without the required phone is rejected
         mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId,
@@ -671,6 +683,7 @@ class OrganisationAuthIntegrationTest {
                                 "usernameRequired", false, "phoneRequired", false,
                                 "usernameCanLogin", true))));
         mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId,
@@ -688,6 +701,7 @@ class OrganisationAuthIntegrationTest {
         String boss = registerPlatform("orgauth-nopw-boss@nexx.io", SLUGS[14]);
         long orgId = createOrganisation(boss, platform);
         String org = platform + "/organisations/" + orgId;
+        String clientKey = createClient(boss, org, "Test Client");
 
         // disable password auth: register without a password is allowed
         mockMvc.perform(patch(org + "/auth-config")
@@ -698,6 +712,7 @@ class OrganisationAuthIntegrationTest {
                 .andExpect(jsonPath("$.passwordEnabled").value(false));
 
         MvcResult reg = mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId,
@@ -710,6 +725,7 @@ class OrganisationAuthIntegrationTest {
 
         // no password method enabled: login always fails
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId,
                                 "identifier", "nopw", "password", "whatever1"))))
@@ -727,6 +743,7 @@ class OrganisationAuthIntegrationTest {
                         .content(json(Map.of("password", "newpass123"))))
                 .andExpect(status().isOk());
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId,
                                 "identifier", "nopw", "password", "newpass123"))))
@@ -741,10 +758,12 @@ class OrganisationAuthIntegrationTest {
         String boss = registerPlatform("orgauth-disable-boss@nexx.io", SLUGS[15]);
         long orgId = createOrganisation(boss, platform);
         String org = platform + "/organisations/" + orgId;
-        long disabled = registerOrgUser(orgAuth, orgId, "toby", "orgpass1");
+        String clientKey = createClient(boss, org, "Test Client");
+        long disabled = registerOrgUser(orgAuth, clientKey, "toby", "orgpass1");
 
         // a working session first
         MvcResult login = mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "toby", "password", "orgpass1"))))
                 .andExpect(status().isOk())
@@ -760,6 +779,7 @@ class OrganisationAuthIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.enabled").value(false));
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "toby", "password", "orgpass1"))))
                 .andExpect(status().isUnauthorized());
@@ -775,6 +795,7 @@ class OrganisationAuthIntegrationTest {
                         .content(json(Map.of("enabled", true))))
                 .andExpect(status().isOk());
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "toby", "password", "orgpass1"))))
                 .andExpect(status().isOk());
@@ -788,9 +809,11 @@ class OrganisationAuthIntegrationTest {
         String boss = registerPlatform("orgauth-reset-boss@nexx.io", SLUGS[9]);
         long orgId = createOrganisation(boss, platform);
         String org = platform + "/organisations/" + orgId;
-        long pam = registerOrgUser(orgAuth, orgId, "pam", "orgpass1");
+        String clientKey = createClient(boss, org, "Test Client");
+        long pam = registerOrgUser(orgAuth, clientKey, "pam", "orgpass1");
 
         MvcResult login = mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "pam", "password", "orgpass1"))))
                 .andExpect(status().isOk())
@@ -813,10 +836,12 @@ class OrganisationAuthIntegrationTest {
 
         // the old password no longer works; the new one does
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "pam", "password", "orgpass1"))))
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "pam", "password", "newpass123"))))
                 .andExpect(status().isOk());
@@ -829,9 +854,11 @@ class OrganisationAuthIntegrationTest {
         String orgAuth = platform + "/auth";
         String boss = registerPlatform("orgauth-lastname-boss@nexx.io", SLUGS[17]);
         long orgId = createOrganisation(boss, platform);
+        String clientKey = createClient(boss, platform + "/organisations/" + orgId, "Test Client");
 
         // register without a last name succeeds; the response carries lastName null
         mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId,
@@ -844,6 +871,7 @@ class OrganisationAuthIntegrationTest {
 
         // the user can log in and still reports lastName null
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId,
                                 "identifier", "nolast", "password", "orgpass1"))))
@@ -852,6 +880,7 @@ class OrganisationAuthIntegrationTest {
 
         // first name is still required: a blank first name is a 400
         mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId,
@@ -870,6 +899,7 @@ class OrganisationAuthIntegrationTest {
         String boss = registerPlatform("orgauth-email-boss@nexx.io", SLUGS[5]);
         long orgId = createOrganisation(boss, platform);
         String org = platform + "/organisations/" + orgId;
+        String clientKey = createClient(boss, org, "Test Client");
 
         // enable the setting
         mockMvc.perform(patch(org)
@@ -880,6 +910,7 @@ class OrganisationAuthIntegrationTest {
 
         // register with the email as identifier
         mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId,
@@ -891,6 +922,7 @@ class OrganisationAuthIntegrationTest {
 
         // login with the email
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId,
                                 "identifier", "EMAIL-USER@nexx.io", "password", "orgpass1"))))
@@ -952,11 +984,11 @@ class OrganisationAuthIntegrationTest {
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
     }
 
-    private long registerOrgUser(String orgAuth, long orgId, String identifier, String password) throws Exception {
+    private long registerOrgUser(String orgAuth, String clientKey, String identifier, String password) throws Exception {
         MvcResult result = mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
-                                "organisationId", orgId,
                                 "username", identifier,
                                 "password", password,
                                 "firstName", "F", "lastName", "L"))))
@@ -965,10 +997,11 @@ class OrganisationAuthIntegrationTest {
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("user").get("id").asLong();
     }
 
-    private String loginOrg(String orgAuth, long orgId, String identifier, String password) throws Exception {
+    private String loginOrg(String orgAuth, String clientKey, String identifier, String password) throws Exception {
         MvcResult result = mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", identifier, "password", password))))
+                        .content(json(Map.of("identifier", identifier, "password", password))))
                 .andExpect(status().isOk())
                 .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("accessToken").asText();

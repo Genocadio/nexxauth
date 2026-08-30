@@ -297,6 +297,7 @@ class OrganisationClientIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString()).get("id").asLong();
         long readerId = objectMapper.readTree(mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", webKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "username", "alice",
                                 "password", "password1", "firstName", "A", "lastName", "L"))))
@@ -308,6 +309,7 @@ class OrganisationClientIntegrationTest {
                         .content(json(Map.of("roleIds", List.of(roleId)))))
                 .andExpect(status().isOk());
         String aliceToken = objectMapper.readTree(mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", webKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "alice", "password", "password1"))))
                 .andExpect(status().isOk())
@@ -341,7 +343,8 @@ class OrganisationClientIntegrationTest {
 
         String orgPath = "/" + platform + "/organisations/" + orgId;
 
-        // an org user with READ, no client at all
+        // register a user via a temporary client, then test access without client
+        String tempKey = createClient(boss, clients, "Temp", "WEB", null);
         long roleId = objectMapper.readTree(mockMvc.perform(post(orgPath + "/roles")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -350,6 +353,7 @@ class OrganisationClientIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString()).get("id").asLong();
         long userId = objectMapper.readTree(mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", tempKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "username", "bob",
                                 "password", "password1", "firstName", "B", "lastName", "L"))))
@@ -361,6 +365,7 @@ class OrganisationClientIntegrationTest {
                         .content(json(Map.of("roleIds", List.of(roleId)))))
                 .andExpect(status().isOk());
         String bobToken = objectMapper.readTree(mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", tempKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "bob", "password", "password1"))))
                 .andExpect(status().isOk())

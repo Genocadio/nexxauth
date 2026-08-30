@@ -49,6 +49,7 @@ class OrganisationUserFieldIntegrationTest {
         createField(boss, org, "active", "BOOLEAN", false);
         createField(boss, org, "joined", "DATE", false);
         createField(boss, org, "score", "NUMBER", false);
+        String clientKey = createClient(boss, org, "Test Client");
 
         mockMvc.perform(get(org + "/user-fields").header("Authorization", bearer(boss)))
                 .andExpect(status().isOk())
@@ -56,7 +57,7 @@ class OrganisationUserFieldIntegrationTest {
                 .andExpect(jsonPath("$[0].key").value("active"))
                 .andExpect(jsonPath("$[0].loginEnabled").value(false));
 
-        long henry = registerOrgUser(orgAuth, orgId, "henry", "orgpass1");
+        long henry = registerOrgUser(orgAuth, clientKey, "henry", "orgpass1");
 
         // boss sets metadata on henry
         mockMvc.perform(patch(org + "/users/" + henry)
@@ -77,7 +78,7 @@ class OrganisationUserFieldIntegrationTest {
         mockMvc.perform(get(org + "/users/" + henry).header("Authorization", bearer(boss)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.metadata.score").value("1.5"));
-        String henryToken = loginOrg(orgAuth, orgId, "henry", "orgpass1");
+        String henryToken = loginOrg(orgAuth, clientKey, "henry", "orgpass1");
         mockMvc.perform(get(org + "/users/me").header("Authorization", bearer(henryToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.metadata['employee-id']").value("EMP123"));
@@ -130,6 +131,7 @@ class OrganisationUserFieldIntegrationTest {
         createField(boss, org, "score", "NUMBER", true);
         createField(boss, org, "joined", "DATE", true);
         createField(boss, org, "active", "BOOLEAN", false);
+        String clientKey = createClient(boss, org, "Test Client");
 
         createUserWithPassword(boss, org, "alice", Map.of(
                 "employee-id", "EMP123",
@@ -139,25 +141,30 @@ class OrganisationUserFieldIntegrationTest {
 
         // login by each login-enabled field, values normalized on the way in
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "EMP123", "password", "orgpass1"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.user.metadata['employee-id']").value("EMP123"));
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "1.5", "password", "orgpass1"))))
                 .andExpect(status().isOk());
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "1.50", "password", "orgpass1"))))
                 .andExpect(status().isOk());
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "2026-01-05", "password", "orgpass1"))))
                 .andExpect(status().isOk());
 
         // STRING login values match case-insensitively
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "emp123", "password", "orgpass1"))))
                 .andExpect(status().isOk());
@@ -173,6 +180,7 @@ class OrganisationUserFieldIntegrationTest {
 
         // a non-login-enabled field's value is not a login identifier
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "true", "password", "orgpass1"))))
                 .andExpect(status().isUnauthorized());
@@ -217,16 +225,17 @@ class OrganisationUserFieldIntegrationTest {
                 "ORGANISATION_USER_FIELD_UPDATE",
                 "ORGANISATION_USER_FIELD_DELETE");
         long viewerRole = createRole(boss, org, "FieldViewer", "ORGANISATION_USER_FIELD_READ");
+        String clientKey = createClient(boss, org, "Test Client");
 
-        long ada = registerOrgUser(orgAuth, orgId, "ada", "orgpass1");
-        long vick = registerOrgUser(orgAuth, orgId, "vick", "orgpass1");
-        long noel = registerOrgUser(orgAuth, orgId, "noel", "orgpass1");
+        long ada = registerOrgUser(orgAuth, clientKey, "ada", "orgpass1");
+        long vick = registerOrgUser(orgAuth, clientKey, "vick", "orgpass1");
+        long noel = registerOrgUser(orgAuth, clientKey, "noel", "orgpass1");
         patchOrgUser(boss, org, ada, Map.of("roleIds", List.of(adminRole)));
         patchOrgUser(boss, org, vick, Map.of("roleIds", List.of(viewerRole)));
 
-        String adaToken = loginOrg(orgAuth, orgId, "ada", "orgpass1");
-        String vickToken = loginOrg(orgAuth, orgId, "vick", "orgpass1");
-        String noelToken = loginOrg(orgAuth, orgId, "noel", "orgpass1");
+        String adaToken = loginOrg(orgAuth, clientKey, "ada", "orgpass1");
+        String vickToken = loginOrg(orgAuth, clientKey, "vick", "orgpass1");
+        String noelToken = loginOrg(orgAuth, clientKey, "noel", "orgpass1");
 
         // no role at all: no read
         mockMvc.perform(get(org + "/user-fields").header("Authorization", bearer(noelToken)))
@@ -285,8 +294,10 @@ class OrganisationUserFieldIntegrationTest {
         String org = platform + "/organisations/" + orgId;
 
         createField(boss, org, "badge", "STRING", false);
+        String clientKey = createClient(boss, org, "Test Client");
 
         mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId,
@@ -299,6 +310,7 @@ class OrganisationUserFieldIntegrationTest {
 
         // unknown keys are rejected at registration too
         mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId,
@@ -367,10 +379,12 @@ class OrganisationUserFieldIntegrationTest {
         String org = platform + "/organisations/" + orgId;
 
         long fieldId = createField(boss, org, "emp", "STRING", true);
-        long carol = createUserWithPassword(boss, org, "carol", Map.of("emp", "E1"));
+        long carol =        createUserWithPassword(boss, org, "carol", Map.of("emp", "E1"));
+        String clientKey = createClient(boss, org, "Test Client");
 
         // login works through the field
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "E1", "password", "orgpass1"))))
                 .andExpect(status().isOk());
@@ -388,6 +402,7 @@ class OrganisationUserFieldIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "E1", "password", "orgpass1"))))
                 .andExpect(status().isUnauthorized());
@@ -417,6 +432,16 @@ class OrganisationUserFieldIntegrationTest {
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
     }
 
+    private String createClient(String boss, String org, String name) throws Exception {
+        MvcResult result = mockMvc.perform(post(org + "/clients")
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("name", name, "type", "WEB"))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("clientKey").asText();
+    }
+
     private long createField(String boss, String org, String key, String type, boolean loginEnabled)
             throws Exception {
         return getId(mockMvc.perform(post(org + "/user-fields")
@@ -437,11 +462,11 @@ class OrganisationUserFieldIntegrationTest {
                 .andReturn(), "/id");
     }
 
-    private long registerOrgUser(String orgAuth, long orgId, String identifier, String password) throws Exception {
+    private long registerOrgUser(String orgAuth, String clientKey, String identifier, String password) throws Exception {
         return getId(mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
-                                "organisationId", orgId,
                                 "username", identifier,
                                 "password", password,
                                 "firstName", "F", "lastName", "L"))))
@@ -471,10 +496,11 @@ class OrganisationUserFieldIntegrationTest {
                 .andExpect(status().isOk());
     }
 
-    private String loginOrg(String orgAuth, long orgId, String identifier, String password) throws Exception {
+    private String loginOrg(String orgAuth, String clientKey, String identifier, String password) throws Exception {
         MvcResult result = mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", identifier, "password", password))))
+                        .content(json(Map.of("identifier", identifier, "password", password))))
                 .andExpect(status().isOk())
                 .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("accessToken").asText();

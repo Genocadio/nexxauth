@@ -37,7 +37,7 @@ export default function UsersPage() {
 
       <Endpoint
         method="GET"
-        path={`/organisations/${docs.organisation.id}/users`}
+        path="/organisations/users"
         description="List all users"
         auth="SERVER client or platform user with ORGANISATION_USER_READ permission"
         response={JSON.stringify(
@@ -67,7 +67,7 @@ export default function UsersPage() {
 
       <Endpoint
         method="GET"
-        path={`/organisations/${docs.organisation.id}/users/me`}
+        path="/organisations/users/me"
         description="Get current user profile"
         auth="Any authenticated org user"
         response={JSON.stringify(
@@ -91,7 +91,7 @@ export default function UsersPage() {
 
       <Endpoint
         method="PATCH"
-        path={`/organisations/${docs.organisation.id}/users/me`}
+        path="/organisations/users/me"
         description="Update own profile"
         auth="Any authenticated org user"
         request={JSON.stringify(

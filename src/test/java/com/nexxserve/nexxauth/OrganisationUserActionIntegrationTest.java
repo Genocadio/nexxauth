@@ -57,8 +57,11 @@ class OrganisationUserActionIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.temporaryPassword").value(true));
 
+        String clientKey = createClient(boss, org, "Test Client");
+
         // first login: CHANGE_PASSWORD action, 5-min access, NO refresh token
         MvcResult login = mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "tempuser", "password", "temp-pass1"))))
                 .andExpect(status().isOk())
@@ -85,6 +88,7 @@ class OrganisationUserActionIntegrationTest {
 
         // after the change the session is unrestricted again
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "tempuser", "password", "new-pass-123"))))
                 .andExpect(status().isOk())
@@ -111,7 +115,9 @@ class OrganisationUserActionIntegrationTest {
                                 "temporaryPassword", true))))
                 .andExpect(status().isCreated());
 
+        String clientKey = createClient(boss, org, "Test Client");
         MvcResult login = mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "tempuser2", "password", "temp-pass1"))))
                 .andExpect(status().isOk())
@@ -127,6 +133,7 @@ class OrganisationUserActionIntegrationTest {
 
         // the action is still pending: login still gates the session
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "tempuser2", "password", "temp-pass1"))))
                 .andExpect(status().isOk())
@@ -142,9 +149,11 @@ class OrganisationUserActionIntegrationTest {
         long orgId = createOrganisation(boss, platform);
         String org = platform + "/organisations/" + orgId;
 
+        String clientKey = createClient(boss, org, "Test Client");
         // register a user normally (no temporary password), then log in
-        long userId = registerOrgUser(orgAuth, orgId, "forced", "org-pass-1");
+        long userId = registerOrgUser(orgAuth, clientKey, "forced", "org-pass-1");
         MvcResult login = mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "forced", "password", "org-pass-1"))))
                 .andExpect(status().isOk())
@@ -169,6 +178,7 @@ class OrganisationUserActionIntegrationTest {
 
         // login now gates the session until the user changes the password
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "forced", "password", "org-pass-1"))))
                 .andExpect(status().isOk())
@@ -205,9 +215,12 @@ class OrganisationUserActionIntegrationTest {
                                 "password", "org-pass-1"))))
                 .andExpect(status().isCreated());
 
+        String clientKey = createClient(boss, org, "Test Client");
+
         // login: UPDATE_PROFILE is advisory - refresh token and normal access
         // token are still issued, and other endpoints keep working
         MvcResult login = mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "profuser", "password", "org-pass-1"))))
                 .andExpect(status().isOk())
@@ -233,6 +246,7 @@ class OrganisationUserActionIntegrationTest {
 
         // next login has no pending actions
         mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "profuser", "password", "org-pass-1"))))
                 .andExpect(status().isOk())
@@ -263,11 +277,21 @@ class OrganisationUserActionIntegrationTest {
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
     }
 
-    private long registerOrgUser(String orgAuth, long orgId, String identifier, String password) throws Exception {
+    private String createClient(String boss, String org, String name) throws Exception {
+        MvcResult result = mockMvc.perform(post(org + "/clients")
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("name", name, "type", "WEB"))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("clientKey").asText();
+    }
+
+    private long registerOrgUser(String orgAuth, String clientKey, String identifier, String password) throws Exception {
         MvcResult result = mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
-                                "organisationId", orgId,
                                 "username", identifier,
                                 "password", password,
                                 "firstName", "F", "lastName", "L"))))

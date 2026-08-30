@@ -38,7 +38,7 @@ export default function VerificationPage() {
             Get the public keys for your organisation:
           </p>
           <CodeBlock
-            code={`curl ${baseUrl}/organisations/${docs.organisation.id}/keys`}
+            code={`curl ${baseUrl}/organisations/keys`}
             language="bash"
           />
           <p className="text-sm text-muted-foreground">Response:</p>
@@ -75,6 +75,7 @@ export default function VerificationPage() {
   "exp": 1704068100,             // Expires at
   "kid": "key-1",               // Key ID for verification
   "roles": ["User"],            // Role names (not permissions)
+  "dataHash": "uuid",           // Changes on every user data mutation
   "orgId": ${docs.organisation.id}                  // Organisation ID
 }`}
             language="json"
@@ -95,7 +96,7 @@ echo $TOKEN | cut -d'.' -f2 | base64 -d 2>/dev/null | jq .
 # Verify with public key
 echo $TOKEN | cut -d'.' -f1-2 > /tmp/token.txt
 echo "-----BEGIN PUBLIC KEY-----" > /tmp/pubkey.pem
-curl -s ${baseUrl}/organisations/${docs.organisation.id}/keys | jq -r '.[0].publicKey' >> /tmp/pubkey.pem
+curl -s ${baseUrl}/organisations/keys | jq -r '.[0].publicKey' >> /tmp/pubkey.pem
 echo "-----END PUBLIC KEY-----" >> /tmp/pubkey.pem
 openssl dgst -sha256 -verify /tmp/pubkey.pem -signature <(echo -n "$TOKEN" | cut -d'.' -f3 | base64 -d) /tmp/token.txt`}
             language="bash"

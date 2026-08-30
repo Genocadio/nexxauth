@@ -48,7 +48,7 @@ export default function ServerClientPage() {
 
       <Endpoint
         method="GET"
-        path={`/organisations/${docs.organisation.id}/users`}
+        path="/organisations/users"
         description="List users (SERVER client)"
         auth="X-Client-Id + Authorization: Bearer <static_token>"
         response={JSON.stringify(
@@ -94,7 +94,7 @@ Authorization: Bearer nx_your_static_token`}
         </CardHeader>
         <CardContent>
           <CodeBlock
-            code={`curl -X PATCH ${baseUrl}/organisations/${docs.organisation.id}/users/1 \\
+            code={`curl -X PATCH ${baseUrl}/organisations/users/1 \\
   -H "Content-Type: application/json" \\
   -H "X-Client-Id: cli_your_client_key" \\
   -H "Authorization: Bearer nx_your_static_token" \\
