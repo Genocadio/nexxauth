@@ -31,6 +31,9 @@ public record OrganisationClientResponse(
         boolean allowRegister,
         boolean allowLogin,
         /** Parsed set of allowed role names; empty means no restriction. */
-        Set<String> allowedRoles
+        Set<String> allowedRoles,
+        // --- link management ---
+        /** Per-link CORS and source-restriction settings. */
+        List<OrganisationClientLinkResponse> links
 ) {
 }

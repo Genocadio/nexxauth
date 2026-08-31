@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { Loader2, Link } from "lucide-react";
 import { useState } from "react";
 import { FormField } from "@/components/shared/form-field";
 import { Button } from "@/components/ui/button";
@@ -78,8 +78,8 @@ export function OrgClientSettingsDialog({
       : { accessTokenTtlSeconds: -1, refreshTokenTtlSeconds: -1, maxSessionsPerUser: -1 };
 
     const allowedRoles = useRoleRestrictions && selectedRoles.size > 0
-      ? selectedRoles
-      : new Set<string>();
+      ? Array.from(selectedRoles)
+      : [];
 
     await update.mutateAsync({
       clientKey: client.clientKey,
@@ -109,6 +109,23 @@ export function OrgClientSettingsDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Links summary */}
+          {(client.links ?? []).length > 0 && (
+            <div className="rounded-lg border p-3">
+              <div className="flex items-center gap-2">
+                <Link className="h-4 w-4 text-muted-foreground" />
+                <p className="text-sm font-medium">
+                  {(client.links ?? []).length} link{(client.links ?? []).length === 1 ? "" : "s"} configured
+                </p>
+              </div>
+              {(client.links ?? []).some((l) => l.limitSource) && (
+                <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                  {(client.links ?? []).filter((l) => l.limitSource).length} with source restriction — only requests from those origins are allowed.
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Enabled */}
           <FormField label="Enabled" hint="A disabled client is rejected with 401 on every request.">
             <div className="flex items-center justify-between rounded-md border px-3 py-2">

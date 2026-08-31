@@ -11,12 +11,14 @@ import type {
   OrganisationUserResponse,
 } from "@/types/api";
 import type {
+  CreateOrganisationClientLinkRequest,
   CreateOrganisationClientRequest,
   CreateOrganisationRequest,
   CreateOrganisationRoleRequest,
   CreateOrganisationUserFieldRequest,
   CreateOrganisationUserRequest,
   UpdateOrganisationAuthConfigRequest,
+  UpdateOrganisationClientLinkRequest,
   UpdateOrganisationClientRequest,
   UpdateOrganisationRequest,
   UpdateOrganisationRoleRequest,
@@ -24,6 +26,7 @@ import type {
   UpdateOrganisationUserFieldRequest,
   UpdateOrganisationUserRequest,
 } from "@/types/requests";
+import type { OrganisationClientLinkResponse } from "@/types/api";
 
 /** Organisation endpoints, addressed under the platform slug. */
 export const organisationsApi = {
@@ -175,6 +178,46 @@ export const organisationsApi = {
     post<OrganisationClientResponse>(
       endpoints.organisations(platformSlug).rotateClientToken(organisationId, clientKey),
       undefined,
+      "platform",
+    ),
+
+  // -- client links --------------------------------------------------------
+  clientLinks: (platformSlug: string, organisationId: number, clientKey: string) =>
+    get<OrganisationClientLinkResponse[]>(
+      endpoints.organisations(platformSlug).clientLinks(organisationId, clientKey),
+      "platform",
+    ),
+  createClientLink: (
+    platformSlug: string,
+    organisationId: number,
+    clientKey: string,
+    body: CreateOrganisationClientLinkRequest,
+  ) =>
+    post<OrganisationClientLinkResponse>(
+      endpoints.organisations(platformSlug).clientLinks(organisationId, clientKey),
+      body,
+      "platform",
+    ),
+  updateClientLink: (
+    platformSlug: string,
+    organisationId: number,
+    clientKey: string,
+    linkId: number,
+    body: UpdateOrganisationClientLinkRequest,
+  ) =>
+    patch<OrganisationClientLinkResponse>(
+      endpoints.organisations(platformSlug).clientLink(organisationId, clientKey, linkId),
+      body,
+      "platform",
+    ),
+  deleteClientLink: (
+    platformSlug: string,
+    organisationId: number,
+    clientKey: string,
+    linkId: number,
+  ) =>
+    del<void>(
+      endpoints.organisations(platformSlug).clientLink(organisationId, clientKey, linkId),
       "platform",
     ),
 };

@@ -14,6 +14,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { getErrorMessage } from "@/types/errors";
 import type {
   OrganisationAuthConfigResponse,
+  OrganisationClientLinkResponse,
   OrganisationClientResponse,
   OrganisationKeyResponse,
   OrganisationResponse,
@@ -25,12 +26,14 @@ import type {
 } from "@/types/api";
 import type {
   AddPlatformUserRequest,
+  CreateOrganisationClientLinkRequest,
   CreateOrganisationClientRequest,
   CreateOrganisationRequest,
   CreateOrganisationRoleRequest,
   CreateOrganisationUserFieldRequest,
   CreateOrganisationUserRequest,
   UpdateOrganisationAuthConfigRequest,
+  UpdateOrganisationClientLinkRequest,
   UpdateOrganisationClientRequest,
   UpdateOrganisationRequest,
   UpdateOrganisationRoleRequest,
@@ -289,6 +292,44 @@ export function useRotateOrgClientToken(platformSlug: string, organisationId: nu
     mutationFn: (clientKey) => organisationsApi.rotateClientToken(platformSlug, organisationId, clientKey),
     invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgClients(organisationId) })],
     successMessage: "Client token rotated",
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Organisation client links
+// ---------------------------------------------------------------------------
+
+export function useCreateOrgClientLink(platformSlug: string, organisationId: number, clientKey: string) {
+  return useApiMutation<OrganisationClientLinkResponse, CreateOrganisationClientLinkRequest>({
+    mutationFn: (body) => organisationsApi.createClientLink(platformSlug, organisationId, clientKey, body),
+    invalidate: [
+      (qc) => qc.invalidateQueries({ queryKey: [...queryKeys.orgClients(organisationId), "links", clientKey] }),
+      (qc) => qc.invalidateQueries({ queryKey: queryKeys.orgClients(organisationId) }),
+    ],
+    successMessage: "Link added",
+  });
+}
+
+export function useUpdateOrgClientLink(platformSlug: string, organisationId: number, clientKey: string) {
+  return useApiMutation<OrganisationClientLinkResponse, { linkId: number; body: UpdateOrganisationClientLinkRequest }>({
+    mutationFn: ({ linkId, body }) =>
+      organisationsApi.updateClientLink(platformSlug, organisationId, clientKey, linkId, body),
+    invalidate: [
+      (qc) => qc.invalidateQueries({ queryKey: [...queryKeys.orgClients(organisationId), "links", clientKey] }),
+      (qc) => qc.invalidateQueries({ queryKey: queryKeys.orgClients(organisationId) }),
+    ],
+    successMessage: "Link updated",
+  });
+}
+
+export function useDeleteOrgClientLink(platformSlug: string, organisationId: number, clientKey: string) {
+  return useApiMutation<void, number>({
+    mutationFn: (linkId) => organisationsApi.deleteClientLink(platformSlug, organisationId, clientKey, linkId),
+    invalidate: [
+      (qc) => qc.invalidateQueries({ queryKey: [...queryKeys.orgClients(organisationId), "links", clientKey] }),
+      (qc) => qc.invalidateQueries({ queryKey: queryKeys.orgClients(organisationId) }),
+    ],
+    successMessage: "Link removed",
   });
 }
 

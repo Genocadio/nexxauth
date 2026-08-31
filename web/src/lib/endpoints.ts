@@ -54,6 +54,11 @@ export const endpoints = {
       `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/clients/${clientKey}`,
     rotateClientToken: (organisationId: number, clientKey: string) =>
       `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/clients/${clientKey}/rotate-token`,
+    // -- client links -------------------------------------------------------
+    clientLinks: (organisationId: number, clientKey: string) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/clients/${clientKey}/links`,
+    clientLink: (organisationId: number, clientKey: string, linkId: number) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/clients/${clientKey}/links/${linkId}`,
   }),
 
   orgAuth: (platformSlug: string) => ({

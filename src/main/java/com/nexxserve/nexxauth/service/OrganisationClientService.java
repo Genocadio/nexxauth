@@ -2,17 +2,20 @@ package com.nexxserve.nexxauth.service;
 
 import com.nexxserve.nexxauth.dto.request.CreateOrganisationClientRequest;
 import com.nexxserve.nexxauth.dto.request.UpdateOrganisationClientRequest;
+import com.nexxserve.nexxauth.dto.response.OrganisationClientLinkResponse;
 import com.nexxserve.nexxauth.dto.response.OrganisationClientResponse;
 import com.nexxserve.nexxauth.entity.ClientType;
 import com.nexxserve.nexxauth.entity.LogCategory;
 import com.nexxserve.nexxauth.entity.LogLevel;
 import com.nexxserve.nexxauth.entity.Organisation;
 import com.nexxserve.nexxauth.entity.OrganisationClient;
+import com.nexxserve.nexxauth.entity.OrganisationClientLink;
 import com.nexxserve.nexxauth.entity.Platform;
 import com.nexxserve.nexxauth.exception.BadRequestException;
 import com.nexxserve.nexxauth.exception.ConflictException;
 import com.nexxserve.nexxauth.exception.ResourceNotFoundException;
 import com.nexxserve.nexxauth.mapper.OrganisationClientMapper;
+import com.nexxserve.nexxauth.repository.OrganisationClientLinkRepository;
 import com.nexxserve.nexxauth.repository.OrganisationClientRepository;
 import com.nexxserve.nexxauth.security.ClientTokens;
 import com.nexxserve.nexxauth.security.OrgActor;
@@ -41,6 +44,7 @@ public class OrganisationClientService {
     };
 
     private final OrganisationClientRepository clientRepository;
+    private final OrganisationClientLinkRepository linkRepository;
     private final OrganisationClientMapper clientMapper;
     private final PlatformAccess platformAccess;
     private final OrganisationAccess organisationAccess;
@@ -48,12 +52,14 @@ public class OrganisationClientService {
     private final AuthAuditService audit;
 
     public OrganisationClientService(OrganisationClientRepository clientRepository,
+                                     OrganisationClientLinkRepository linkRepository,
                                      OrganisationClientMapper clientMapper,
                                      PlatformAccess platformAccess,
                                      OrganisationAccess organisationAccess,
                                      ObjectMapper objectMapper,
                                      AuthAuditService audit) {
         this.clientRepository = clientRepository;
+        this.linkRepository = linkRepository;
         this.clientMapper = clientMapper;
         this.platformAccess = platformAccess;
         this.organisationAccess = organisationAccess;
@@ -289,6 +295,10 @@ public class OrganisationClientService {
 
     private OrganisationClientResponse toResponse(OrganisationClient client, String token) {
         OrganisationClientResponse base = clientMapper.toResponse(client);
+        List<OrganisationClientLinkResponse> links = linkRepository.findByClientIdOrderByIdAsc(client.getId())
+                .stream().map(link -> new OrganisationClientLinkResponse(
+                        link.getId(), link.getOrigin(), link.isAllowCors(), link.isLimitSource(),
+                        link.getCreatedAt())).toList();
         return new OrganisationClientResponse(
                 base.clientKey(), base.name(), base.type(), base.requireAuthentication(),
                 base.allowedOrigins(), base.enabled(), deserializeSettings(client.getSettings()),
@@ -296,6 +306,6 @@ public class OrganisationClientService {
                 client.getAccessTokenTtlSeconds(), client.getRefreshTokenTtlSeconds(),
                 client.getMaxSessionsPerUser(),
                 client.isAllowRegister(), client.isAllowLogin(),
-                clientMapper.splitRoles(client.getAllowedRoles()));
+                clientMapper.splitRoles(client.getAllowedRoles()), links);
     }
 }

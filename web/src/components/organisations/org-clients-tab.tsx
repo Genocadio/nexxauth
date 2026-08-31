@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { AppWindow, Pencil, Plus, RefreshCw, Settings, Trash2 } from "lucide-react";
+import { AppWindow, Link, Pencil, Plus, RefreshCw, Settings, Trash2 } from "lucide-react";
 import { ClientTokenDialog } from "@/components/organisations/client-token-dialog";
 import { OrgClientDialog } from "@/components/organisations/org-client-dialog";
+import { OrgClientLinksDialog } from "@/components/organisations/org-client-links-dialog";
 import { OrgClientSettingsDialog } from "@/components/organisations/org-client-settings-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { CopyButton } from "@/components/shared/copy-button";
@@ -43,6 +44,8 @@ function restrictionBadges(client: OrganisationClientResponse): string[] {
   if (!client.allowLogin) badges.push("No login");
   if (!client.allowRegister) badges.push("No register");
   if (client.allowedRoles.length > 0) badges.push(`${client.allowedRoles.length} role${client.allowedRoles.length === 1 ? "" : "s"}`);
+  const restrictedLinks = (client.links ?? []).filter((l) => l.limitSource).length;
+  if (restrictedLinks > 0) badges.push(`${restrictedLinks} restricted`);
   return badges;
 }
 
@@ -54,6 +57,7 @@ export function OrgClientsTab({ platformSlug, organisationId }: OrgClientsTabPro
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<OrganisationClientResponse | null>(null);
   const [settingsClient, setSettingsClient] = useState<OrganisationClientResponse | null>(null);
+  const [linksClient, setLinksClient] = useState<OrganisationClientResponse | null>(null);
   const [deleting, setDeleting] = useState<OrganisationClientResponse | null>(null);
   const [rotating, setRotating] = useState<OrganisationClientResponse | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -123,8 +127,24 @@ export function OrgClientsTab({ platformSlug, organisationId }: OrgClientsTabPro
                           ))}
                         </div>
                       </TableCell>
-                      <TableCell className="hidden max-w-[180px] truncate text-sm text-muted-foreground lg:table-cell">
-                        {client.allowedOrigins.length > 0 ? client.allowedOrigins.join(", ") : "None"}
+                      <TableCell className="hidden max-w-[200px] text-sm text-muted-foreground lg:table-cell">
+                        {(client.links ?? []).length > 0 ? (
+                          <div className="space-y-0.5">
+                            <span className="flex items-center gap-1">
+                              <Link className="h-3 w-3" />
+                              {(client.links ?? []).length} link{(client.links ?? []).length === 1 ? "" : "s"}
+                            </span>
+                            {(client.links ?? []).some((l) => l.limitSource) && (
+                              <span className="text-[11px] text-amber-600 dark:text-amber-400">
+                                {(client.links ?? []).filter((l) => l.limitSource).length} source-restricted
+                              </span>
+                            )}
+                          </div>
+                        ) : client.allowedOrigins.length > 0 ? (
+                          <span className="truncate block">{client.allowedOrigins.join(", ")}</span>
+                        ) : (
+                          "None"
+                        )}
                       </TableCell>
                       <TableCell>
                         <EnabledBadge enabled={client.enabled} />
@@ -141,6 +161,14 @@ export function OrgClientsTab({ platformSlug, organisationId }: OrgClientsTabPro
                             onClick={() => setEditing(client)}
                           >
                             <Pencil />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`Links for ${client.name}`}
+                            onClick={() => setLinksClient(client)}
+                          >
+                            <Link />
                           </Button>
                           <Button
                             variant="ghost"
@@ -213,6 +241,19 @@ export function OrgClientsTab({ platformSlug, organisationId }: OrgClientsTabPro
         onOpenChange={(open) => !open && setEditing(null)}
         client={editing ?? undefined}
       />
+
+      {/* Links dialog */}
+      {linksClient ? (
+        <OrgClientLinksDialog
+          key={linksClient.clientKey}
+          platformSlug={platformSlug}
+          organisationId={organisationId}
+          clientKey={linksClient.clientKey}
+          clientName={linksClient.name}
+          open={!!linksClient}
+          onOpenChange={(open) => !open && setLinksClient(null)}
+        />
+      ) : null}
 
       {/* Settings dialog */}
       {settingsClient ? (

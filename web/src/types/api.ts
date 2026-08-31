@@ -140,6 +140,14 @@ export interface OrganisationKeyResponse {
   active: boolean;
 }
 
+export interface OrganisationClientLinkResponse {
+  id: number;
+  origin: string;
+  allowCors: boolean;
+  limitSource: boolean;
+  createdAt: IsoDate;
+}
+
 export interface OrganisationClientResponse {
   clientKey: string;
   name: string;
@@ -160,6 +168,8 @@ export interface OrganisationClientResponse {
   allowLogin: boolean;
   /** Set of allowed role names; empty means no restriction. */
   allowedRoles: string[];
+  /** Per-link CORS and source-restriction settings. */
+  links: OrganisationClientLinkResponse[];
 }
 
 /** Full display name of a person. */

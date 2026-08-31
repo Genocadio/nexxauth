@@ -2,6 +2,8 @@ package com.nexxserve.nexxauth.security;
 
 import com.nexxserve.nexxauth.entity.LogLevel;
 import com.nexxserve.nexxauth.entity.OrganisationClient;
+import com.nexxserve.nexxauth.entity.OrganisationClientLink;
+import com.nexxserve.nexxauth.repository.OrganisationClientLinkRepository;
 import com.nexxserve.nexxauth.repository.OrganisationClientRepository;
 import com.nexxserve.nexxauth.service.AuthAuditService;
 import jakarta.servlet.FilterChain;
@@ -15,20 +17,24 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
  * Applies the CORS headers a client is entitled to. When a request from a
- * client (identified via {@code X-Client-Id}) carries an {@code Origin} that is
- * in the client's configured allowed origins, the origin is echoed on the
- * response. Works for every client type that has trusted origins configured
- * (web clients are the typical case); requests from origins that are not
- * trusted get no CORS headers and are blocked by the browser.
+ * client (identified via {@code X-Client-Id}) carries an {@code Origin} that
+ * matches a link with {@code allowCors = true}, the origin is echoed on the
+ * response. Requests from origins that are not trusted get no CORS headers
+ * and are blocked by the browser.
+ * <p>
+ * When any link has {@code limitSource = true}, only requests whose
+ * {@code Origin} matches one of those links are allowed through — all other
+ * origins are rejected (403). This enforces per-origin source restrictions.
  * <p>
  * Preflight {@code OPTIONS} requests never carry custom headers — browsers
  * strip them, so {@code X-Client-Id} cannot identify the client yet. A
- * preflight is answered whenever <em>any</em> enabled client trusts the
+ * preflight is answered whenever <em>any</em> enabled client link trusts the
  * {@code Origin}; the real request that follows still needs its own matching
  * {@code X-Client-Id}, so this widens nothing beyond configured origins.
  * <p>
@@ -46,10 +52,14 @@ public class ClientCorsFilter extends OncePerRequestFilter {
     private static final String EXPOSED_HEADERS = "X-Request-Id";
 
     private final OrganisationClientRepository clientRepository;
+    private final OrganisationClientLinkRepository linkRepository;
     private final AuthAuditService audit;
 
-    public ClientCorsFilter(OrganisationClientRepository clientRepository, AuthAuditService audit) {
+    public ClientCorsFilter(OrganisationClientRepository clientRepository,
+                             OrganisationClientLinkRepository linkRepository,
+                             AuthAuditService audit) {
         this.clientRepository = clientRepository;
+        this.linkRepository = linkRepository;
         this.audit = audit;
     }
 
@@ -66,16 +76,57 @@ public class ClientCorsFilter extends OncePerRequestFilter {
         String clientIdHeader = request.getHeader(CLIENT_ID_HEADER);
         if (clientIdHeader != null) {
             OrganisationClient client = findEnabledClient(clientIdHeader);
-            if (client == null || !allowedOrigins(client).contains(origin)) {
-                // Unknown/disabled client or untrusted origin: log the rejection
+            if (client == null) {
                 String ip = com.nexxserve.nexxauth.util.ClientIps.resolve(request, false);
                 String domain = extractDomain(request);
                 audit.logRisk(LogLevel.WARN, AuthAuditService.CORS_ORIGIN_REJECTED,
                         ip, domain,
-                        "origin=" + origin + " clientId=" + clientIdHeader);
+                        "origin=" + origin + " clientId=" + clientIdHeader + " reason=unknown_client");
                 filterChain.doFilter(request, response);
                 return;
             }
+
+            List<OrganisationClientLink> links = linkRepository.findByClientIdOrderByIdAsc(client.getId());
+
+            // Limit source check: if any link has limitSource = true, the request
+            // must come from one of those origins.
+            if (hasLimitSource(links) && !matchesLimitSource(links, origin)) {
+                String ip = com.nexxserve.nexxauth.util.ClientIps.resolve(request, false);
+                String domain = extractDomain(request);
+                audit.logRisk(LogLevel.WARN, AuthAuditService.CORS_ORIGIN_REJECTED,
+                        ip, domain,
+                        "origin=" + origin + " clientId=" + clientIdHeader + " reason=limit_source");
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"message\":\"Origin not allowed by source restriction\"}");
+                return;
+            }
+
+            // CORS check: find a matching link with allowCors = true.
+            // Fallback: if no links exist, check the legacy allowed_origins field.
+            OrganisationClientLink matchingLink = findCorsLink(links, origin);
+            if (matchingLink == null && links.isEmpty() && isLegacyOriginTrusted(client, origin)) {
+                // Legacy path: client has no links yet but origin is in allowed_origins
+                applyCorsHeaders(response, origin);
+                if (preflight) {
+                    applyPreflightHeaders(response);
+                    response.setStatus(HttpServletResponse.SC_OK);
+                    return;
+                }
+                filterChain.doFilter(request, response);
+                return;
+            }
+            if (matchingLink == null) {
+                // No CORS link matches — log and pass through (browser blocks)
+                String ip = com.nexxserve.nexxauth.util.ClientIps.resolve(request, false);
+                String domain = extractDomain(request);
+                audit.logRisk(LogLevel.WARN, AuthAuditService.CORS_ORIGIN_REJECTED,
+                        ip, domain,
+                        "origin=" + origin + " clientId=" + clientIdHeader + " reason=no_cors_link");
+                filterChain.doFilter(request, response);
+                return;
+            }
+
             applyCorsHeaders(response, origin);
             if (preflight) {
                 applyPreflightHeaders(response);
@@ -88,9 +139,9 @@ public class ClientCorsFilter extends OncePerRequestFilter {
 
         // No X-Client-Id: browsers strip custom headers from preflights, so the
         // client cannot be identified yet. Answer the preflight when any enabled
-        // client trusts this origin — the real request still carries its own
+        // client link trusts this origin — the real request still carries its own
         // X-Client-Id and must match that client's origins to be served.
-        if (preflight && anyEnabledClientTrusts(origin)) {
+        if (preflight && anyEnabledClientLinkTrusts(origin)) {
             applyCorsHeaders(response, origin);
             applyPreflightHeaders(response);
             response.setStatus(HttpServletResponse.SC_OK);
@@ -109,13 +160,51 @@ public class ClientCorsFilter extends OncePerRequestFilter {
         return client != null && client.isEnabled() ? client : null;
     }
 
-    private boolean anyEnabledClientTrusts(String origin) {
+    /** True when any link for this client has limitSource = true. */
+    private static boolean hasLimitSource(List<OrganisationClientLink> links) {
+        return links.stream().anyMatch(OrganisationClientLink::isLimitSource);
+    }
+
+    /** True when the origin matches a link with limitSource = true. */
+    private static boolean matchesLimitSource(List<OrganisationClientLink> links, String origin) {
+        return links.stream()
+                .filter(OrganisationClientLink::isLimitSource)
+                .anyMatch(link -> link.getOrigin().equalsIgnoreCase(origin));
+    }
+
+    /** Find the first link whose origin matches and has allowCors = true. */
+    private static OrganisationClientLink findCorsLink(List<OrganisationClientLink> links, String origin) {
+        return links.stream()
+                .filter(OrganisationClientLink::isAllowCors)
+                .filter(link -> link.getOrigin().equalsIgnoreCase(origin))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private boolean anyEnabledClientLinkTrusts(String origin) {
         for (OrganisationClient client : clientRepository.findByEnabledTrue()) {
-            if (allowedOrigins(client).contains(origin)) {
+            List<OrganisationClientLink> links = linkRepository.findByClientIdOrderByIdAsc(client.getId());
+            if (findCorsLink(links, origin) != null) {
+                return true;
+            }
+            // Legacy fallback: no links but origin in allowed_origins
+            if (links.isEmpty() && isLegacyOriginTrusted(client, origin)) {
                 return true;
             }
         }
         return false;
+    }
+
+    /** Legacy fallback: check the comma-separated allowed_origins field. */
+    private static boolean isLegacyOriginTrusted(OrganisationClient client, String origin) {
+        String raw = client.getAllowedOrigins();
+        if (raw == null || raw.isBlank()) {
+            return false;
+        }
+        return Arrays.stream(raw.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .anyMatch(o -> o.equalsIgnoreCase(origin));
     }
 
     private static void applyCorsHeaders(HttpServletResponse response, String origin) {
@@ -140,16 +229,5 @@ public class ClientCorsFilter extends OncePerRequestFilter {
     private static boolean isPreflight(HttpServletRequest request) {
         return "OPTIONS".equalsIgnoreCase(request.getMethod())
                 && request.getHeader("Access-Control-Request-Method") != null;
-    }
-
-    private static Set<String> allowedOrigins(OrganisationClient client) {
-        String raw = client.getAllowedOrigins();
-        if (raw == null || raw.isBlank()) {
-            return Set.of();
-        }
-        return Arrays.stream(raw.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .collect(Collectors.toUnmodifiableSet());
     }
 }

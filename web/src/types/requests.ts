@@ -228,7 +228,7 @@ export interface CreateOrganisationClientRequest {
   maxSessionsPerUser?: number | null;
   allowRegister?: boolean;
   allowLogin?: boolean;
-  allowedRoles?: Set<string> | null;
+  allowedRoles?: string[] | null;
 }
 
 export interface UpdateOrganisationClientRequest {
@@ -243,5 +243,21 @@ export interface UpdateOrganisationClientRequest {
   maxSessionsPerUser?: number | null;
   allowRegister?: boolean;
   allowLogin?: boolean;
-  allowedRoles?: Set<string> | null;
+  allowedRoles?: string[] | null;
+}
+
+// ---------------------------------------------------------------------------
+// Organisation client links
+// ---------------------------------------------------------------------------
+
+export interface CreateOrganisationClientLinkRequest {
+  origin: string;
+  allowCors?: boolean;
+  limitSource?: boolean;
+}
+
+export interface UpdateOrganisationClientLinkRequest {
+  origin?: string;
+  allowCors?: boolean;
+  limitSource?: boolean;
 }

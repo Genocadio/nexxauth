@@ -130,6 +130,15 @@ export function useOrgClients(organisationId: number) {
   });
 }
 
+export function useOrgClientLinks(organisationId: number, clientKey: string) {
+  const platformSlug = usePlatformSlug();
+  return useQuery({
+    queryKey: [...queryKeys.orgClients(organisationId), "links", clientKey],
+    queryFn: () => organisationsApi.clientLinks(platformSlug!, organisationId, clientKey),
+    enabled: !!platformSlug && !!organisationId && !!clientKey,
+  });
+}
+
 export function useOrgSessions(organisationId: number, userId?: number, clientKey?: string) {
   const platformSlug = usePlatformSlug();
   return useQuery({
