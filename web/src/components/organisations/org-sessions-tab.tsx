@@ -125,9 +125,13 @@ export function OrgSessionsTab({ platformSlug, organisationId }: OrgSessionsTabP
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All clients</SelectItem>
-                  {/* Build unique client list from sessions */}
-                  {[...new Set((sessions.data ?? []).map((s) => s.clientKey).filter(Boolean))].map((ck) => (
-                    <SelectItem key={ck!} value={ck!}>{ck}</SelectItem>
+                  {/* Build unique client list from sessions, showing clientName */}
+                  {[...new Map(
+                    (sessions.data ?? [])
+                      .filter((s) => s.clientKey)
+                      .map((s) => [s.clientKey, s.clientName ?? s.clientKey])
+                  ).entries()].map(([key, name]) => (
+                    <SelectItem key={key!} value={key!}>{name}</SelectItem>
                   ))}
                   <SelectItem value="__none__">Unknown client</SelectItem>
                 </SelectContent>
@@ -194,6 +198,9 @@ function SessionRow({
     ipAddress: string | null;
     userAgent: string | null;
     clientKey: string | null;
+    clientName: string | null;
+    clientType: string | null;
+    hostname: string | null;
     createdAt: string;
     lastActivityAt: string;
     expiresAt: string;
@@ -223,7 +230,7 @@ function SessionRow({
         tabIndex={0}
         onClick={() => setExpanded((v) => !v)}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded((v) => !v); } }}
-        className={`flex w-full items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/30 ${expanded ? "bg-muted/20" : ""}`}
+        className={`flex w-full items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/30 ${expanded ? "bg-muted/20" : ""} ${!session.active ? "opacity-60" : ""}`}
       >
         {/* Expand chevron */}
         <ChevronRight
@@ -268,9 +275,12 @@ function SessionRow({
                 {session.tokenCount} rotations
               </span>
             )}
-            {session.clientKey ? (
+            {session.clientName || session.clientKey ? (
               <Badge variant="outline" className="bg-violet-500/10 text-violet-600 dark:text-violet-400 text-[10px]">
-                {session.clientKey}
+                {session.clientName ?? session.clientKey}
+                {session.clientType ? (
+                  <span className="ml-1 uppercase opacity-60">{session.clientType}</span>
+                ) : null}
               </Badge>
             ) : (
               <Badge variant="outline" className="text-[10px] text-muted-foreground/60">
@@ -279,9 +289,14 @@ function SessionRow({
             )}
           </div>
           <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground/70">
-            {session.ipAddress && (
+            {session.hostname && (
               <span className="flex items-center gap-1">
                 <Globe className="h-3 w-3" />
+                {session.hostname}
+              </span>
+            )}
+            {session.ipAddress && (
+              <span className="flex items-center gap-1">
                 {session.ipAddress}
               </span>
             )}
@@ -495,6 +510,9 @@ function SessionTimeline({
                   ? `evicted ${new Date(event.evictedAt).toLocaleString()}`
                   : `expires ${new Date(event.expiresAt).toLocaleString()}`}
             </span>
+            {event.hostname && (
+              <span className="text-muted-foreground/40">{event.hostname}</span>
+            )}
           </div>
         ))}
       </div>

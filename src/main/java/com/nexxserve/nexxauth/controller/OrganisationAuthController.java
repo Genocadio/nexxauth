@@ -8,6 +8,7 @@ import com.nexxserve.nexxauth.dto.response.OrgAuthResponse;
 import com.nexxserve.nexxauth.security.RateLimitProperties;
 import com.nexxserve.nexxauth.service.OrganisationAuthService;
 import com.nexxserve.nexxauth.util.ClientIps;
+import com.nexxserve.nexxauth.util.Hostnames;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -51,7 +52,7 @@ public class OrganisationAuthController {
                                     @RequestHeader(value = CLIENT_ID_HEADER, required = false) String clientId,
                                     @Valid @RequestBody OrgRegisterRequest request,
                                     HttpServletRequest httpRequest) {
-        return authService.register(slug, request, clientId, resolveIp(httpRequest), httpRequest.getHeader("User-Agent"));
+        return authService.register(slug, request, clientId, resolveIp(httpRequest), httpRequest.getHeader("User-Agent"), resolveHostname(httpRequest));
     }
 
     @PostMapping("/login")
@@ -59,7 +60,7 @@ public class OrganisationAuthController {
                                  @RequestHeader(value = CLIENT_ID_HEADER, required = false) String clientId,
                                  @Valid @RequestBody OrgLoginRequest request,
                                  HttpServletRequest httpRequest) {
-        return authService.login(slug, request, clientId, resolveIp(httpRequest), httpRequest.getHeader("User-Agent"));
+        return authService.login(slug, request, clientId, resolveIp(httpRequest), httpRequest.getHeader("User-Agent"), resolveHostname(httpRequest));
     }
 
     @PostMapping("/refresh")
@@ -67,7 +68,7 @@ public class OrganisationAuthController {
                                    @Valid @RequestBody RefreshTokenRequest request,
                                    HttpServletRequest httpRequest) {
         return authService.refresh(slug, request.refreshToken(),
-                resolveIp(httpRequest), httpRequest.getHeader("User-Agent"));
+                resolveIp(httpRequest), httpRequest.getHeader("User-Agent"), resolveHostname(httpRequest));
     }
 
     @PostMapping("/logout")
@@ -80,5 +81,9 @@ public class OrganisationAuthController {
 
     private String resolveIp(HttpServletRequest request) {
         return ClientIps.resolve(request, rateLimitProperties.isUseForwardedFor());
+    }
+
+    private String resolveHostname(HttpServletRequest request) {
+        return Hostnames.resolve(request, resolveIp(request));
     }
 }

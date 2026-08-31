@@ -78,7 +78,7 @@ public interface OrganisationRefreshTokenRepository extends JpaRepository<Organi
     List<OrganisationRefreshToken> findActiveByOrganisationId(@Param("organisationId") Long organisationId,
                                                               @Param("now") Instant now);
 
-    /** All active tokens for a specific user within an organisation. */
+    /** All tokens for a specific user within an organisation. */
     @Query("""
             select rt from OrganisationRefreshToken rt
             where rt.organisationUser.organisation.id = :organisationId
@@ -90,6 +90,23 @@ public interface OrganisationRefreshTokenRepository extends JpaRepository<Organi
             @Param("organisationId") Long organisationId,
             @Param("userId") Long userId,
             @Param("now") Instant now);
+
+    /** All tokens (any state) for an organisation. */
+    @Query("""
+            select rt from OrganisationRefreshToken rt
+            where rt.organisationUser.organisation.id = :organisationId
+            order by rt.sessionId, rt.expiresAt desc""")
+    List<OrganisationRefreshToken> findAllByOrganisationId(@Param("organisationId") Long organisationId);
+
+    /** All tokens (any state) for a specific user within an organisation. */
+    @Query("""
+            select rt from OrganisationRefreshToken rt
+            where rt.organisationUser.organisation.id = :organisationId
+              and rt.organisationUser.id = :userId
+            order by rt.sessionId, rt.expiresAt desc""")
+    List<OrganisationRefreshToken> findAllByOrganisationIdAndUserId(
+            @Param("organisationId") Long organisationId,
+            @Param("userId") Long userId);
 
     /** Revoke all tokens for a session. */
     @Modifying

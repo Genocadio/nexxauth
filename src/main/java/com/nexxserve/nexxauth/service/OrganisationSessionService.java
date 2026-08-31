@@ -2,10 +2,13 @@ package com.nexxserve.nexxauth.service;
 
 import com.nexxserve.nexxauth.dto.response.OrganisationSessionResponse;
 import com.nexxserve.nexxauth.dto.response.SessionTimelineEvent;
+import com.nexxserve.nexxauth.entity.ClientType;
+import com.nexxserve.nexxauth.entity.OrganisationClient;
 import com.nexxserve.nexxauth.entity.OrganisationRefreshToken;
 import com.nexxserve.nexxauth.entity.OrganisationUser;
 import com.nexxserve.nexxauth.exception.BadRequestException;
 import com.nexxserve.nexxauth.exception.ResourceNotFoundException;
+import com.nexxserve.nexxauth.repository.OrganisationClientRepository;
 import com.nexxserve.nexxauth.repository.OrganisationRefreshTokenRepository;
 import com.nexxserve.nexxauth.repository.OrganisationUserRepository;
 import org.springframework.stereotype.Service;
@@ -30,11 +33,14 @@ public class OrganisationSessionService {
 
     private final OrganisationRefreshTokenRepository refreshTokenRepository;
     private final OrganisationUserRepository userRepository;
+    private final OrganisationClientRepository clientRepository;
 
     public OrganisationSessionService(OrganisationRefreshTokenRepository refreshTokenRepository,
-                                       OrganisationUserRepository userRepository) {
+                                       OrganisationUserRepository userRepository,
+                                       OrganisationClientRepository clientRepository) {
         this.refreshTokenRepository = refreshTokenRepository;
         this.userRepository = userRepository;
+        this.clientRepository = clientRepository;
     }
 
     /**
@@ -65,14 +71,29 @@ public class OrganisationSessionService {
      */
     @Transactional(readOnly = true)
     public List<OrganisationSessionResponse> listSessions(Long organisationId, Long userId, String clientKey) {
-        Instant now = Instant.now();
         List<OrganisationRefreshToken> tokens;
         if (userId != null) {
-            tokens = refreshTokenRepository.findActiveByOrganisationIdAndUserId(organisationId, userId, now);
+            tokens = refreshTokenRepository.findAllByOrganisationIdAndUserId(organisationId, userId);
         } else {
-            tokens = refreshTokenRepository.findActiveByOrganisationId(organisationId, now);
+            tokens = refreshTokenRepository.findAllByOrganisationId(organisationId);
         }
-        List<OrganisationSessionResponse> sessions = aggregateSessions(tokens);
+
+        // Resolve client keys to names and types
+        List<String> clientKeys = tokens.stream()
+                .map(OrganisationRefreshToken::getClientKey)
+                .filter(k -> k != null && !k.isBlank())
+                .distinct()
+                .toList();
+        Map<String, ClientInfo> clientInfoMap = new java.util.HashMap<>();
+        if (!clientKeys.isEmpty()) {
+            List<OrganisationClient> clients = clientRepository.findByOrganisationIdAndClientKeyIn(organisationId, clientKeys);
+            for (OrganisationClient client : clients) {
+                clientInfoMap.put(client.getClientKey(),
+                        new ClientInfo(client.getName(), client.getType() != null ? client.getType().name() : null));
+            }
+        }
+
+        List<OrganisationSessionResponse> sessions = aggregateSessions(tokens, clientInfoMap);
 
         // Filter by client key if requested
         if (clientKey != null) {
@@ -133,7 +154,8 @@ public class OrganisationSessionService {
                         t.getRevokedAt(),
                         t.getEvictedAt(),
                         !t.isRevoked() && !t.isEvicted() && !t.isExpired(),
-                        t.getClientKey()
+                        t.getClientKey(),
+                        t.getHostname()
                 ))
                 .toList();
     }
@@ -168,7 +190,8 @@ public class OrganisationSessionService {
     /**
      * Aggregate a flat list of tokens into sessions grouped by sessionId.
      */
-    private List<OrganisationSessionResponse> aggregateSessions(List<OrganisationRefreshToken> tokens) {
+    private List<OrganisationSessionResponse> aggregateSessions(List<OrganisationRefreshToken> tokens,
+                                                                   Map<String, ClientInfo> clientInfoMap) {
         Instant now = Instant.now();
         // Group by sessionId, preserving insertion order
         Map<String, List<OrganisationRefreshToken>> grouped = new LinkedHashMap<>();
@@ -213,6 +236,13 @@ public class OrganisationSessionService {
                     .filter(k -> k != null && !k.isBlank())
                     .findFirst()
                     .orElse(null);
+            // Source hostname from the most recent token in the session
+            String hostname = sessionTokens.stream()
+                    .map(OrganisationRefreshToken::getHostname)
+                    .filter(h -> h != null && !h.isBlank())
+                    .findFirst()
+                    .orElse(null);
+            ClientInfo info = clientKey != null ? clientInfoMap.get(clientKey) : null;
 
             sessions.add(new OrganisationSessionResponse(
                     entry.getKey(),
@@ -221,6 +251,9 @@ public class OrganisationSessionService {
                     primary.getIpAddress(),
                     primary.getUserAgent(),
                     clientKey,
+                    info != null ? info.name() : (clientKey != null ? clientKey : null),
+                    info != null ? info.type() : null,
+                    hostname,
                     earliest,
                     latestActivity,
                     latestExpiry,
@@ -236,5 +269,8 @@ public class OrganisationSessionService {
         });
 
         return sessions;
+    }
+
+    private record ClientInfo(String name, String type) {
     }
 }

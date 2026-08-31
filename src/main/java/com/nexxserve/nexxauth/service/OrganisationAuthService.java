@@ -98,6 +98,12 @@ public class OrganisationAuthService {
     @Transactional
     public OrgAuthResponse register(String platformSlug, OrgRegisterRequest request, String clientId,
                                      String ipAddress, String userAgent) {
+        return register(platformSlug, request, clientId, ipAddress, userAgent, null);
+    }
+
+    @Transactional
+    public OrgAuthResponse register(String platformSlug, OrgRegisterRequest request, String clientId,
+                                     String ipAddress, String userAgent, String hostname) {
         OrganisationClient client = resolveClient(clientId);
         enforceClientRestrictions(client, "register");
         Organisation organisation = resolveOrganisation(platformSlug, client, null);
@@ -135,23 +141,29 @@ public class OrganisationAuthService {
         enforceRoleRestrictions(client, userWithRoles);
         audit.logPersisted(LogLevel.INFO, LogCategory.AUTH, AuthAuditService.ORG_REGISTER, identifierOf(saved),
                 organisation.getSlug(), organisation.getId(), null);
-        return issueTokens(saved, client, ipAddress, userAgent);
+        return issueTokens(saved, client, ipAddress, userAgent, hostname);
     }
 
     @Transactional
     public OrgAuthResponse login(String platformSlug, OrgLoginRequest request, String clientId,
                                   String ipAddress, String userAgent) {
+        return login(platformSlug, request, clientId, ipAddress, userAgent, null);
+    }
+
+    @Transactional
+    public OrgAuthResponse login(String platformSlug, OrgLoginRequest request, String clientId,
+                                  String ipAddress, String userAgent, String hostname) {
         OrganisationClient client = resolveClient(clientId);
         enforceClientRestrictions(client, "login");
         Organisation organisation = resolveOrganisation(platformSlug, client, request.organisationId());
         AuthType method = request.authType() != null ? request.authType() : AuthType.PASSWORD;
         return switch (method) {
-            case PASSWORD -> passwordLogin(organisation, request, client, ipAddress, userAgent);
+            case PASSWORD -> passwordLogin(organisation, request, client, ipAddress, userAgent, hostname);
         };
     }
 
     private OrgAuthResponse passwordLogin(Organisation organisation, OrgLoginRequest request,
-                                          OrganisationClient client, String ipAddress, String userAgent) {
+                                          OrganisationClient client, String ipAddress, String userAgent, String hostname) {
         if (request.password() == null || request.password().isBlank())
             throw new BadRequestException("Password is required for the PASSWORD auth method");
         String identifier = request.identifier().trim();
@@ -187,12 +199,18 @@ public class OrganisationAuthService {
         audit.logPersisted(LogLevel.INFO, LogCategory.AUTH, AuthAuditService.ORG_LOGIN_SUCCESS, identifier,
                 organisation.getSlug(), organisation.getId(), null);
         enforceRoleRestrictions(client, user);
-        return issueTokens(user, client, ipAddress, userAgent);
+        return issueTokens(user, client, ipAddress, userAgent, hostname);
     }
 
     @Transactional
     public OrgAuthResponse refresh(String platformSlug, String rawRefreshToken,
                                     String ipAddress, String userAgent) {
+        return refresh(platformSlug, rawRefreshToken, ipAddress, userAgent, null);
+    }
+
+    @Transactional
+    public OrgAuthResponse refresh(String platformSlug, String rawRefreshToken,
+                                    String ipAddress, String userAgent, String hostname) {
         OrganisationUser resolved = refreshTokenService.resolveSubject(rawRefreshToken);
         if (orgUserActions.hasPendingGatingAction(resolved))
             throw new RefreshTokenException("Pending action required: change password");
@@ -206,7 +224,7 @@ public class OrganisationAuthService {
                 rotation.subject().getOrganisation().getSlug(),
                 rotation.subject().getOrganisation().getId(), null);
         return issueTokens(rotation.subject(), rotation.newToken(), client,
-                ipAddress, userAgent, existingSessionId);
+                ipAddress, userAgent, existingSessionId, hostname);
     }
 
     @Transactional
@@ -329,8 +347,13 @@ public class OrganisationAuthService {
 
     private OrgAuthResponse issueTokens(OrganisationUser user, OrganisationClient client,
                                          String ipAddress, String userAgent) {
+        return issueTokens(user, client, ipAddress, userAgent, null);
+    }
+
+    private OrgAuthResponse issueTokens(OrganisationUser user, OrganisationClient client,
+                                         String ipAddress, String userAgent, String hostname) {
         Organisation organisation = user.getOrganisation();
-        if (orgUserActions.hasPendingGatingAction(user)) return issueTokens(user, null, OrgUserActions.GATING_ACCESS_TTL, null, null, null);
+        if (orgUserActions.hasPendingGatingAction(user)) return issueTokens(user, null, OrgUserActions.GATING_ACCESS_TTL, null, null, null, hostname);
         refreshTokenService.enforceSessionLimit(organisation, user.getId(), client);
         // Dedup: if the user is logging in from the same IP+UA, reuse the existing session id
         String sessionId = sessionService.findExistingSessionId(user.getId(), ipAddress, userAgent);
@@ -340,18 +363,29 @@ public class OrganisationAuthService {
         return issueTokens(user, refreshTokenService.issueWithClient(user,
                 sessionSettingsService.refreshTokenTtl(organisation, client),
                 client != null ? client.getClientKey() : null,
-                ipAddress, userAgent, sessionId), client, ipAddress, userAgent, sessionId);
+                ipAddress, userAgent, sessionId, hostname), client, ipAddress, userAgent, sessionId);
     }
 
     private OrgAuthResponse issueTokens(OrganisationUser user, String refreshToken,
                                          OrganisationClient client, String ipAddress,
                                          String userAgent, String sessionId) {
+        return issueTokens(user, refreshToken, client, ipAddress, userAgent, sessionId, null);
+    }
+
+    private OrgAuthResponse issueTokens(OrganisationUser user, String refreshToken,
+                                         OrganisationClient client, String ipAddress,
+                                         String userAgent, String sessionId, String hostname) {
         return issueTokens(user, refreshToken, sessionSettingsService.accessTokenTtl(user.getOrganisation(), client),
-                ipAddress, userAgent, sessionId);
+                ipAddress, userAgent, sessionId, hostname);
     }
 
     private OrgAuthResponse issueTokens(OrganisationUser user, String refreshToken, Duration accessTtl,
                                          String ipAddress, String userAgent, String sessionId) {
+        return issueTokens(user, refreshToken, accessTtl, ipAddress, userAgent, sessionId, null);
+    }
+
+    private OrgAuthResponse issueTokens(OrganisationUser user, String refreshToken, Duration accessTtl,
+                                         String ipAddress, String userAgent, String sessionId, String hostname) {
         Organisation organisation = user.getOrganisation();
         OrganisationSigningKey signingKey = orgKeyService.activeKey(organisation);
         String accessToken = orgJwtService.generateAccessToken(user, signingKey, accessTtl);

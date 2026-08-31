@@ -85,7 +85,7 @@ public class OrganisationRefreshTokenService
      */
     @Transactional
     public String issueWithClient(OrganisationUser subject, Duration ttl, String clientKey) {
-        return issueWithClient(subject, ttl, clientKey, null, null, null);
+        return issueWithClient(subject, ttl, clientKey, null, null, null, null);
     }
 
     /**
@@ -96,6 +96,16 @@ public class OrganisationRefreshTokenService
     @Transactional
     public String issueWithClient(OrganisationUser subject, Duration ttl, String clientKey,
                                   String ipAddress, String userAgent, String sessionId) {
+        return issueWithClient(subject, ttl, clientKey, ipAddress, userAgent, sessionId, null);
+    }
+
+    /**
+     * Issues a refresh token with full session context: client, IP, user-agent,
+     * session id and source hostname. All parameters are nullable.
+     */
+    @Transactional
+    public String issueWithClient(OrganisationUser subject, Duration ttl, String clientKey,
+                                  String ipAddress, String userAgent, String sessionId, String hostname) {
         String rawToken = RefreshTokens.generateRaw();
         OrganisationRefreshToken token = createToken(subject, RefreshTokens.hash(rawToken),
                 Instant.now().plus(ttl));
@@ -103,6 +113,7 @@ public class OrganisationRefreshTokenService
         token.setIpAddress(ipAddress);
         token.setUserAgent(userAgent);
         token.setSessionId(sessionId);
+        token.setHostname(hostname);
         save(token);
         return rawToken;
     }

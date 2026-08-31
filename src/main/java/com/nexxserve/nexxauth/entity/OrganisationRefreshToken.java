@@ -58,6 +58,12 @@ public class OrganisationRefreshToken extends BaseEntity {
     @Column(name = "session_id", length = 36)
     private String sessionId;
 
+    /** Source domain of the client that created this token: raw value of the
+     * {@code Origin} header where present, otherwise the reverse-DNS hostname
+     * of {@link #ipAddress} when resolvable. Null when neither is available. */
+    @Column(name = "hostname", length = 255)
+    private String hostname;
+
     public boolean isExpired() {
         return expiresAt.isBefore(Instant.now());
     }

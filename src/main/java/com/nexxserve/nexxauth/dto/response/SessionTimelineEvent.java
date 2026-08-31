@@ -12,6 +12,7 @@ public record SessionTimelineEvent(
         Instant revokedAt,
         Instant evictedAt,
         boolean active,
-        String clientKey
+        String clientKey,
+        String hostname
 ) {
 }

@@ -211,6 +211,9 @@ export interface OrganisationSessionResponse {
   ipAddress: string | null;
   userAgent: string | null;
   clientKey: string | null;
+  clientName: string | null;
+  clientType: string | null;
+  hostname: string | null;
   createdAt: IsoDate;
   lastActivityAt: IsoDate;
   expiresAt: IsoDate;
@@ -225,4 +228,5 @@ export interface SessionTimelineEvent {
   evictedAt: IsoDate | null;
   active: boolean;
   clientKey: string | null;
+  hostname: string | null;
 }
