@@ -23,6 +23,7 @@ import com.nexxserve.nexxauth.exception.ResourceNotFoundException;
 import com.nexxserve.nexxauth.mapper.OrganisationClientMapper;
 import com.nexxserve.nexxauth.mapper.OrganisationUserMapper;
 import com.nexxserve.nexxauth.repository.OrganisationClientRepository;
+import com.nexxserve.nexxauth.repository.OrganisationRepository;
 import com.nexxserve.nexxauth.repository.OrganisationRoleRepository;
 import com.nexxserve.nexxauth.repository.OrganisationUserRepository;
 import com.nexxserve.nexxauth.security.AuthTiming;
@@ -44,6 +45,7 @@ public class OrganisationAuthService {
 
     private final PlatformAccess platformAccess;
     private final OrganisationClientRepository clientRepository;
+    private final OrganisationRepository organisationRepository;
     private final OrganisationRoleRepository roleRepository;
     private final OrganisationUserRepository userRepository;
     private final OrganisationRefreshTokenService refreshTokenService;
@@ -62,6 +64,7 @@ public class OrganisationAuthService {
 
     public OrganisationAuthService(PlatformAccess platformAccess,
                                    OrganisationClientRepository clientRepository,
+                                   OrganisationRepository organisationRepository,
                                    OrganisationRoleRepository roleRepository,
                                    OrganisationUserRepository userRepository,
                                    OrganisationRefreshTokenService refreshTokenService, OrgJwtService orgJwtService,
@@ -74,6 +77,7 @@ public class OrganisationAuthService {
                                    OrgUserActions orgUserActions, OrganisationSessionService sessionService) {
         this.platformAccess = platformAccess;
         this.clientRepository = clientRepository;
+        this.organisationRepository = organisationRepository;
         this.roleRepository = roleRepository;
         this.userRepository = userRepository;
         this.refreshTokenService = refreshTokenService;
@@ -96,7 +100,7 @@ public class OrganisationAuthService {
                                      String ipAddress, String userAgent) {
         OrganisationClient client = resolveClient(clientId);
         enforceClientRestrictions(client, "register");
-        Organisation organisation = resolveOrganisation(platformSlug, client);
+        Organisation organisation = resolveOrganisation(platformSlug, client, null);
         String email = normalizedEmail(request.email());
         String username = cleanedUsername(request.username());
         String phone = cleanedPhone(request.phone());
@@ -139,7 +143,7 @@ public class OrganisationAuthService {
                                   String ipAddress, String userAgent) {
         OrganisationClient client = resolveClient(clientId);
         enforceClientRestrictions(client, "login");
-        Organisation organisation = resolveOrganisation(platformSlug, client);
+        Organisation organisation = resolveOrganisation(platformSlug, client, request.organisationId());
         AuthType method = request.authType() != null ? request.authType() : AuthType.PASSWORD;
         return switch (method) {
             case PASSWORD -> passwordLogin(organisation, request, client, ipAddress, userAgent);
@@ -305,11 +309,20 @@ public class OrganisationAuthService {
         return clientRepository.findByClientKey(clientId.trim()).orElse(null);
     }
 
-    private Organisation resolveOrganisation(String platformSlug, OrganisationClient client) {
-        if (client == null) throw new BadRequestException("X-Client-Id header is required");
-        Organisation o = client.getOrganisation();
-        if (!o.getPlatform().getSlug().equals(platformSlug)) throw ResourceNotFoundException.of("Organisation", o.getId());
-        return o;
+    private Organisation resolveOrganisation(String platformSlug, OrganisationClient client, Long organisationId) {
+        if (client != null) {
+            Organisation o = client.getOrganisation();
+            if (!o.getPlatform().getSlug().equals(platformSlug)) throw ResourceNotFoundException.of("Organisation", o.getId());
+            return o;
+        }
+        // Fallback: portal flow — resolve from organisationId in the body
+        if (organisationId != null) {
+            Organisation o = organisationRepository.findById(organisationId)
+                    .orElseThrow(() -> ResourceNotFoundException.of("Organisation", organisationId));
+            if (!o.getPlatform().getSlug().equals(platformSlug)) throw ResourceNotFoundException.of("Organisation", organisationId);
+            return o;
+        }
+        throw new BadRequestException("X-Client-Id header or organisationId is required");
     }
 
 

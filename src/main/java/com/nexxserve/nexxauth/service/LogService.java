@@ -29,6 +29,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Central logging service: persists log entries, broadcasts them to connected
@@ -45,7 +49,19 @@ public class LogService {
     private final OrganisationRepository organisationRepository;
     private final ObjectMapper objectMapper;
 
+    private static final long HEARTBEAT_INTERVAL_SECONDS = 15;
+
     private final Map<String, CopyOnWriteArrayList<SseEmitter>> emitters = new ConcurrentHashMap<>();
+
+    /** Per-emitter heartbeat future so each connection can be cancelled independently. */
+    private final Map<SseEmitter, ScheduledFuture<?>> heartbeatFutures = new ConcurrentHashMap<>();
+
+    private final ScheduledExecutorService heartbeatScheduler =
+            Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "sse-heartbeat");
+                t.setDaemon(true);
+                return t;
+            });
 
     /** In-memory cache of organisation id → slug to avoid repeated lookups. */
     private final Map<Long, String> orgSlugCache = new ConcurrentHashMap<>();
@@ -221,11 +237,51 @@ public class LogService {
 
         emitters.computeIfAbsent(key, k -> new CopyOnWriteArrayList<>()).add(emitter);
 
-        emitter.onCompletion(() -> removeEmitter(key, emitter));
-        emitter.onTimeout(() -> removeEmitter(key, emitter));
-        emitter.onError(e -> removeEmitter(key, emitter));
+        // Send an initial event so the client knows the connection is live.
+        // This also flushes the response through reverse-proxy buffers.
+        try {
+            emitter.send(SseEmitter.event().name("connected").data("ok"));
+        } catch (IOException ignored) {
+            // Client disconnected before we could send — clean up below
+        }
+
+        // Periodic heartbeat (SSE comment lines) to prevent proxy/CDN idle timeouts.
+        ScheduledFuture<?> future = heartbeatScheduler.scheduleAtFixedRate(
+                () -> sendHeartbeat(emitter),
+                HEARTBEAT_INTERVAL_SECONDS, HEARTBEAT_INTERVAL_SECONDS, TimeUnit.SECONDS);
+        heartbeatFutures.put(emitter, future);
+
+        emitter.onCompletion(() -> {
+            cancelHeartbeat(emitter);
+            removeEmitter(key, emitter);
+        });
+        emitter.onTimeout(() -> {
+            cancelHeartbeat(emitter);
+            removeEmitter(key, emitter);
+        });
+        emitter.onError(e -> {
+            cancelHeartbeat(emitter);
+            removeEmitter(key, emitter);
+        });
 
         return emitter;
+    }
+
+    private void sendHeartbeat(SseEmitter emitter) {
+        try {
+            // SSE comment lines (starting with ':') are ignored by clients
+            // but keep the TCP connection alive through proxies.
+            emitter.send(SseEmitter.event().name("heartbeat").data(""));
+        } catch (IOException | IllegalStateException e) {
+            cancelHeartbeat(emitter);
+        }
+    }
+
+    private void cancelHeartbeat(SseEmitter emitter) {
+        ScheduledFuture<?> future = heartbeatFutures.remove(emitter);
+        if (future != null) {
+            future.cancel(false);
+        }
     }
 
     private void broadcast(LogEntry entry) {

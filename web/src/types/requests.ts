@@ -118,6 +118,8 @@ export interface OrgLoginRequest {
   authType?: "PASSWORD";
   /** Required when authType is PASSWORD (the only method today). */
   password?: string;
+  /** Organisation ID — used by the portal flow when no X-Client-Id header is present. */
+  organisationId?: number;
 }
 
 // ---------------------------------------------------------------------------

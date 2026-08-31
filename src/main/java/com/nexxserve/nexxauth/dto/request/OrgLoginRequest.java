@@ -29,6 +29,10 @@ public record OrgLoginRequest(
 
         /** Credential for the {@code PASSWORD} method; required for it. */
         @Size(max = 72, message = "Password must be at most 72 characters")
-        String password
+        String password,
+
+        /** Organisation ID — used by the portal flow when no X-Client-Id header
+         *  is present. The client header takes precedence when both are supplied. */
+        Long organisationId
 ) {
 }
