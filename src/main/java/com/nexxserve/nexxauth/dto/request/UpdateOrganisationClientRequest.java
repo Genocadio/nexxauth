@@ -3,7 +3,6 @@ package com.nexxserve.nexxauth.dto.request;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -17,9 +16,6 @@ public record UpdateOrganisationClientRequest(
         String name,
 
         Boolean requireAuthentication,
-
-        @Size(max = 20, message = "At most 20 allowed origins")
-        List<@NotBlank(message = "Allowed origins must not be blank") String> allowedOrigins,
 
         Boolean enabled,
 

@@ -5,6 +5,7 @@ import com.nexxserve.nexxauth.entity.OrganisationClient;
 import com.nexxserve.nexxauth.entity.OrganisationClientLink;
 import com.nexxserve.nexxauth.repository.OrganisationClientLinkRepository;
 import com.nexxserve.nexxauth.repository.OrganisationClientRepository;
+
 import com.nexxserve.nexxauth.service.AuthAuditService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -16,10 +17,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Applies the CORS headers a client is entitled to. When a request from a
@@ -103,19 +101,7 @@ public class ClientCorsFilter extends OncePerRequestFilter {
             }
 
             // CORS check: find a matching link with allowCors = true.
-            // Fallback: if no links exist, check the legacy allowed_origins field.
             OrganisationClientLink matchingLink = findCorsLink(links, origin);
-            if (matchingLink == null && links.isEmpty() && isLegacyOriginTrusted(client, origin)) {
-                // Legacy path: client has no links yet but origin is in allowed_origins
-                applyCorsHeaders(response, origin);
-                if (preflight) {
-                    applyPreflightHeaders(response);
-                    response.setStatus(HttpServletResponse.SC_OK);
-                    return;
-                }
-                filterChain.doFilter(request, response);
-                return;
-            }
             if (matchingLink == null) {
                 // No CORS link matches — log and pass through (browser blocks)
                 String ip = com.nexxserve.nexxauth.util.ClientIps.resolve(request, false);
@@ -187,24 +173,8 @@ public class ClientCorsFilter extends OncePerRequestFilter {
             if (findCorsLink(links, origin) != null) {
                 return true;
             }
-            // Legacy fallback: no links but origin in allowed_origins
-            if (links.isEmpty() && isLegacyOriginTrusted(client, origin)) {
-                return true;
-            }
         }
         return false;
-    }
-
-    /** Legacy fallback: check the comma-separated allowed_origins field. */
-    private static boolean isLegacyOriginTrusted(OrganisationClient client, String origin) {
-        String raw = client.getAllowedOrigins();
-        if (raw == null || raw.isBlank()) {
-            return false;
-        }
-        return Arrays.stream(raw.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .anyMatch(o -> o.equalsIgnoreCase(origin));
     }
 
     private static void applyCorsHeaders(HttpServletResponse response, String origin) {

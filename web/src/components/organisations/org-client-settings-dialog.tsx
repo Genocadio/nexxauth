@@ -86,7 +86,6 @@ export function OrgClientSettingsDialog({
       body: {
         name: client.name,
         enabled,
-        allowedOrigins: client.allowedOrigins,
         ...sessionPayload,
         allowRegister,
         allowLogin,

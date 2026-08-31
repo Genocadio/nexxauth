@@ -5,7 +5,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -26,9 +25,6 @@ public record CreateOrganisationClientRequest(
         ClientType type,
 
         Boolean requireAuthentication,
-
-        @Size(max = 20, message = "At most 20 allowed origins")
-        List<@NotBlank(message = "Allowed origins must not be blank") String> allowedOrigins,
 
         Boolean enabled,
 

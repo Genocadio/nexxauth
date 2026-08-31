@@ -209,14 +209,12 @@ export const updateUserFieldSchema = z.object({
 // ---------------------------------------------------------------------------
 
 /**
- * Form shape shared by the create/edit client dialog. Allowed origins are
- * entered one per line; the dialog splits them into a list on submit.
+ * Form shape shared by the create/edit client dialog.
  */
 export const orgClientFormSchema = z.object({
   name: requiredName(100, "Name"),
   type: z.enum(["WEB", "ANDROID", "IOS", "SERVER"] as const satisfies readonly ClientType[]),
   requireAuthentication: z.boolean(),
-  allowedOrigins: z.string(),
   enabled: z.boolean(),
 });
 

@@ -153,7 +153,6 @@ export interface OrganisationClientResponse {
   name: string;
   type: ClientType;
   requireAuthentication: boolean;
-  allowedOrigins: string[];
   enabled: boolean;
   settings: Record<string, string> | null;
   createdAt: IsoDate;

@@ -305,7 +305,7 @@ endpoints below.
 | `GET /clients` | list clients | read · `PERM_ORGANISATION_USER_READ` |
 | `POST /clients` | create a client (response carries the `nx_` token once) | `SUPER_USER` |
 | `GET /clients/{clientKey}` | read one client (`token` always `null` here) | read · `PERM_ORGANISATION_USER_READ` |
-| `PATCH /clients/{clientKey}` | update a client (origins, auth, name) | `SUPER_USER` |
+| `PATCH /clients/{clientKey}` | update a client (auth, name) | `SUPER_USER` |
 | `DELETE /clients/{clientKey}` | delete a client | `SUPER_USER` |
 | `POST /clients/{clientKey}/rotate-token` | issue a new `nx_` token (shown once) | `SUPER_USER` |
 | `GET /keys` | **public** — verification keys (`kid` + DER SPKI public key) | no auth |
@@ -323,17 +323,26 @@ never blocked.
 ### 5.3 CORS for browser apps
 
 A browser app must send both `Origin` and `X-Client-Id`, and the `Origin` must
-be in that client's configured `allowedOrigins` (see the client in the console).
-Only then are CORS headers echoed. Unknown `X-Client-Id` → `401 Unknown client`;
-disabled client → `403 Client is disabled`; a no-auth client (e.g. `WEB`)
-reaching anything beyond `login`/`register` without a user JWT → `403 This
-client type can only access the organisation login and register endpoints`.
+be in that client's configured links (see the client in the console under
+**Link management**). Only then are CORS headers echoed.
+
+Each link controls CORS and source restrictions independently:
+- **Allow CORS** — when enabled, the origin is echoed on responses with proper
+  CORS headers. When disabled, the browser blocks cross-origin requests.
+- **Limit source** — when enabled alongside Allow CORS, only requests from
+  this specific origin are allowed through. Other origins are rejected with
+  `403 Origin not allowed by source restriction`.
+
+Unknown `X-Client-Id` → `401 Unknown client`; disabled client → `403 Client is
+disabled`; a no-auth client (e.g. `WEB`) reaching anything beyond
+`login`/`register` without a user JWT → `403 This client type can only access
+the organisation login and register endpoints`.
 
 Preflight `OPTIONS` requests are special: browsers strip custom headers from
 them, so they cannot carry `X-Client-Id`. A preflight is therefore answered
-whenever **any** enabled client trusts the `Origin`. The real request that
-follows still needs its own `X-Client-Id`, and that client's origins must
-contain the `Origin` — so configuring an origin on a client is exactly what
+whenever **any** enabled client link trusts the `Origin`. The real request that
+follows still needs its own `X-Client-Id`, and that client's links must
+contain the `Origin` — so configuring a link on a client is exactly what
 lets that origin's browser app call the API.
 
 ---

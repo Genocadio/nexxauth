@@ -25,10 +25,8 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Clients of an organisation (the external apps that talk to its API).
@@ -99,7 +97,6 @@ public class OrganisationClientService {
         client.setClientKey(ClientTokens.generateKey());
         client.setRequireAuthentication(requireAuth);
         client.setEnabled(request.enabled() == null || request.enabled());
-        client.setAllowedOrigins(clientMapper.joinOrigins(parseOrigins(request.allowedOrigins())));
         client.setSettings(serializeSettings(request.settings()));
         client.setAccessTokenTtlSeconds(request.accessTokenTtlSeconds());
         client.setRefreshTokenTtlSeconds(request.refreshTokenTtlSeconds());
@@ -149,9 +146,6 @@ public class OrganisationClientService {
             }
         }
 
-        if (request.allowedOrigins() != null) {
-            client.setAllowedOrigins(clientMapper.joinOrigins(parseOrigins(request.allowedOrigins())));
-        }
         if (request.enabled() != null) {
             client.setEnabled(request.enabled());
         }
@@ -252,25 +246,6 @@ public class OrganisationClientService {
         return organisation;
     }
 
-    /** Trim, deduplicate and validate each origin (scheme://host, no path). */
-    private List<String> parseOrigins(List<String> origins) {
-        if (origins == null) {
-            return null;
-        }
-        Set<String> cleaned = new LinkedHashSet<>();
-        for (String origin : origins) {
-            if (origin == null || origin.isBlank()) {
-                continue;
-            }
-            String trimmed = origin.trim();
-            if (!trimmed.matches("^https?://[^/]+$")) {
-                throw new BadRequestException("Invalid origin URL: " + trimmed);
-            }
-            cleaned.add(trimmed);
-        }
-        return List.copyOf(cleaned);
-    }
-
     private String serializeSettings(Map<String, String> settings) {
         if (settings == null || settings.isEmpty()) {
             return null;
@@ -301,7 +276,7 @@ public class OrganisationClientService {
                         link.getCreatedAt())).toList();
         return new OrganisationClientResponse(
                 base.clientKey(), base.name(), base.type(), base.requireAuthentication(),
-                base.allowedOrigins(), base.enabled(), deserializeSettings(client.getSettings()),
+                base.enabled(), deserializeSettings(client.getSettings()),
                 base.createdAt(), token,
                 client.getAccessTokenTtlSeconds(), client.getRefreshTokenTtlSeconds(),
                 client.getMaxSessionsPerUser(),

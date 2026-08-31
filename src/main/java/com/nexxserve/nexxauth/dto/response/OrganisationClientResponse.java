@@ -18,7 +18,6 @@ public record OrganisationClientResponse(
         String name,
         ClientType type,
         boolean requireAuthentication,
-        List<String> allowedOrigins,
         boolean enabled,
         Map<String, String> settings,
         Instant createdAt,

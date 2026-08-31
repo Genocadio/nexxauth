@@ -46,10 +46,6 @@ public class OrganisationClient extends BaseEntity {
     @Column(name = "token_hash", length = 64)
     private String tokenHash;
 
-    /** Comma-separated trusted origins for CORS (may be blank). */
-    @Column(name = "allowed_origins", length = 2000)
-    private String allowedOrigins;
-
     @Column(name = "enabled", nullable = false)
     private boolean enabled = true;
 

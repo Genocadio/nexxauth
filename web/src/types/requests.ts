@@ -220,7 +220,6 @@ export interface CreateOrganisationClientRequest {
   name: string;
   type: ClientType;
   requireAuthentication?: boolean;
-  allowedOrigins?: string[];
   enabled?: boolean;
   settings?: Record<string, string>;
   accessTokenTtlSeconds?: number | null;
@@ -234,7 +233,6 @@ export interface CreateOrganisationClientRequest {
 export interface UpdateOrganisationClientRequest {
   name?: string;
   requireAuthentication?: boolean;
-  allowedOrigins?: string[];
   enabled?: boolean;
   settings?: Record<string, string>;
   /** Pass a positive value to set, or -1 to clear back to org default. */

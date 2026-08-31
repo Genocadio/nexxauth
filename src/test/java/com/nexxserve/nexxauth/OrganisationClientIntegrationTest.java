@@ -53,19 +53,17 @@ class OrganisationClientIntegrationTest {
         String platform = getPlatformSlug(boss);
         String clients = clientsPath(platform, orgId);
 
-        // web client: never authenticated, no token, CORS origins stored as list
+        // web client: never authenticated, no token
         MvcResult web = mockMvc.perform(post(clients)
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("name", "Web App", "type", "WEB",
-                                "allowedOrigins", List.of("https://app.example.com")))))
+                        .content(json(Map.of("name", "Web App", "type", "WEB"))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("Web App"))
                 .andExpect(jsonPath("$.type").value("WEB"))
                 .andExpect(jsonPath("$.clientKey").value(matchesPattern(CLIENT_KEY_PATTERN)))
                 .andExpect(jsonPath("$.requireAuthentication").value(false))
                 .andExpect(jsonPath("$.enabled").value(true))
-                .andExpect(jsonPath("$.allowedOrigins[0]").value("https://app.example.com"))
                 .andExpect(jsonPath("$.token").value(nullValue()))
                 .andReturn();
         String webKey = clientKey(web);
@@ -94,16 +92,14 @@ class OrganisationClientIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Web App"));
 
-        // update: name, origins, disable
+        // update: name, disable
         mockMvc.perform(patch(clients + "/" + webKey)
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("name", "Web App v2", "enabled", false,
-                                "allowedOrigins", List.of("https://one.example.com", "https://two.example.com")))))
+                        .content(json(Map.of("name", "Web App v2", "enabled", false))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Web App v2"))
                 .andExpect(jsonPath("$.enabled").value(false))
-                .andExpect(jsonPath("$.allowedOrigins.length()").value(2))
                 .andExpect(jsonPath("$.token").value(nullValue()));
 
         // rotate: fresh token, shown once again
@@ -406,10 +402,22 @@ class OrganisationClientIntegrationTest {
         String platform = getPlatformSlug(boss);
         String clients = clientsPath(platform, orgId);
 
-        String webKey = createClient(boss, clients, "Web", "WEB",
-                Map.of("allowedOrigins", List.of("https://app.example.com")));
-        String serverKey = createClient(boss, clients, "Server", "SERVER",
-                Map.of("allowedOrigins", List.of("https://svc.example.com")));
+        String webKey = createClient(boss, clients, "Web", "WEB", null);
+        String serverKey = createClient(boss, clients, "Server", "SERVER", null);
+
+        // Create links with CORS enabled for each client
+        String webLinks = clients + "/" + webKey + "/links";
+        mockMvc.perform(post(webLinks)
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("origin", "https://app.example.com", "allowCors", true))))
+                .andExpect(status().isCreated());
+        String serverLinks = clients + "/" + serverKey + "/links";
+        mockMvc.perform(post(serverLinks)
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("origin", "https://svc.example.com", "allowCors", true))))
+                .andExpect(status().isCreated());
 
         // matching preflight -> 200 with CORS headers, no auth involved
         mockMvc.perform(options("/" + platform + "/auth/login")
@@ -455,8 +463,15 @@ class OrganisationClientIntegrationTest {
         String boss = register("client-preflight@nexx.io", "Client Preflight Platform");
         long orgId = createOrg(boss, ORG_SLUG);
         String platform = getPlatformSlug(boss);
-        createClient(boss, clientsPath(platform, orgId), "Web", "WEB",
-                Map.of("allowedOrigins", List.of("https://app.example.com")));
+        String clients = clientsPath(platform, orgId);
+        String webKey = createClient(boss, clients, "Web", "WEB", null);
+
+        // Create a link with CORS enabled
+        mockMvc.perform(post(clients + "/" + webKey + "/links")
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("origin", "https://app.example.com", "allowCors", true))))
+                .andExpect(status().isCreated());
 
         // trusted-origin preflight without X-Client-Id -> answered
         mockMvc.perform(options("/" + platform + "/auth/login")

@@ -21,7 +21,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { useCreateOrgClient, useUpdateOrgClient } from "@/hooks/mutations";
 import { useForm } from "@/hooks/use-form";
 import { orgClientFormSchema } from "@/lib/validation";
@@ -63,7 +62,6 @@ export function OrgClientDialog({
     name: client?.name ?? "",
     type: client?.type ?? "WEB",
     requireAuthentication: client?.requireAuthentication ?? false,
-    allowedOrigins: client?.allowedOrigins.join("\n") ?? "",
     enabled: client?.enabled ?? true,
   });
 
@@ -77,10 +75,6 @@ export function OrgClientDialog({
 
   const submit = async () => {
     const data = form.values;
-    const allowedOrigins = data.allowedOrigins
-      .split("\n")
-      .map((origin) => origin.trim())
-      .filter(Boolean);
     const authOptional = CLIENT_TYPE_AUTH_MODE[data.type] === "optional";
 
     if (isEdit && client) {
@@ -89,7 +83,6 @@ export function OrgClientDialog({
         body: {
           name: data.name,
           enabled: client.enabled,
-          allowedOrigins,
           ...(authOptional ? { requireAuthentication: data.requireAuthentication } : {}),
         },
       });
@@ -99,7 +92,6 @@ export function OrgClientDialog({
         name: data.name,
         type: data.type,
         enabled: true,
-        allowedOrigins,
         ...(authOptional ? { requireAuthentication: data.requireAuthentication } : {}),
       });
       onCreated?.(created);
@@ -114,7 +106,7 @@ export function OrgClientDialog({
           <DialogTitle>{isEdit ? "Edit client" : "New client"}</DialogTitle>
           <DialogDescription>
             {isEdit
-              ? "Update the name, origins or authentication for this client."
+              ? "Update the name or authentication for this client."
               : "A client is an external app that talks to this organisation's API. Configure access restrictions after creation."}
           </DialogDescription>
         </DialogHeader>
@@ -167,20 +159,6 @@ export function OrgClientDialog({
                 onCheckedChange={(checked) => form.setValue("requireAuthentication", checked)}
               />
             </div>
-          </FormField>
-
-          <FormField
-            label="Allowed origins"
-            htmlFor="client-origins"
-            hint="Browser CORS allow-list, one origin per line (https://app.example.com). Leave empty to allow none."
-            error={form.errors.allowedOrigins}
-          >
-            <Textarea
-              id="client-origins"
-              placeholder={"https://app.example.com\nhttps://dashboard.example.com"}
-              value={form.values.allowedOrigins}
-              onChange={(e) => form.setValue("allowedOrigins", e.target.value)}
-            />
           </FormField>
 
           {form.submitError ? (

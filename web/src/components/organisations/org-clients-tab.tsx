@@ -140,8 +140,6 @@ export function OrgClientsTab({ platformSlug, organisationId }: OrgClientsTabPro
                               </span>
                             )}
                           </div>
-                        ) : client.allowedOrigins.length > 0 ? (
-                          <span className="truncate block">{client.allowedOrigins.join(", ")}</span>
                         ) : (
                           "None"
                         )}
