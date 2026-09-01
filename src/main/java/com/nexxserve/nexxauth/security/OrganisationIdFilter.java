@@ -2,7 +2,6 @@ package com.nexxserve.nexxauth.security;
 
 import com.nexxserve.nexxauth.entity.Organisation;
 import com.nexxserve.nexxauth.entity.OrganisationClient;
-import com.nexxserve.nexxauth.repository.OrganisationClientRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -53,10 +52,10 @@ public class OrganisationIdFilter extends OncePerRequestFilter {
     private static final Pattern SKIP_PATHS =
             Pattern.compile("^/(health|docs).*");
 
-    private final OrganisationClientRepository clientRepository;
+    private final ClientCache clientCache;
 
-    public OrganisationIdFilter(OrganisationClientRepository clientRepository) {
-        this.clientRepository = clientRepository;
+    public OrganisationIdFilter(ClientCache clientCache) {
+        this.clientCache = clientCache;
     }
 
     @Override
@@ -83,9 +82,9 @@ public class OrganisationIdFilter extends OncePerRequestFilter {
                     return;
                 }
 
-                // Resolve org from client
-                OrganisationClient client = clientRepository
-                        .findByClientKey(clientId.trim()).orElse(null);
+                // Resolve org from client (cached — OrganisationIdFilter and
+                // ClientTokenFilter share this cache to avoid a redundant DB query)
+                OrganisationClient client = clientCache.findByClientKey(clientId.trim()).orElse(null);
                 if (client != null) {
                     Organisation org = client.getOrganisation();
                     String slug = m.group(1);

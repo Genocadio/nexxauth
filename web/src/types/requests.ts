@@ -228,6 +228,7 @@ export interface CreateOrganisationClientRequest {
   allowRegister?: boolean;
   allowLogin?: boolean;
   allowedRoles?: string[] | null;
+  roleRestrictionMode?: "NONE" | "ALLOWLIST" | "BLOCKLIST" | null;
 }
 
 export interface UpdateOrganisationClientRequest {
@@ -242,6 +243,7 @@ export interface UpdateOrganisationClientRequest {
   allowRegister?: boolean;
   allowLogin?: boolean;
   allowedRoles?: string[] | null;
+  roleRestrictionMode?: "NONE" | "ALLOWLIST" | "BLOCKLIST" | null;
 }
 
 // ---------------------------------------------------------------------------

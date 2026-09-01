@@ -46,6 +46,8 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler(errorResponseWriter, logService)))
                 .authorizeHttpRequests(auth -> auth
                         // Actuator health/info: open so monitoring probes need no token.
+                        // Unauthenticated health probe for uptime monitoring (separate from actuator).
+                        .requestMatchers("/health").permitAll()
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         // Platform (console) auth at the clean root origin.
                         .requestMatchers("/auth/login", "/auth/register",

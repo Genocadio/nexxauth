@@ -22,6 +22,9 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -63,8 +66,12 @@ public class LogService {
                 return t;
             });
 
-    /** In-memory cache of organisation id → slug to avoid repeated lookups. */
-    private final Map<Long, String> orgSlugCache = new ConcurrentHashMap<>();
+    /** Bounded cache of organisation id → slug to avoid repeated lookups. Caffeine
+     * with a TTL prevents unbounded growth if org ids churn over time. */
+    private final Cache<Long, String> orgSlugCache = Caffeine.newBuilder()
+            .expireAfterWrite(10, TimeUnit.MINUTES)
+            .maximumSize(1_000)
+            .build();
 
     public LogService(LogEntryRepository logEntryRepository,
                       PlatformRepository platformRepository,
@@ -342,10 +349,10 @@ public class LogService {
         );
     }
 
-    /** Resolve an organisation id to its slug, using an in-memory cache. */
+    /** Resolve an organisation id to its slug, using a bounded Caffeine cache. */
     private String resolveOrgSlug(Long organisationId) {
         if (organisationId == null) return null;
-        return orgSlugCache.computeIfAbsent(organisationId, id ->
+        return orgSlugCache.get(organisationId, id ->
                 organisationRepository.findById(id)
                         .map(o -> o.getSlug())
                         .orElse("unknown")

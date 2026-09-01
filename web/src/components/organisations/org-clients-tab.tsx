@@ -43,7 +43,10 @@ function restrictionBadges(client: OrganisationClientResponse): string[] {
   const badges: string[] = [];
   if (!client.allowLogin) badges.push("No login");
   if (!client.allowRegister) badges.push("No register");
-  if (client.allowedRoles.length > 0) badges.push(`${client.allowedRoles.length} role${client.allowedRoles.length === 1 ? "" : "s"}`);
+  if (client.allowedRoles.length > 0 && client.roleRestrictionMode !== "NONE") {
+    const mode = client.roleRestrictionMode === "BLOCKLIST" ? "blocked" : "allowed";
+    badges.push(`${client.allowedRoles.length} role${client.allowedRoles.length === 1 ? "" : "s"} ${mode}`);
+  }
   const restrictedLinks = (client.links ?? []).filter((l) => l.limitSource).length;
   if (restrictedLinks > 0) badges.push(`${restrictedLinks} restricted`);
   return badges;

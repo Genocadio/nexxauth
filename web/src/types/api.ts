@@ -167,6 +167,8 @@ export interface OrganisationClientResponse {
   allowLogin: boolean;
   /** Set of allowed role names; empty means no restriction. */
   allowedRoles: string[];
+  /** How allowedRoles is interpreted: NONE, ALLOWLIST, or BLOCKLIST. */
+  roleRestrictionMode: "NONE" | "ALLOWLIST" | "BLOCKLIST";
   /** Per-link CORS and source-restriction settings. */
   links: OrganisationClientLinkResponse[];
 }

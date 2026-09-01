@@ -1,5 +1,6 @@
 package com.nexxserve.nexxauth.dto.request;
 
+import com.nexxserve.nexxauth.entity.RoleRestrictionMode;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -37,6 +38,11 @@ public record UpdateOrganisationClientRequest(
         Boolean allowLogin,
 
         @Size(max = 50, message = "At most 50 allowed roles")
-        Set<@NotBlank(message = "Role name must not be blank") String> allowedRoles
+        Set<@NotBlank(message = "Role name must not be blank") String> allowedRoles,
+
+        /** How allowedRoles is interpreted: NONE (clear restrictions),
+         *  ALLOWLIST (only these roles may login) or BLOCKLIST (these roles
+         *  are prohibited). */
+        RoleRestrictionMode roleRestrictionMode
 ) {
 }

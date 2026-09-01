@@ -1,6 +1,7 @@
 package com.nexxserve.nexxauth.dto.response;
 
 import com.nexxserve.nexxauth.entity.ClientType;
+import com.nexxserve.nexxauth.entity.RoleRestrictionMode;
 
 import java.time.Instant;
 import java.util.List;
@@ -31,6 +32,8 @@ public record OrganisationClientResponse(
         boolean allowLogin,
         /** Parsed set of allowed role names; empty means no restriction. */
         Set<String> allowedRoles,
+        /** How allowedRoles is interpreted. */
+        RoleRestrictionMode roleRestrictionMode,
         // --- link management ---
         /** Per-link CORS and source-restriction settings. */
         List<OrganisationClientLinkResponse> links

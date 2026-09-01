@@ -5,7 +5,6 @@ import com.nexxserve.nexxauth.entity.LogLevel;
 import com.nexxserve.nexxauth.entity.OrganisationClient;
 import com.nexxserve.nexxauth.entity.Permission;
 import com.nexxserve.nexxauth.exception.ErrorResponseWriter;
-import com.nexxserve.nexxauth.repository.OrganisationClientRepository;
 import com.nexxserve.nexxauth.service.AuthAuditService;
 import com.nexxserve.nexxauth.service.LogService;
 import jakarta.servlet.FilterChain;
@@ -67,12 +66,12 @@ public class ClientTokenFilter extends OncePerRequestFilter {
             Pattern.compile("^/(?!api/)[^/]+/auth/(login|register|refresh|logout)$");
     private static final List<SimpleGrantedAuthority> CLIENT_AUTHORITIES = clientAuthorities();
 
-    private final OrganisationClientRepository clientRepository;
+    private final ClientCache clientCache;
     private final ErrorResponseWriter errorResponseWriter;
     private final LogService logService;
 
-    public ClientTokenFilter(OrganisationClientRepository clientRepository, ErrorResponseWriter errorResponseWriter, LogService logService) {
-        this.clientRepository = clientRepository;
+    public ClientTokenFilter(ClientCache clientCache, ErrorResponseWriter errorResponseWriter, LogService logService) {
+        this.clientCache = clientCache;
         this.errorResponseWriter = errorResponseWriter;
         this.logService = logService;
     }
@@ -96,7 +95,7 @@ public class ClientTokenFilter extends OncePerRequestFilter {
             return;
         }
 
-        OrganisationClient client = clientRepository.findByClientKey(clientIdHeader.trim()).orElse(null);
+        OrganisationClient client = clientCache.findByClientKey(clientIdHeader.trim()).orElse(null);
         if (client == null) {
             logFailure(request, null, clientIdHeader.trim(), "Unknown client");
             write(response, HttpStatus.UNAUTHORIZED, "Unknown client", request.getRequestURI());

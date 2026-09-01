@@ -13,6 +13,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.matchesPattern;
@@ -505,6 +506,93 @@ class OrganisationClientIntegrationTest {
                 .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
     }
 
+    @Test
+    void roleRestrictionAllowlistAndBlocklist() throws Exception {
+        String boss = register("client-roles@nexx.io", "Client Roles Platform");
+        long orgId = createOrg(boss, ORG_SLUG);
+        String platform = getPlatformSlug(boss);
+        String clients = clientsPath(platform, orgId);
+        String org = "/" + platform + "/organisations/" + orgId;
+        String orgAuth = "/" + platform + "/auth";
+
+long adminRole = createRole(boss, org, "admin", true, "ORGANISATION_USER_READ");
+        long viewerRole = createRole(boss, org, "viewer", "ORGANISATION_USER_READ");
+
+        String allowKey = createClientWithRoles(boss, clients, "AllowClient", "WEB",
+                Set.of("admin"), "ALLOWLIST");
+        String blockKey = createClientWithRoles(boss, clients, "BlockClient", "WEB",
+                Set.of("admin"), "BLOCKLIST");
+        String openKey = createClient(boss, clients, "OpenClient", "WEB", null);
+
+        long aliceId = registerOrgUser(orgAuth, allowKey, "alice", "password1");
+        long bobId = registerOrgUser(orgAuth, allowKey, "bob", "password1");
+        patchOrgUser(boss, org, aliceId, Map.of("roleIds", List.of(adminRole)));
+        patchOrgUser(boss, org, bobId, Map.of("roleIds", List.of(viewerRole)));
+
+        // ALLOWLIST: alice (admin) allowed, bob (viewer) blocked
+        mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", allowKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("identifier", "alice", "password", "password1"))))
+                .andExpect(status().isOk());
+        mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", allowKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("identifier", "bob", "password", "password1"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Your role is not permitted to authenticate from this client"));
+
+        // BLOCKLIST: alice (admin) blocked, bob (viewer) allowed
+        mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", blockKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("identifier", "alice", "password", "password1"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Your role is not permitted to authenticate from this client"));
+        mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", blockKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("identifier", "bob", "password", "password1"))))
+                .andExpect(status().isOk());
+
+        // NO RESTRICTION: both can login
+        mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", openKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("identifier", "alice", "password", "password1"))))
+                .andExpect(status().isOk());
+        mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", openKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("identifier", "bob", "password", "password1"))))
+                .andExpect(status().isOk());
+
+        // response carries the roleRestrictionMode
+        mockMvc.perform(get(clients + "/" + allowKey).header("Authorization", bearer(boss)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.roleRestrictionMode").value("ALLOWLIST"))
+                .andExpect(jsonPath("$.allowedRoles[0]").value("admin"));
+        mockMvc.perform(get(clients + "/" + blockKey).header("Authorization", bearer(boss)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.roleRestrictionMode").value("BLOCKLIST"));
+        mockMvc.perform(get(clients + "/" + openKey).header("Authorization", bearer(boss)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.roleRestrictionMode").value("NONE"));
+
+        // switching from ALLOWLIST to NONE removes restriction
+        mockMvc.perform(patch(clients + "/" + allowKey)
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("roleRestrictionMode", "NONE"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.roleRestrictionMode").value("NONE"));
+        mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", allowKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("identifier", "bob", "password", "password1"))))
+                .andExpect(status().isOk());
+    }
+
     // --- helpers ---
 
     private String register(String email, String platformName) throws Exception {
@@ -583,6 +671,59 @@ class OrganisationClientIntegrationTest {
 
     private String clientKey(MvcResult result) throws Exception {
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("clientKey").asText();
+    }
+
+    private String createClientWithRoles(String boss, String clients, String name, String type,
+                                         java.util.Set<String> roles, String mode) throws Exception {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("name", name);
+        body.put("type", type);
+        body.put("allowedRoles", List.copyOf(roles));
+        body.put("roleRestrictionMode", mode);
+        return clientKey(mockMvc.perform(post(clients)
+                .header("Authorization", bearer(boss))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(body)))
+                .andExpect(status().isCreated())
+                .andReturn());
+    }
+
+    private long registerOrgUser(String orgAuth, String clientKey, String identifier, String password) throws Exception {
+        MvcResult result = mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("username", identifier, "password", password,
+                                "firstName", "F", "lastName", "L"))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("user").get("id").asLong();
+    }
+
+    private long createRole(String boss, String org, String name, String... permissions) throws Exception {
+        return createRole(boss, org, name, null, permissions);
+    }
+
+    private long createRole(String boss, String org, String name, Boolean isDefault,
+                            String... permissions) throws Exception {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("name", name);
+        body.put("permissions", List.of(permissions));
+        if (isDefault != null) body.put("isDefault", isDefault);
+        MvcResult result = mockMvc.perform(post(org + "/roles")
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(body)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
+    }
+
+    private void patchOrgUser(String boss, String org, long userId, Map<String, Object> body) throws Exception {
+        mockMvc.perform(patch(org + "/users/" + userId)
+                        .header("Authorization", bearer(boss))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(body)))
+                .andExpect(status().isOk());
     }
 
     private String bearer(String token) {

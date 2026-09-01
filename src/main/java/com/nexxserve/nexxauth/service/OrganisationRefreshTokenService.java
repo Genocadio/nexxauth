@@ -61,14 +61,18 @@ public class OrganisationRefreshTokenService
      * dies quietly and cannot trigger the family-wide theft detection.
      */
     @Transactional
-    public void enforceSessionLimit(Organisation organisation, Long userId, OrganisationClient client) {
-        // Serialize concurrent session issuance for the user's organisation on
-        // its row: otherwise two parallel logins could both count the same set
-        // of active sessions and together exceed the limit. (The user row is
-        // already managed in this transaction, so the org row - always present,
-        // lock-reentrant across the settings lookup below - is the safe thing
-        // to lock.)
-        entityManager.lock(entityManager.merge(organisation), LockModeType.PESSIMISTIC_WRITE);
+    public void enforceSessionLimit(Organisation organisation, Long userId, OrganisationClient client,
+                                    OrganisationUser user) {
+        // Lock ONLY the user row — not the organisation row. Two different users
+        // logging in concurrently under the same org share zero data (each user's
+        // session count is independent), so org-level serialization is needless
+        // contention. Locking the user row serializes only concurrent logins for
+        // the SAME user, preventing over-eviction from race-counted tokens.
+        //
+        // The user entity is always already managed in the caller's persistence
+        // context (loaded via findWithRolesById during login/register), so
+        // merge() is a no-op — just returns the existing instance.
+        entityManager.lock(user, LockModeType.PESSIMISTIC_WRITE);
         int max = sessionSettingsService.maxSessionsPerUser(organisation, client);
         List<OrganisationRefreshToken> active =
                 refreshTokenRepository.findActiveByUserIdOrderByExpiresAtAsc(userId, Instant.now());

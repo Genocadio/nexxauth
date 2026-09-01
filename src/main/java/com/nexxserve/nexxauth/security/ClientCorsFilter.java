@@ -51,13 +51,16 @@ public class ClientCorsFilter extends OncePerRequestFilter {
 
     private final OrganisationClientRepository clientRepository;
     private final OrganisationClientLinkRepository linkRepository;
+    private final ClientCache clientCache;
     private final AuthAuditService audit;
 
     public ClientCorsFilter(OrganisationClientRepository clientRepository,
                              OrganisationClientLinkRepository linkRepository,
+                             ClientCache clientCache,
                              AuthAuditService audit) {
         this.clientRepository = clientRepository;
         this.linkRepository = linkRepository;
+        this.clientCache = clientCache;
         this.audit = audit;
     }
 
@@ -142,8 +145,9 @@ public class ClientCorsFilter extends OncePerRequestFilter {
         if (key.isEmpty()) {
             return null;
         }
-        OrganisationClient client = clientRepository.findByClientKey(key).orElse(null);
-        return client != null && client.isEnabled() ? client : null;
+        return clientCache.findByClientKey(key)
+                .filter(OrganisationClient::isEnabled)
+                .orElse(null);
     }
 
     /** True when any link for this client has limitSource = true. */

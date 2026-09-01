@@ -42,8 +42,11 @@ export function OrgClientSettingsDialog({
   const [allowRegister, setAllowRegister] = useState(client.allowRegister);
   const [allowLogin, setAllowLogin] = useState(client.allowLogin);
   const [useRoleRestrictions, setUseRoleRestrictions] = useState(
-    !!(client.allowedRoles && client.allowedRoles.length > 0),
+    client.roleRestrictionMode !== "NONE",
   );
+  const [roleRestrictionMode, setRoleRestrictionMode] = useState<
+    "ALLOWLIST" | "BLOCKLIST"
+  >(client.roleRestrictionMode === "BLOCKLIST" ? "BLOCKLIST" : "ALLOWLIST");
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(
     new Set(client.allowedRoles ?? []),
   );
@@ -80,6 +83,7 @@ export function OrgClientSettingsDialog({
     const allowedRoles = useRoleRestrictions && selectedRoles.size > 0
       ? Array.from(selectedRoles)
       : [];
+    const restrictionMode = useRoleRestrictions ? roleRestrictionMode : "NONE";
 
     await update.mutateAsync({
       clientKey: client.clientKey,
@@ -90,6 +94,7 @@ export function OrgClientSettingsDialog({
         allowRegister,
         allowLogin,
         allowedRoles,
+        roleRestrictionMode: restrictionMode,
       },
     });
     onOpenChange(false);
@@ -154,13 +159,43 @@ export function OrgClientSettingsDialog({
               <div>
                 <p className="text-sm font-medium">Role restrictions</p>
                 <p className="text-xs text-muted-foreground">
-                  Only allow specific roles to authenticate via this client.
+                  Restrict which roles can authenticate via this client.
                 </p>
               </div>
               <Switch checked={useRoleRestrictions} onCheckedChange={setUseRoleRestrictions} />
             </div>
             {useRoleRestrictions ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
+                {/* Allowlist / Blocklist toggle */}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRoleRestrictionMode("ALLOWLIST")}
+                    className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                      roleRestrictionMode === "ALLOWLIST"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80"
+                    }`}
+                  >
+                    Allow only these
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRoleRestrictionMode("BLOCKLIST")}
+                    className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                      roleRestrictionMode === "BLOCKLIST"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80"
+                    }`}
+                  >
+                    Block these
+                  </button>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {roleRestrictionMode === "ALLOWLIST"
+                    ? "Only users with a checked role can login."
+                    : "Users with a checked role are blocked. All others can login."}
+                </p>
                 {availableRoles.length === 0 ? (
                   <p className="text-xs text-muted-foreground italic">
                     No roles created yet. Create roles first to restrict access.
@@ -195,7 +230,7 @@ export function OrgClientSettingsDialog({
                 )}
                 {selectedRoles.size > 0 && (
                   <p className="text-[11px] text-muted-foreground">
-                    {selectedRoles.size} role{selectedRoles.size !== 1 ? "s" : ""} allowed
+                    {selectedRoles.size} role{selectedRoles.size !== 1 ? "s" : ""} {roleRestrictionMode === "ALLOWLIST" ? "allowed" : "blocked"}
                   </p>
                 )}
               </div>

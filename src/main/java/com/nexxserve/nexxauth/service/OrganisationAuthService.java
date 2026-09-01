@@ -61,6 +61,7 @@ public class OrganisationAuthService {
     private final OrganisationUserFieldService userFieldService;
     private final OrgUserActions orgUserActions;
     private final OrganisationSessionService sessionService;
+    private final com.nexxserve.nexxauth.security.AccountLockoutService accountLockout;
 
     public OrganisationAuthService(PlatformAccess platformAccess,
                                    OrganisationClientRepository clientRepository,
@@ -74,7 +75,8 @@ public class OrganisationAuthService {
                                    AuthAuditService audit, OrganisationAuthConfigService authConfigService,
                                    OrganisationSessionSettingsService sessionSettingsService,
                                    AuthTiming authTiming, OrganisationUserFieldService userFieldService,
-                                   OrgUserActions orgUserActions, OrganisationSessionService sessionService) {
+                                   OrgUserActions orgUserActions, OrganisationSessionService sessionService,
+                                   com.nexxserve.nexxauth.security.AccountLockoutService accountLockout) {
         this.platformAccess = platformAccess;
         this.clientRepository = clientRepository;
         this.organisationRepository = organisationRepository;
@@ -93,6 +95,7 @@ public class OrganisationAuthService {
         this.userFieldService = userFieldService;
         this.orgUserActions = orgUserActions;
         this.sessionService = sessionService;
+        this.accountLockout = accountLockout;
     }
 
     @Transactional
@@ -167,7 +170,15 @@ public class OrganisationAuthService {
         if (request.password() == null || request.password().isBlank())
             throw new BadRequestException("Password is required for the PASSWORD auth method");
         String identifier = request.identifier().trim();
+
+        // Per-account lockout: check before doing any credential work.
+        if (accountLockout.isLocked(organisation.getId(), identifier)) {
+            authTiming.equalsUnknown(request.password()); // timing burn
+            throw new InvalidCredentialsException();
+        }
+
         if (!authConfigService.configOf(organisation).isPasswordEnabled()) {
+            accountLockout.recordFailure(organisation.getId(), identifier);
             audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY, AuthAuditService.ORG_LOGIN_FAILURE, identifier,
                     organisation.getSlug(), organisation.getId(), null);
             authTiming.equalsUnknown(request.password());
@@ -178,6 +189,7 @@ public class OrganisationAuthService {
                 .orElseThrow(() -> {
                     audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY, AuthAuditService.ORG_LOGIN_FAILURE, identifier,
                             organisation.getSlug(), organisation.getId(), null);
+                    accountLockout.recordFailure(organisation.getId(), identifier);
                     authTiming.equalsUnknown(request.password());
                     return new InvalidCredentialsException();
                 });
@@ -188,6 +200,7 @@ public class OrganisationAuthService {
         if (user.getAuthType() != AuthType.PASSWORD || !user.isEnabled() || !passwordMatches) {
             audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY, AuthAuditService.ORG_LOGIN_FAILURE, identifier,
                     organisation.getSlug(), organisation.getId(), null);
+            accountLockout.recordFailure(organisation.getId(), identifier);
             throw new InvalidCredentialsException();
         }
         var config = authConfigService.configOf(organisation);
@@ -196,6 +209,7 @@ public class OrganisationAuthService {
                     organisation.getSlug(), organisation.getId(), "password_expired");
             throw new PasswordExpiredException();
         }
+        accountLockout.clearFailures(organisation.getId(), identifier);
         audit.logPersisted(LogLevel.INFO, LogCategory.AUTH, AuthAuditService.ORG_LOGIN_SUCCESS, identifier,
                 organisation.getSlug(), organisation.getId(), null);
         enforceRoleRestrictions(client, user);
@@ -306,18 +320,37 @@ public class OrganisationAuthService {
     /**
      * Enforce role-based restrictions. After the user is known, check
      * whether the client restricts which roles may login/register.
+     * <p>
+     * Three modes ({@link com.nexxserve.nexxauth.entity.RoleRestrictionMode}):
+     * <ul>
+     *   <li>{@code NONE} — no restriction; all roles are allowed.</li>
+     *   <li>{@code ALLOWLIST} — only users holding at least one of the listed
+     *       roles may authenticate.</li>
+     *   <li>{@code BLOCKLIST} — users holding any of the listed roles are
+     *       rejected; all other roles may authenticate.</li>
+     * </ul>
      */
     private void enforceRoleRestrictions(OrganisationClient client, OrganisationUser user) {
-        if (client == null || client.getAllowedRoles() == null || client.getAllowedRoles().isBlank()) return;
-        Set<String> allowed = clientMapper.splitRoles(client.getAllowedRoles());
-        if (allowed.isEmpty()) return;
-        boolean hasAllowedRole = user.getRoles().stream()
-                .anyMatch(role -> allowed.contains(role.getName()));
-        if (!hasAllowedRole) {
+        if (client == null) return;
+        com.nexxserve.nexxauth.entity.RoleRestrictionMode mode = client.getRoleRestrictionMode();
+        if (mode == null || mode == com.nexxserve.nexxauth.entity.RoleRestrictionMode.NONE) return;
+        Set<String> restricted = clientMapper.splitRoles(client.getAllowedRoles());
+        if (restricted.isEmpty()) return;
+
+        boolean userHasRestrictedRole = user.getRoles().stream()
+                .anyMatch(role -> restricted.contains(role.getName()));
+
+        boolean blocked = switch (mode) {
+            case ALLOWLIST -> !userHasRestrictedRole;  // user lacks any allowed role
+            case BLOCKLIST -> userHasRestrictedRole;    // user holds a blocked role
+            case NONE -> false;                         // already returned above
+        };
+
+        if (blocked) {
             Organisation organisation = user.getOrganisation();
             audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY, AuthAuditService.ORG_LOGIN_FAILURE,
                     identifierOf(user), organisation.getSlug(), organisation.getId(),
-                    "role_not_allowed");
+                    "role_not_allowed_" + mode.name().toLowerCase());
             throw new BadRequestException("Your role is not permitted to authenticate from this client");
         }
     }
@@ -354,7 +387,7 @@ public class OrganisationAuthService {
                                          String ipAddress, String userAgent, String hostname) {
         Organisation organisation = user.getOrganisation();
         if (orgUserActions.hasPendingGatingAction(user)) return issueTokens(user, null, OrgUserActions.GATING_ACCESS_TTL, null, null, null, hostname);
-        refreshTokenService.enforceSessionLimit(organisation, user.getId(), client);
+        refreshTokenService.enforceSessionLimit(organisation, user.getId(), client, user);
         // Dedup: if the user is logging in from the same IP+UA, reuse the existing session id
         String sessionId = sessionService.findExistingSessionId(user.getId(), ipAddress, userAgent);
         if (sessionId == null) {

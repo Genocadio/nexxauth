@@ -20,6 +20,7 @@ public interface OrganisationClientMapper {
 
     @Mapping(target = "token", ignore = true)
     @Mapping(target = "settings", ignore = true)
+    @Mapping(target = "allowedRoles", expression = "java(splitRoles(client.getAllowedRoles()))")
     OrganisationClientResponse toResponse(OrganisationClient client);
 
     @Mapping(target = "organisation", ignore = true)

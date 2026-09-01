@@ -63,10 +63,17 @@ public class OrganisationClient extends BaseEntity {
     @Column(name = "allow_login", nullable = false)
     private boolean allowLogin = true;
 
-    /** Comma-separated role names; when non-null only users holding at least
-     *  one of these roles may login/register via this client. Null = no restriction. */
+    /** Comma-separated role names; the interpretation depends on
+     * {@link #roleRestrictionMode}: ALLOWLIST = only these roles may login,
+     * BLOCKLIST = these roles are prohibited, NONE = no restriction. */
     @Column(name = "allowed_roles", length = 500)
     private String allowedRoles;
+
+    /** How {@link #allowedRoles} is interpreted. Defaults to NONE (no
+     * restriction) for backward compatibility. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role_restriction_mode", nullable = false, length = 20)
+    private RoleRestrictionMode roleRestrictionMode = RoleRestrictionMode.NONE;
 
     // --- session overrides (null = use organisation defaults) ---
 

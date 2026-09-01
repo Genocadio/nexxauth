@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -41,8 +42,12 @@ public class OrgJwtAuthenticationFilter extends OncePerRequestFilter {
      * reach the action endpoints; every other org endpoint stays closed. The
      * negative lookahead keeps a slug literally named "api" from matching
      * /api/... paths (org endpoints live at /{slug}/organisations/...). */
-    private static final String ACTION_ENDPOINTS =
-            "^/(?!api/)[^/]+/organisations/\\d+/users/me/change-password$";
+    private static final Pattern ACTION_ENDPOINTS =
+            Pattern.compile("^/(?!api/)[^/]+/organisations/\\d+/users/me/change-password$");
+
+    /** Pre-compiled: does this path target an org-scoped endpoint? */
+    private static final Pattern ORG_SCOPED_PATH =
+            Pattern.compile("^/(?!api/)[^/]+/organisations(/.*)?$");
 
     private final OrgJwtService orgJwtService;
     private final OrganisationUserRepository organisationUserRepository;
@@ -62,13 +67,13 @@ public class OrgJwtAuthenticationFilter extends OncePerRequestFilter {
         // /{slug}/organisations/..., including the bare list path). On any
         // other path (platform auth, platform users, ...) an org token must
         // stay unauthenticated so the platform entry point answers 401.
-        return !request.getRequestURI().matches("^/(?!api/)[^/]+/organisations(/.*)?$");
+        return !ORG_SCOPED_PATH.matcher(request.getRequestURI()).matches();
     }
 
     /** True when the request targets an endpoint that stays reachable while a
      * gating action is pending (e.g. completing the change-password action). */
     private boolean isActionEndpoint(HttpServletRequest request) {
-        return request.getRequestURI().matches(ACTION_ENDPOINTS);
+        return ACTION_ENDPOINTS.matcher(request.getRequestURI()).matches();
     }
 
     @Override

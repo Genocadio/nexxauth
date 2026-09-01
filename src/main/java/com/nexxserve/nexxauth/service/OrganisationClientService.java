@@ -105,6 +105,9 @@ public class OrganisationClientService {
         client.setAllowRegister(request.allowRegister() == null || request.allowRegister());
         client.setAllowLogin(request.allowLogin() == null || request.allowLogin());
         client.setAllowedRoles(clientMapper.joinRoles(request.allowedRoles()));
+        client.setRoleRestrictionMode(request.roleRestrictionMode() != null
+                ? request.roleRestrictionMode()
+                : com.nexxserve.nexxauth.entity.RoleRestrictionMode.NONE);
 
         String token = null;
         if (requireAuth) {
@@ -171,6 +174,9 @@ public class OrganisationClientService {
         }
         if (request.allowedRoles() != null) {
             client.setAllowedRoles(clientMapper.joinRoles(request.allowedRoles()));
+        }
+        if (request.roleRestrictionMode() != null) {
+            client.setRoleRestrictionMode(request.roleRestrictionMode());
         }
         OrganisationClient saved = clientRepository.save(client);
         audit.logPersisted(LogLevel.INFO, LogCategory.CONFIG, AuthAuditService.ORG_CLIENT_UPDATED, null,
@@ -281,6 +287,7 @@ public class OrganisationClientService {
                 client.getAccessTokenTtlSeconds(), client.getRefreshTokenTtlSeconds(),
                 client.getMaxSessionsPerUser(),
                 client.isAllowRegister(), client.isAllowLogin(),
-                clientMapper.splitRoles(client.getAllowedRoles()), links);
+                clientMapper.splitRoles(client.getAllowedRoles()),
+                client.getRoleRestrictionMode(), links);
     }
 }
