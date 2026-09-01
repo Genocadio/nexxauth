@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDeleteOrganisation, useUpdateOrgAuthConfig, useUpdateOrganisation, useUpdateOrgSessionSettings } from "@/hooks/mutations";
@@ -25,7 +26,7 @@ import { useOrganisation, useOrgAuthConfig, useOrgSessionSettings } from "@/hook
 import { useForm } from "@/hooks/use-form";
 import { authConfigSchema, sessionSettingsSchema } from "@/lib/validation";
 import { z } from "zod";
-import { formatDuration } from "@/lib/constants";
+import { DURATION_UNITS, decomposeDuration, formatDuration, toSeconds, type DurationUnit } from "@/lib/constants";
 
 interface OrgSettingsTabProps {
   platformSlug: string;
@@ -281,33 +282,60 @@ function SessionSettingsCard({ platformSlug, organisationId }: OrgSettingsTabPro
   const settings = useOrgSessionSettings(organisationId);
   const update = useUpdateOrgSessionSettings(platformSlug, organisationId);
 
-  const form = useForm(sessionSettingsSchema, {
-    accessTokenTtlSeconds: 900,
-    refreshTokenTtlSeconds: 604800,
-    maxSessionsPerUser: 5,
-  } satisfies z.input<typeof sessionSettingsSchema>);
+  const [maxSessions, setMaxSessions] = useState(5);
+  const [access, setAccess] = useState({ value: 15, unit: "minutes" as DurationUnit });
+  const [refresh, setRefresh] = useState({ value: 7, unit: "days" as DurationUnit });
+  const [errors, setErrors] = useState<{ access?: string; refresh?: string; sessions?: string }>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // Hydrate the pickers from the fetched settings once they arrive. This
+  // intentionally syncs external (query) data into local editor state.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (settings.data) {
-      form.setValues({
-        accessTokenTtlSeconds: settings.data.accessTokenTtlSeconds,
-        refreshTokenTtlSeconds: settings.data.refreshTokenTtlSeconds,
-        maxSessionsPerUser: settings.data.maxSessionsPerUser,
-      });
+      setMaxSessions(settings.data.maxSessionsPerUser);
+      setAccess(decomposeDuration(settings.data.accessTokenTtlSeconds));
+      setRefresh(decomposeDuration(settings.data.refreshTokenTtlSeconds));
+      setErrors({});
+      setSubmitError(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.data]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   if (settings.isLoading) return <TableSkeleton rows={4} columns={2} />;
   if (settings.isError) return <ErrorState error={settings.error} onRetry={() => settings.refetch()} />;
 
   const submit = async () => {
-    const data = form.values;
-    await update.mutateAsync({
-      accessTokenTtlSeconds: data.accessTokenTtlSeconds,
-      refreshTokenTtlSeconds: data.refreshTokenTtlSeconds,
-      maxSessionsPerUser: data.maxSessionsPerUser,
-    });
+    const payload = {
+      accessTokenTtlSeconds: toSeconds(access.value, access.unit),
+      refreshTokenTtlSeconds: toSeconds(refresh.value, refresh.unit),
+      maxSessionsPerUser: maxSessions,
+    };
+    if (access.value < 1) {
+      setErrors({ access: "Value must be at least 1" });
+      return;
+    }
+    if (refresh.value < 1) {
+      setErrors({ refresh: "Value must be at least 1" });
+      return;
+    }
+    const parsed = sessionSettingsSchema.safeParse(payload);
+    if (!parsed.success) {
+      const next: { access?: string; refresh?: string } = {};
+      for (const issue of parsed.error.issues) {
+        const key = issue.path[0];
+        if (key === "accessTokenTtlSeconds") {
+          next.access = issue.message;
+        } else if (key === "refreshTokenTtlSeconds") {
+          next.refresh = issue.message;
+        }
+      }
+      setErrors(next);
+      return;
+    }
+    setErrors({});
+    setSubmitError(null);
+    await update.mutateAsync(payload);
   };
 
   return (
@@ -321,41 +349,37 @@ function SessionSettingsCard({ platformSlug, organisationId }: OrgSettingsTabPro
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={form.handleSubmit(() => submit())} className="space-y-4">
-          <FormField
-            label="Access token lifetime (seconds)"
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void submit();
+          }}
+          className="space-y-4"
+        >
+          <DurationInput
+            label="Access token lifetime"
             htmlFor="ss-access"
-            error={form.errors.accessTokenTtlSeconds}
-            hint={formatDuration(form.values.accessTokenTtlSeconds)}
-          >
-            <Input
-              id="ss-access"
-              type="number"
-              min={60}
-              max={86400}
-              value={form.values.accessTokenTtlSeconds}
-              onChange={(e) => form.setValue("accessTokenTtlSeconds", Number(e.target.value))}
-            />
-          </FormField>
-          <FormField
-            label="Refresh token lifetime (seconds)"
+            value={access.value}
+            unit={access.unit}
+            onValueChange={(value) => setAccess((p) => ({ ...p, value }))}
+            onUnitChange={(unit) => setAccess((p) => ({ ...p, unit }))}
+            error={errors.access}
+            hint={`${formatDuration(toSeconds(access.value, access.unit))} (max 24 hrs)`}
+          />
+          <DurationInput
+            label="Refresh token lifetime"
             htmlFor="ss-refresh"
-            error={form.errors.refreshTokenTtlSeconds}
-            hint={formatDuration(form.values.refreshTokenTtlSeconds)}
-          >
-            <Input
-              id="ss-refresh"
-              type="number"
-              min={300}
-              max={31536000}
-              value={form.values.refreshTokenTtlSeconds}
-              onChange={(e) => form.setValue("refreshTokenTtlSeconds", Number(e.target.value))}
-            />
-          </FormField>
+            value={refresh.value}
+            unit={refresh.unit}
+            onValueChange={(value) => setRefresh((p) => ({ ...p, value }))}
+            onUnitChange={(unit) => setRefresh((p) => ({ ...p, unit }))}
+            error={errors.refresh}
+            hint={`${formatDuration(toSeconds(refresh.value, refresh.unit))} (max 365 days)`}
+          />
           <FormField
             label="Max sessions per user"
             htmlFor="ss-sessions"
-            error={form.errors.maxSessionsPerUser}
+            error={errors.sessions}
             hint="Oldest sessions are evicted when the limit is reached"
           >
             <Input
@@ -363,13 +387,13 @@ function SessionSettingsCard({ platformSlug, organisationId }: OrgSettingsTabPro
               type="number"
               min={1}
               max={100}
-              value={form.values.maxSessionsPerUser}
-              onChange={(e) => form.setValue("maxSessionsPerUser", Number(e.target.value))}
+              value={maxSessions}
+              onChange={(e) => setMaxSessions(Number(e.target.value))}
             />
           </FormField>
-          {form.submitError ? (
+          {submitError ? (
             <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {form.submitError}
+              {submitError}
             </p>
           ) : null}
           <div className="flex justify-end">
@@ -381,6 +405,59 @@ function SessionSettingsCard({ platformSlug, organisationId }: OrgSettingsTabPro
         </form>
       </CardContent>
     </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Session: duration value + unit picker
+// ---------------------------------------------------------------------------
+
+interface DurationInputProps {
+  label: string;
+  htmlFor: string;
+  value: number;
+  unit: DurationUnit;
+  onValueChange: (value: number) => void;
+  onUnitChange: (unit: DurationUnit) => void;
+  error?: string;
+  hint?: string;
+}
+
+function DurationInput({
+  label,
+  htmlFor,
+  value,
+  unit,
+  onValueChange,
+  onUnitChange,
+  error,
+  hint,
+}: DurationInputProps) {
+  return (
+    <FormField label={label} htmlFor={htmlFor} error={error} hint={hint}>
+      <div className="flex items-center gap-2">
+        <Input
+          id={htmlFor}
+          type="number"
+          min={1}
+          value={value}
+          onChange={(e) => onValueChange(Number(e.target.value))}
+          className="w-24"
+        />
+        <Select value={unit} onValueChange={(v) => onUnitChange(v as DurationUnit)}>
+          <SelectTrigger aria-label={`${label} unit`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {DURATION_UNITS.map((u) => (
+              <SelectItem key={u.value} value={u.value}>
+                {u.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </FormField>
   );
 }
 
