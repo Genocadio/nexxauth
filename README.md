@@ -189,6 +189,11 @@ platform-wide and lives at the origin root.
 
 ### Organisations — under the project base URL
 
+**External clients** call these endpoints **without** `{organisationId}` in the
+path — the organisation is resolved from the `X-Client-Id` header. **Platform
+users** (admin console) include `{organisationId}` in the path and authenticate
+with a platform JWT.
+
 | Method & path | Auth | Description |
 |---|---|---|
 | `GET /organisations` | platform member | list organisations of the platform (org users → 403) |
@@ -197,16 +202,32 @@ platform-wide and lives at the origin root.
 | `PATCH /organisations/{organisationId}` | platform super user | update name / description / settings |
 | `DELETE /organisations/{organisationId}` | platform super user | delete org (users, roles, keys, tokens cascade) |
 
+> ⚠️ **External clients never send `organisationId`.** The numeric id is a
+> platform-internal detail resolved automatically from `X-Client-Id`.
+
 ### Organisation auth — under the project base URL
 
 | Method & path | Auth | Description |
 |---|---|---|
-| `POST /auth/register` | public | creates an org user (password rules enforced), returns org tokens |
-| `POST /auth/login` | public | `{organisationId, identifier, password}` → org tokens |
+| `POST /auth/register` | public (`X-Client-Id` required for external apps) | creates an org user (password rules enforced), returns org tokens |
+| `POST /auth/login` | public (`X-Client-Id` required for external apps) | `{identifier, password}` → org tokens |
 | `POST /auth/refresh` | public | rotate the org refresh token |
 | `POST /auth/logout` | public | revoke the org refresh token (204) |
 
+> **External clients** identify the organisation via `X-Client-Id` — no
+> `organisationId` is needed or should be sent in the request body. The numeric
+> `organisationId` is a platform-internal detail. See
+> [docs/CLIENT_API.md](docs/CLIENT_API.md) for the full external API guide.
+>
+> **Platform console** (internal): the Next.js web app sends `organisationId`
+> in the login body when no client is present. This path is CORS-locked to the
+> frontend origin and is not part of the external API.
+
 ### Organisation RBAC — under `/organisations/{organisationId}`
+
+**External clients** call these endpoints without `{organisationId}` in the path
+(`X-Client-Id` resolves the org automatically). **Platform users** (admin
+console) include `{organisationId}` in the path.
 
 | Method & path | Auth | Description |
 |---|---|---|

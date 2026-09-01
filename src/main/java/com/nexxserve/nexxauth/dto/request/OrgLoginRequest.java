@@ -14,6 +14,11 @@ import jakarta.validation.constraints.Size;
  * enabled identifier in order. {@code authType} selects the authentication
  * method — today only {@code PASSWORD}, which is also the default; future
  * methods (passkey, OTP, ...) extend {@link AuthType}.
+ * <p>
+ * <b>External clients must never send {@code organisationId}.</b> The
+ * organisation is resolved automatically from the {@code X-Client-Id} header.
+ * The {@code organisationId} field is an internal detail used only by the
+ * platform console portal flow (when no client header is present).
  */
 public record OrgLoginRequest(
 
@@ -31,8 +36,11 @@ public record OrgLoginRequest(
         @Size(max = 72, message = "Password must be at most 72 characters")
         String password,
 
-        /** Organisation ID — used by the portal flow when no X-Client-Id header
-         *  is present. The client header takes precedence when both are supplied. */
+        /** Organisation ID — <b>internal only</b>. Used by the platform console
+         *  portal flow when no {@code X-Client-Id} header is present. External
+         *  clients must never send this field; the organisation is resolved from
+         *  the client header. The client header takes precedence when both are
+         *  supplied. */
         Long organisationId
 ) {
 }

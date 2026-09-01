@@ -66,8 +66,10 @@ class HardeningIntegrationTest {
 
     @Test
     void wrongJsonTypesAre400Never500() throws Exception {
-        // string where number expected (organisationId is no longer in the DTO;
-        // a bogus field is silently ignored, so test with a missing required field)
+        // organisationId was removed from the external login DTO — it is an
+        // internal-only field (platform console portal flow). A bogus
+        // organisationId field is silently ignored by Jackson; test a missing
+        // required field instead to confirm validation still catches bad input.
         mockMvc.perform(post("/" + SLUGS[0] + "/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("username", "u",

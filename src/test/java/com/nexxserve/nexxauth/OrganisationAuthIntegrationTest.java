@@ -38,7 +38,7 @@ class OrganisationAuthIntegrationTest {
 
     // Each test registers its own platform (unique slug) because all tests
     // share one database; a shared slug would 409 on the second registration.
-    private static final String[] SLUGS = {"orgauth1", "orgauth2", "orgauth3", "orgauth4", "orgauth5", "orgauth6", "orgauth7", "orgauth8", "orgauth9", "orgauth10", "orgauth11", "orgauth12", "orgauth13", "orgauth14", "orgauth15", "orgauth16", "orgauth17", "orgauth18"};
+    private static final String[] SLUGS = {"orgauth1", "orgauth2", "orgauth3", "orgauth4", "orgauth5", "orgauth6", "orgauth7", "orgauth8", "orgauth9", "orgauth10", "orgauth11", "orgauth12", "orgauth13", "orgauth14", "orgauth15", "orgauth16",            "orgauth17", "orgauth18", "orgauth19"};
     private static final String ORG_SLUG = "oa-org";
 
     @Autowired
@@ -543,6 +543,56 @@ class OrganisationAuthIntegrationTest {
         mockMvc.perform(get(org + "/users").header("Authorization", bearer(boss)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
+    void clientHeaderWinsOverBodyOrganisationId() throws Exception {
+        String platform = "/" + SLUGS[18];
+
+        String orgAuth = platform + "/auth";
+        String boss = registerPlatform("orgauth-conflict-boss@nexx.io", SLUGS[18]);
+        long orgId = createOrganisation(boss, platform);
+        String org = platform + "/organisations/" + orgId;
+        String clientKey = createClient(boss, org, "Conflicting Client");
+
+        // register: bogus organisationId in body is ignored; client's org wins
+        MvcResult regResult = mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "organisationId", 999999L,
+                                "username", "conflict-user",
+                                "password", "orgpass1",
+                                "firstName", "C", "lastName", "U"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.user.username").value("conflict-user"))
+                .andReturn();
+        long conflictUserId = objectMapper.readTree(regResult.getResponse().getContentAsString())
+                .path("user").path("id").asLong();
+
+        // the user was created under the CLIENT's org, not the bogus body id
+        mockMvc.perform(get(org + "/users/" + conflictUserId)
+                        .header("Authorization", bearer(boss)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("conflict-user"));
+
+        // login: bogus organisationId in body is ignored; client's org wins
+        MvcResult loginResult = mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "organisationId", 999999L,
+                                "identifier", "conflict-user",
+                                "password", "orgpass1"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        // the returned token carries the CLIENT's org, not the body id
+        JsonNode claims = decodeClaims(
+                objectMapper.readTree(loginResult.getResponse().getContentAsString())
+                        .get("accessToken").asText());
+        assertEquals(orgId, claims.get("orgId").asLong());
+        assertEquals(conflictUserId, Long.parseLong(claims.get("sub").asText()));
     }
 
     @Test

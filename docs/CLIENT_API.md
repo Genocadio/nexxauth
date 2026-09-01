@@ -78,6 +78,26 @@ All timestamps are ISO-8601. All `exp`/`iat` JWT claims are Unix seconds.
 
 ---
 
+## 2a. Two API tracks
+
+The organisation API serves two distinct audiences with **different
+authentication models and path conventions**:
+
+| | **External** (client apps) | **Internal** (platform console) |
+|---|---|---|
+| **Who calls it** | Mobile apps, web apps, server-side services | The platform admin console (Next.js web app) |
+| **Auth method** | `X-Client-Id` header + optional org-user JWT | Platform user JWT (HS256) |
+| **Organisation in path** | **Never** — resolved automatically from the client | **Always** — `/{slug}/organisations/{organisationId}/…` |
+| **Organisation in body** | **Never** — external clients must not send `organisationId` | N/A (path-based) |
+| **CORS** | Per-client link-based origins | Locked to the frontend web app origin |
+
+**This guide documents the external track.** External clients identify the
+organisations through the `X-Client-Id` header — the numeric `organisationId`
+is a platform-internal detail that should **never** appear in external request
+bodies or URLs.
+
+---
+
 ## 3. Client identity
 
 An external app is registered inside an organisation as a **client**. Each
@@ -117,6 +137,12 @@ These endpoints are public — a browser app calls them **with** `X-Client-Id` +
 > authoritative and **no `organisationId` is needed in the body** (any body id
 > is ignored). External apps should **never send `organisationId`** — it is a
 > platform-internal detail resolved automatically from the client.
+>
+> ⚠️ **Internal-only note:** the login endpoint accepts an optional
+> `organisationId` body field for the **platform console portal flow** (when no
+> `X-Client-Id` is present). This is an internal implementation detail —
+> external clients must always use `X-Client-Id` and must never send
+> `organisationId`.
 >
 > Without a client header (server-side scripts only), the body's
 > `organisationId` is **required**. This path is for platform users and is not
@@ -263,6 +289,16 @@ scoped to the organisation in the path:
 | **Platform user** (console) | platform JWT (HS256) | member reads; `SUPER_USER` writes |
 
 ### 5.1 Endpoint reference
+
+**External clients** call these endpoints **without** `{organisationId}` in the
+path — the organisation is resolved from the `X-Client-Id` header
+(`OrganisationIdFilter` rewrites the URL server-side). **Platform users** (the
+admin console) include `{organisationId}` in the path and authenticate with a
+platform JWT.
+
+> ⚠️ **Never send `organisationId` in request bodies or URLs.** External
+> clients must not include the numeric organisation id in any request. The
+> organisation is always resolved from the `X-Client-Id` header.
 
 All paths below are relative to `/organisations/` (external clients) or
 `/organisations/{organisationId}/` (platform users). External clients should
