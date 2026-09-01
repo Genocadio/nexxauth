@@ -24,8 +24,9 @@ export default function WebClientPage() {
         <AlertTitle>No Static Token</AlertTitle>
         <AlertDescription>
           WEB clients are never authenticated with a static token. They can only
-          access the login and register endpoints. To access other endpoints, the
-          user must be logged in and the request must include their JWT.
+          access the organisation auth endpoints: login, register, refresh and
+          logout. To access other endpoints, the user must be logged in and the
+          request must include their JWT.
         </AlertDescription>
       </Alert>
 
@@ -36,7 +37,7 @@ export default function WebClientPage() {
         <CardContent className="space-y-2">
           <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
             <li>Never requires a static token</li>
-            <li>Only accessible endpoints: login, register</li>
+            <li>Only accessible endpoints: login, register, refresh, logout</li>
             <li>CORS origins are enforced</li>
             <li>When a valid user JWT is present, the user proceeds under their own roles</li>
             <li>Use case: web dashboards, admin panels</li>

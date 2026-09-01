@@ -40,8 +40,8 @@ const CLIENT_TYPES: ClientType[] = ["WEB", "ANDROID", "IOS", "SERVER"];
 
 const AUTH_HINTS: Record<ClientType, string> = {
   WEB: "Web clients never authenticate — they sign users in via the login endpoint.",
-  ANDROID: "When on, the client authenticates with a static token; when off it can only reach login and register.",
-  IOS: "When on, the client authenticates with a static token; when off it can only reach login and register.",
+  ANDROID: "When on, the client authenticates with a static token; when off it can only reach the org auth endpoints (login, register, refresh, logout).",
+  IOS: "When on, the client authenticates with a static token; when off it can only reach the org auth endpoints (login, register, refresh, logout).",
   SERVER: "Server clients always authenticate with a static token.",
 };
 

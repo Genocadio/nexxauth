@@ -25,7 +25,8 @@ export default function MobileClientPage() {
         <AlertTitle>Configurable Authentication</AlertTitle>
         <AlertDescription>
           Mobile clients can be configured to require authentication or not.
-          Without authentication, they behave like WEB clients (login/register only).
+          Without authentication, they behave like WEB clients (org auth
+          endpoints only: login, register, refresh, logout).
           With authentication, they have full API access like SERVER clients.
         </AlertDescription>
       </Alert>
@@ -37,7 +38,7 @@ export default function MobileClientPage() {
         <CardContent className="space-y-2">
           <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
             <li>Authentication is configurable (unlike WEB/SERVER)</li>
-            <li>Without auth: login/register only (like WEB)</li>
+            <li>Without auth: org auth endpoints only (like WEB)</li>
             <li>With auth: full API access (like SERVER)</li>
             <li>When a valid user JWT is present, the user proceeds under their own roles</li>
             <li>Use case: mobile apps, progressive web apps</li>
@@ -51,7 +52,8 @@ export default function MobileClientPage() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground mb-4">
-            Only login and register endpoints are accessible:
+            Only the org auth endpoints are accessible (login, register,
+            refresh, logout):
           </p>
           <CodeBlock
             code={`curl -X POST ${baseUrl}/auth/login \\

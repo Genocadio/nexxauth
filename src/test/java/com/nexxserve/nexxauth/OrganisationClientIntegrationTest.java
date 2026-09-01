@@ -206,7 +206,8 @@ class OrganisationClientIntegrationTest {
         String noAuthAppKey = createClient(boss, clients, "App", "ANDROID", null);
         Client authApp = createTokenClient(boss, clients, "App Auth", "IOS");
 
-        // non-auth clients may only hit org login/register
+        // non-auth clients may only hit the org auth endpoints (login,
+        // register, refresh, logout) — the org API is blocked
         mockMvc.perform(post(orgLogin)
                         .header("X-Client-Id", webKey)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -220,11 +221,18 @@ class OrganisationClientIntegrationTest {
 
         mockMvc.perform(get(users).header("X-Client-Id", webKey))
                 .andExpect(status().isForbidden());
+        // refresh/logout pass the client filter and are validated by the
+        // controller (empty body -> 400, not 403)
         mockMvc.perform(post(orgRefresh)
                         .header("X-Client-Id", webKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post(orgRefresh.replace("/refresh", "/logout"))
+                        .header("X-Client-Id", webKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
         mockMvc.perform(get(users).header("X-Client-Id", noAuthAppKey))
                 .andExpect(status().isForbidden());
 

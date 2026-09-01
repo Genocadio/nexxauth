@@ -95,7 +95,7 @@ Client types and their access rules:
 
 | Type | Token required? | What it can reach |
 |---|---|---|
-| `WEB` | never | anonymous: only the org `login`/`register` endpoints. With a valid user JWT on the same request, the user proceeds under their own roles |
+| `WEB` | never | anonymous: only the org auth endpoints (`login`, `register`, `refresh`, `logout`). With a valid user JWT on the same request, the user proceeds under their own roles |
 | `SERVER` | always | the **full** organisation API, scoped to the client's organisation |
 | `ANDROID` / `IOS` | configurable | auth on → full org API; auth off → same as `WEB` |
 
@@ -334,9 +334,9 @@ Each link controls CORS and source restrictions independently:
   `403 Origin not allowed by source restriction`.
 
 Unknown `X-Client-Id` → `401 Unknown client`; disabled client → `403 Client is
-disabled`; a no-auth client (e.g. `WEB`) reaching anything beyond
-`login`/`register` without a user JWT → `403 This client type can only access
-the organisation login and register endpoints`.
+disabled`; a no-auth client (e.g. `WEB`) reaching anything beyond the org auth
+endpoints (`login`, `register`, `refresh`, `logout`) without a user JWT → `403
+This client type can only access the organisation auth endpoints`.
 
 Preflight `OPTIONS` requests are special: browsers strip custom headers from
 them, so they cannot carry `X-Client-Id`. A preflight is therefore answered

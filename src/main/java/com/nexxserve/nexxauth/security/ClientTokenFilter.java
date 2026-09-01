@@ -35,10 +35,11 @@ import java.util.regex.Pattern;
  *       the request (scoped to the client's organisation) for the full org
  *       API;</li>
  *   <li>clients that do not require authentication (web, and apps without
- *       auth) may reach the organisation login/register endpoints anonymously,
- *       and — when the request also carries a valid org-user JWT (already set
- *       by the {@link OrgJwtAuthenticationFilter}) — the org user proceeds to
- *       the org API under their own roles/permissions instead of being blocked.</li>
+ *       auth) may reach the organisation auth endpoints anonymously (login,
+ *       register, refresh, logout), and — when the request also carries a valid
+ *       org-user JWT (already set by the {@link OrgJwtAuthenticationFilter}) —
+ *       the org user proceeds to the org API under their own roles/permissions
+ *       instead of being blocked.</li>
  * </ul>
  * <b>Without {@code X-Client-Id} (default-deny):</b> an org user from a foreign
  * origin (a browser {@code Origin} that is not this server's own) is rejected
@@ -57,10 +58,13 @@ public class ClientTokenFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";
     // Platform auth is /auth/...; the org auth paths are at a platform's clean
-    // root origin /{slug}/auth/(login|register) — the pattern requires the
-    // slug segment, so platform /auth/login can never match.
+    // root origin /{slug}/auth/(login|register|refresh|logout) — the pattern
+    // requires the slug segment, so platform /auth/login can never match.
+    // refresh/logout are allowed for no-auth clients because they validate the
+    // opaque refresh token server-side (rotation + family revocation on reuse),
+    // the same security model as the platform /auth/refresh endpoint.
     private static final Pattern ORG_AUTH_PATH =
-            Pattern.compile("^/(?!api/)[^/]+/auth/(login|register)$");
+            Pattern.compile("^/(?!api/)[^/]+/auth/(login|register|refresh|logout)$");
     private static final List<SimpleGrantedAuthority> CLIENT_AUTHORITIES = clientAuthorities();
 
     private final OrganisationClientRepository clientRepository;
@@ -123,9 +127,10 @@ public class ClientTokenFilter extends OncePerRequestFilter {
         }
 
         // No-auth client (web, or apps without auth): the client itself cannot
-        // reach the org API beyond login/register, but a valid org-user JWT
-        // (authenticated earlier by OrgJwtAuthenticationFilter) proceeds under
-        // that user's own roles/permissions.
+        // reach the org API beyond the org auth endpoints (login, register,
+        // refresh, logout), but a valid org-user JWT (authenticated earlier by
+        // OrgJwtAuthenticationFilter) proceeds under that user's own
+        // roles/permissions.
         if (isOrgUserAuthenticated()) {
             filterChain.doFilter(request, response);
             return;
@@ -135,7 +140,7 @@ public class ClientTokenFilter extends OncePerRequestFilter {
             logFailure(request, client, client.getClientKey(),
                     "Client cannot access this endpoint: " + request.getRequestURI());
             write(response, HttpStatus.FORBIDDEN,
-                    "This client type can only access the organisation login and register endpoints",
+                    "This client type can only access the organisation auth endpoints",
                     request.getRequestURI());
             return;
         }
