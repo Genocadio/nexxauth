@@ -64,6 +64,12 @@ public class AuthAuditService {
     public static final String ORG_KEY_ROTATED = "ORG_KEY_ROTATED";
     public static final String ORG_TOKEN_REUSE = "ORG_TOKEN_REUSE";
 
+    /** Verification (OTP / magic link via nexxbotify) events. */
+    public static final String ORG_VERIFICATION_SENT = "ORG_VERIFICATION_SENT";
+    public static final String ORG_IDENTIFIER_VERIFIED = "ORG_IDENTIFIER_VERIFIED";
+    public static final String ORG_PASSWORD_RESET = "ORG_PASSWORD_RESET";
+    public static final String ORG_PASSWORD_RESET_FAILURE = "ORG_PASSWORD_RESET_FAILURE";
+
     /** Organisation user-field configuration events. */
     public static final String ORG_USER_FIELD_CREATED = "ORG_USER_FIELD_CREATED";
     public static final String ORG_USER_FIELD_UPDATED = "ORG_USER_FIELD_UPDATED";

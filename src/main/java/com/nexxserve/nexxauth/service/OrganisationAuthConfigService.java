@@ -35,15 +35,18 @@ public class OrganisationAuthConfigService {
     private final OrganisationPasswordHistoryRepository historyRepository;
     private final EntityManager entityManager;
     private final PasswordEncoder passwordEncoder;
+    private final NexxbotifyClient nexxbotifyClient;
 
     public OrganisationAuthConfigService(OrganisationAuthConfigRepository configRepository,
                                          OrganisationPasswordHistoryRepository historyRepository,
                                          EntityManager entityManager,
-                                         PasswordEncoder passwordEncoder) {
+                                         PasswordEncoder passwordEncoder,
+                                         NexxbotifyClient nexxbotifyClient) {
         this.configRepository = configRepository;
         this.historyRepository = historyRepository;
         this.entityManager = entityManager;
         this.passwordEncoder = passwordEncoder;
+        this.nexxbotifyClient = nexxbotifyClient;
     }
 
     /** The organisation's config, lazily created with defaults if missing. The
@@ -88,6 +91,12 @@ public class OrganisationAuthConfigService {
                                                  UpdateOrganisationAuthConfigRequest request) {
         OrganisationAuthConfig config = configOf(organisation);
         if (request.authType() != null) {
+            // The config sets the DEFAULT auth type on register; OTP is a
+            // per-login method (the user asks for a code), never a default.
+            if (request.authType() == com.nexxserve.nexxauth.entity.AuthType.OTP) {
+                throw new com.nexxserve.nexxauth.exception.BadRequestException(
+                        "OTP cannot be the organisation's default auth type");
+            }
             config.setAuthType(request.authType());
         }
         if (request.passwordEnabled() != null) {
@@ -104,6 +113,30 @@ public class OrganisationAuthConfigService {
         }
         if (request.passwordHistoryCount() != null) {
             config.setPasswordHistoryCount(request.passwordHistoryCount());
+        }
+        if (request.emailVerificationEnabled() != null) {
+            config.setEmailVerificationEnabled(request.emailVerificationEnabled());
+        }
+        if (request.phoneVerificationEnabled() != null) {
+            config.setPhoneVerificationEnabled(request.phoneVerificationEnabled());
+        }
+        if (request.passwordResetEnabled() != null) {
+            config.setPasswordResetEnabled(request.passwordResetEnabled());
+        }
+        if (request.otpLoginEnabled() != null) {
+            config.setOtpLoginEnabled(request.otpLoginEnabled());
+        }
+        if (request.twoFactorEnabled() != null) {
+            config.setTwoFactorEnabled(request.twoFactorEnabled());
+        }
+        if (request.verificationMode() != null) {
+            config.setVerificationMode(request.verificationMode());
+        }
+        if (request.requireEmailVerificationOnRegister() != null) {
+            config.setRequireEmailVerificationOnRegister(request.requireEmailVerificationOnRegister());
+        }
+        if (request.requirePhoneVerificationOnRegister() != null) {
+            config.setRequirePhoneVerificationOnRegister(request.requirePhoneVerificationOnRegister());
         }
         validateConfig(config);
         return toResponse(configRepository.save(config));
@@ -197,6 +230,10 @@ public class OrganisationAuthConfigService {
         if (config.getPasswordMinLength() > config.getPasswordMaxLength()) {
             throw new BadRequestException("Password minimum length cannot exceed maximum length");
         }
+        // 2FA sits on top of a password: without one there is nothing to gate.
+        if (config.isTwoFactorEnabled() && !config.isPasswordEnabled()) {
+            throw new BadRequestException("Two-factor authentication requires password authentication to be enabled");
+        }
     }
 
     private OrganisationAuthConfigResponse toResponse(OrganisationAuthConfig config) {
@@ -206,6 +243,15 @@ public class OrganisationAuthConfigService {
                 config.getPasswordMinLength(),
                 config.getPasswordMaxLength(),
                 config.getPasswordExpirationDays(),
-                config.getPasswordHistoryCount());
+                config.getPasswordHistoryCount(),
+                config.isEmailVerificationEnabled(),
+                config.isPhoneVerificationEnabled(),
+                config.isPasswordResetEnabled(),
+                config.isOtpLoginEnabled(),
+                config.isTwoFactorEnabled(),
+                config.getVerificationMode(),
+                config.isRequireEmailVerificationOnRegister(),
+                config.isRequirePhoneVerificationOnRegister(),
+                nexxbotifyClient.isConfigured());
     }
 }

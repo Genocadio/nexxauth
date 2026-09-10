@@ -49,4 +49,51 @@ public class OrganisationAuthConfig extends BaseEntity {
     /** How many previous passwords a user may not reuse; {@code 0} = history disabled. */
     @Column(name = "password_history_count", nullable = false)
     private int passwordHistoryCount = 0;
+
+    /** When true, users' email addresses must be verified (a verification
+     * code/link is sent via nexxbotify on request). Unverified users still
+     * sign in but get the VERIFY_EMAIL action. */
+    @Column(name = "email_verification_enabled", nullable = false)
+    private boolean emailVerificationEnabled = false;
+
+    /** When true, users' phone numbers must be verified (a verification
+     * code/link is sent via nexxbotify on request). Unverified users still
+     * sign in but get the VERIFY_PHONE action. */
+    @Column(name = "phone_verification_enabled", nullable = false)
+    private boolean phoneVerificationEnabled = false;
+
+    /** When true, users may reset a forgotten password through an OTP or
+     * magic link sent via nexxbotify. */
+    @Column(name = "password_reset_enabled", nullable = false)
+    private boolean passwordResetEnabled = false;
+
+    /** When true, OTP login is allowed: a user signs in with a one-time code
+     * sent to their identifier instead of a password. */
+    @Column(name = "otp_login_enabled", nullable = false)
+    private boolean otpLoginEnabled = false;
+
+    /** When true, every password login requires a second factor: the server
+     * sends a one-time code to the user's email/phone and the login only
+     * completes after it is submitted on the challenge endpoint. */
+    @Column(name = "two_factor_enabled", nullable = false)
+    private boolean twoFactorEnabled = false;
+
+    /** Default delivery for verification requests that do not pick one: OTP
+     * (a numeric code typed back) or LINK (a magic link opened in a browser).
+     * Login challenges (2FA, verify-at-next-login) are always OTP. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "verification_mode", nullable = false, length = 10)
+    private VerificationDelivery verificationMode = VerificationDelivery.OTP;
+
+    /** When true, new registrations may only reach full access after
+     * verifying their email: the registration response carries a gating
+     * VERIFY_EMAIL action and a restricted session until the email is
+     * verified. */
+    @Column(name = "require_email_verification_on_register", nullable = false)
+    private boolean requireEmailVerificationOnRegister = false;
+
+    /** When true, new registrations may only reach full access after verifying
+     * their phone number (gating VERIFY_PHONE action until verified). */
+    @Column(name = "require_phone_verification_on_register", nullable = false)
+    private boolean requirePhoneVerificationOnRegister = false;
 }

@@ -1,5 +1,6 @@
 package com.nexxserve.nexxauth.controller;
 
+import com.nexxserve.nexxauth.dto.request.ChallengeVerifyRequest;
 import com.nexxserve.nexxauth.dto.request.LogoutRequest;
 import com.nexxserve.nexxauth.dto.request.OrgLoginRequest;
 import com.nexxserve.nexxauth.dto.request.OrgRegisterRequest;
@@ -61,6 +62,15 @@ public class OrganisationAuthController {
                                  @Valid @RequestBody OrgLoginRequest request,
                                  HttpServletRequest httpRequest) {
         return authService.login(slug, request, clientId, resolveIp(httpRequest), httpRequest.getHeader("User-Agent"), resolveHostname(httpRequest));
+    }
+
+    @PostMapping("/challenges/verify")
+    public OrgAuthResponse verifyChallenge(@PathVariable String slug,
+                                           @RequestHeader(value = CLIENT_ID_HEADER, required = false) String clientId,
+                                           @Valid @RequestBody ChallengeVerifyRequest request,
+                                           HttpServletRequest httpRequest) {
+        return authService.verifyLoginChallenge(slug, request, clientId,
+                resolveIp(httpRequest), httpRequest.getHeader("User-Agent"), resolveHostname(httpRequest));
     }
 
     @PostMapping("/refresh")

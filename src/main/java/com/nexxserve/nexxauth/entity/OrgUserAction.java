@@ -16,7 +16,15 @@ public enum OrgUserAction {
 
     /** One or more required organisation user fields have no value for this
      * user; the profile must be completed. Not gating. */
-    UPDATE_PROFILE(false);
+    UPDATE_PROFILE(false),
+
+    /** The organisation requires email verification and the user's email is
+     * not verified yet. Advisory — the user can still sign in. */
+    VERIFY_EMAIL(false),
+
+    /** The organisation requires phone verification and the user's phone is
+     * not verified yet. Advisory — the user can still sign in. */
+    VERIFY_PHONE(false);
 
     private final boolean gating;
 

@@ -87,6 +87,26 @@ public class OrganisationUser extends BaseEntity {
     @Column(name = "data_hash", nullable = false, length = 36)
     private String dataHash;
 
+    /** When the user's email address was verified (null = not verified). */
+    @Column(name = "email_verified_at")
+    private java.time.Instant emailVerifiedAt;
+
+    /** When the user's phone number was verified (null = not verified). */
+    @Column(name = "phone_verified_at")
+    private java.time.Instant phoneVerifiedAt;
+
+    /** When true (set by an admin), the user's next password login does not
+     * complete until their email address is verified: the server sends a
+     * one-time code and the login resumes on the challenge endpoint, which
+     * then stamps the email as verified. Cleared when verified. */
+    @Column(name = "require_email_verification_at_next_login", nullable = false)
+    private boolean requireEmailVerificationAtNextLogin = false;
+
+    /** When true, the user's next password login does not complete until their
+     * phone number is verified (same challenge flow; cleared when verified). */
+    @Column(name = "require_phone_verification_at_next_login", nullable = false)
+    private boolean requirePhoneVerificationAtNextLogin = false;
+
     @jakarta.persistence.PrePersist
     void prePersist() {
         if (dataHash == null) dataHash = UUID.randomUUID().toString();

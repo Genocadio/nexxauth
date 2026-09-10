@@ -36,6 +36,12 @@ public record OrgLoginRequest(
         @Size(max = 72, message = "Password must be at most 72 characters")
         String password,
 
+        /** One-time code for the {@code OTP} method. Request the code first via
+         * the org verification endpoint (purpose {@code LOGIN_OTP}), then send
+         * it here. Required for OTP login; ignored for PASSWORD. */
+        @Size(max = 100, message = "Code must be at most 100 characters")
+        String otpCode,
+
         /** Organisation ID — <b>internal only</b>. Used by the platform console
          *  portal flow when no {@code X-Client-Id} header is present. External
          *  clients must never send this field; the organisation is resolved from

@@ -1,5 +1,6 @@
 package com.nexxserve.nexxauth.service;
 
+import com.nexxserve.nexxauth.repository.OrganisationVerificationTokenRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -22,19 +23,24 @@ public class TokenMaintenanceService {
 
     private final RefreshTokenService refreshTokenService;
     private final OrganisationRefreshTokenService organisationRefreshTokenService;
+    private final OrganisationVerificationTokenRepository verificationTokenRepository;
 
     public TokenMaintenanceService(RefreshTokenService refreshTokenService,
-                                   OrganisationRefreshTokenService organisationRefreshTokenService) {
+                                   OrganisationRefreshTokenService organisationRefreshTokenService,
+                                   OrganisationVerificationTokenRepository verificationTokenRepository) {
         this.refreshTokenService = refreshTokenService;
         this.organisationRefreshTokenService = organisationRefreshTokenService;
+        this.verificationTokenRepository = verificationTokenRepository;
     }
 
-    /** Expired/revoked/evicted refresh tokens are purged daily at 03:00. */
+    /** Expired/revoked/evicted refresh tokens and expired verification
+     * values are purged daily at 03:00. */
     @Scheduled(cron = "0 0 3 * * *")
     public void cleanupExpiredTokens() {
         try {
             refreshTokenService.cleanupExpired();
             organisationRefreshTokenService.cleanupExpired();
+            verificationTokenRepository.deleteExpired(java.time.Instant.now());
         } catch (RuntimeException e) {
             log.warn("Token cleanup failed (will retry tomorrow)", e);
         }

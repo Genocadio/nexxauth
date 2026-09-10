@@ -117,6 +117,9 @@ export interface OrganisationAuthConfigResponse {
   passwordMaxLength: number;
   passwordExpirationDays: number;
   passwordHistoryCount: number;
+  /** False when the notification service (nexxbotify) is not configured:
+   * email/phone verification, password reset, OTP login and 2FA are locked. */
+  verificationServiceAvailable: boolean;
 }
 
 export interface OrganisationSessionSettingsResponse {

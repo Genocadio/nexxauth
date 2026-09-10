@@ -13,6 +13,8 @@ public interface OrganisationUserMapper {
 
     @Mapping(target = "authTypes", expression = "java(user.getAuthType() == null ? java.util.List.of() : java.util.List.of(user.getAuthType()))")
     @Mapping(target = "roles", expression = "java(user.getRoles().stream().map(com.nexxserve.nexxauth.entity.OrganisationRole::getName).sorted().toList())")
+    @Mapping(target = "emailVerified", expression = "java(user.getEmailVerifiedAt() != null)")
+    @Mapping(target = "phoneVerified", expression = "java(user.getPhoneVerifiedAt() != null)")
     OrganisationUserResponse toResponse(OrganisationUser user, Map<String, String> metadata);
 
     @Mapping(target = "organisation", ignore = true)

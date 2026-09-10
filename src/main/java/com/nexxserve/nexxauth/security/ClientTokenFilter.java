@@ -61,9 +61,12 @@ public class ClientTokenFilter extends OncePerRequestFilter {
     // requires the slug segment, so platform /auth/login can never match.
     // refresh/logout are allowed for no-auth clients because they validate the
     // opaque refresh token server-side (rotation + family revocation on reuse),
-    // the same security model as the platform /auth/refresh endpoint.
+    // the same security model as the platform /auth/refresh endpoint. The
+    // verification + password-reset paths are public org auth flows too
+    // (no-auth clients only reach org auth endpoints).
     private static final Pattern ORG_AUTH_PATH =
-            Pattern.compile("^/(?!api/)[^/]+/auth/(login|register|refresh|logout)$");
+            Pattern.compile("^/(?!api/)[^/]+/auth/(login|register|refresh|logout|challenges/verify|"
+                    + "verifications/(request|verify|complete)|password-reset/confirm)$");
     private static final List<SimpleGrantedAuthority> CLIENT_AUTHORITIES = clientAuthorities();
 
     private final ClientCache clientCache;

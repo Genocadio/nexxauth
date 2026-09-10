@@ -183,6 +183,8 @@ function AuthConfigCard({ platformSlug, organisationId }: OrgSettingsTabProps) {
     });
   };
 
+  const locked = config.data && !config.data.verificationServiceAvailable;
+
   return (
     <Card>
       <CardHeader>
@@ -193,7 +195,18 @@ function AuthConfigCard({ platformSlug, organisationId }: OrgSettingsTabProps) {
           Rules every new or reset password in this organisation must satisfy.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        {locked ? (
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
+            <p className="font-medium text-amber-600 dark:text-amber-400">
+              Verification features are unavailable
+            </p>
+            <p className="text-xs text-muted-foreground">
+              The notification service is not configured, so email/phone verification, password
+              reset, OTP login and 2FA challenges are locked for every organisation.
+            </p>
+          </div>
+        ) : null}
         <form onSubmit={form.handleSubmit(() => submit())} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <FormField

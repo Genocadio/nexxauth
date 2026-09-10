@@ -218,6 +218,18 @@ public class OrganisationUserService {
                 refreshTokenService.revokeAllForUser(user.getId());
             }
         }
+        if (request.requireEmailVerificationAtNextLogin() != null) {
+            user.setRequireEmailVerificationAtNextLogin(request.requireEmailVerificationAtNextLogin());
+            if (request.requireEmailVerificationAtNextLogin()) {
+                refreshTokenService.revokeAllForUser(user.getId());
+            }
+        }
+        if (request.requirePhoneVerificationAtNextLogin() != null) {
+            user.setRequirePhoneVerificationAtNextLogin(request.requirePhoneVerificationAtNextLogin());
+            if (request.requirePhoneVerificationAtNextLogin()) {
+                refreshTokenService.revokeAllForUser(user.getId());
+            }
+        }
         if (request.metadata() != null) {
             userFieldService.setMetadata(user, request.metadata());
         }

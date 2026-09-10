@@ -53,7 +53,8 @@ class OrganisationAuthConfigIntegrationTest {
                 .andExpect(jsonPath("$.passwordMinLength").value(8))
                 .andExpect(jsonPath("$.passwordMaxLength").value(72))
                 .andExpect(jsonPath("$.passwordExpirationDays").value(0))
-                .andExpect(jsonPath("$.passwordHistoryCount").value(0));
+                .andExpect(jsonPath("$.passwordHistoryCount").value(0))
+                .andExpect(jsonPath("$.verificationServiceAvailable").value(true));
 
         // the lazy default must actually be persisted (a read-only GET that
         // inserts fails on Postgres - regression guard for that path)

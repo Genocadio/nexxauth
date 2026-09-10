@@ -1,19 +1,24 @@
 package com.nexxserve.nexxauth.service;
 
+import com.nexxserve.nexxauth.dto.request.ChallengeVerifyRequest;
 import com.nexxserve.nexxauth.dto.request.OrgLoginRequest;
 import com.nexxserve.nexxauth.dto.request.OrgRegisterRequest;
+import com.nexxserve.nexxauth.dto.response.LoginChallenge;
 import com.nexxserve.nexxauth.dto.response.OrgAuthResponse;
 import com.nexxserve.nexxauth.entity.AuthType;
 import com.nexxserve.nexxauth.entity.LogCategory;
 import com.nexxserve.nexxauth.entity.LogLevel;
 import com.nexxserve.nexxauth.entity.OrgIdentifierType;
 import com.nexxserve.nexxauth.entity.Organisation;
+import com.nexxserve.nexxauth.entity.OrganisationAuthConfig;
 import com.nexxserve.nexxauth.entity.OrganisationClient;
 import com.nexxserve.nexxauth.entity.OrganisationRole;
 import com.nexxserve.nexxauth.entity.OrganisationSigningKey;
 import com.nexxserve.nexxauth.entity.OrganisationUser;
 import com.nexxserve.nexxauth.entity.OrgUserAction;
 import com.nexxserve.nexxauth.entity.Platform;
+import com.nexxserve.nexxauth.entity.VerificationChannel;
+import com.nexxserve.nexxauth.entity.VerificationPurpose;
 import com.nexxserve.nexxauth.exception.BadRequestException;
 import com.nexxserve.nexxauth.exception.ConflictException;
 import com.nexxserve.nexxauth.exception.InvalidCredentialsException;
@@ -36,6 +41,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -62,6 +68,9 @@ public class OrganisationAuthService {
     private final OrgUserActions orgUserActions;
     private final OrganisationSessionService sessionService;
     private final com.nexxserve.nexxauth.security.AccountLockoutService accountLockout;
+    private final com.nexxserve.nexxauth.repository.OrganisationVerificationTokenRepository verificationTokenRepository;
+    private final VerificationProperties verificationProperties;
+    private final OrganisationVerificationService verificationService;
 
     public OrganisationAuthService(PlatformAccess platformAccess,
                                    OrganisationClientRepository clientRepository,
@@ -76,7 +85,10 @@ public class OrganisationAuthService {
                                    OrganisationSessionSettingsService sessionSettingsService,
                                    AuthTiming authTiming, OrganisationUserFieldService userFieldService,
                                    OrgUserActions orgUserActions, OrganisationSessionService sessionService,
-                                   com.nexxserve.nexxauth.security.AccountLockoutService accountLockout) {
+                                   com.nexxserve.nexxauth.security.AccountLockoutService accountLockout,
+                                   com.nexxserve.nexxauth.repository.OrganisationVerificationTokenRepository verificationTokenRepository,
+                                   VerificationProperties verificationProperties,
+                                   OrganisationVerificationService verificationService) {
         this.platformAccess = platformAccess;
         this.clientRepository = clientRepository;
         this.organisationRepository = organisationRepository;
@@ -96,6 +108,9 @@ public class OrganisationAuthService {
         this.orgUserActions = orgUserActions;
         this.sessionService = sessionService;
         this.accountLockout = accountLockout;
+        this.verificationTokenRepository = verificationTokenRepository;
+        this.verificationProperties = verificationProperties;
+        this.verificationService = verificationService;
     }
 
     @Transactional
@@ -142,6 +157,11 @@ public class OrganisationAuthService {
         // Re-fetch with roles loaded for the role restriction check
         OrganisationUser userWithRoles = userRepository.findById(saved.getId()).orElse(saved);
         enforceRoleRestrictions(client, userWithRoles);
+        // When the org requires verification on registration, kick the flow
+        // off immediately: a code/link (org's verification mode) is sent to
+        // the unverified identifier, and the session below is gated until it
+        // is verified.
+        verificationService.sendOnRegisterVerification(organisation, userWithRoles);
         audit.logPersisted(LogLevel.INFO, LogCategory.AUTH, AuthAuditService.ORG_REGISTER, identifierOf(saved),
                 organisation.getSlug(), organisation.getId(), null);
         return issueTokens(saved, client, ipAddress, userAgent, hostname);
@@ -162,7 +182,173 @@ public class OrganisationAuthService {
         AuthType method = request.authType() != null ? request.authType() : AuthType.PASSWORD;
         return switch (method) {
             case PASSWORD -> passwordLogin(organisation, request, client, ipAddress, userAgent, hostname);
+            case OTP -> otpLogin(organisation, request, client, ipAddress, userAgent, hostname);
         };
+    }
+
+    /** Completes a login that was paused by a server-sent challenge (2FA or
+     * verify-at-next-login). The challenge token + code resolve to the user;
+     * once the obligation is cleared, any remaining obligation is started,
+     * otherwise a full session is issued. */
+    @Transactional
+    public OrgAuthResponse verifyLoginChallenge(String platformSlug, ChallengeVerifyRequest request,
+                                                String clientId, String ipAddress, String userAgent, String hostname) {
+        var resolved = verificationService.resolveLoginChallenge(request.challengeToken(), request.code());
+        OrganisationUser user = resolved.user();
+        Organisation organisation = user.getOrganisation();
+        if (!organisation.getPlatform().getSlug().equals(platformSlug)) {
+            throw ResourceNotFoundException.of("Organisation", organisation.getId());
+        }
+        OrganisationClient client = resolveClient(clientId);
+        if (client != null && !organisation.getId().equals(client.getOrganisation().getId())) {
+            throw new BadRequestException("Client does not belong to the organisation of the challenge");
+        }
+        enforceRoleRestrictions(client, user);
+
+        if (resolved.purpose() == VerificationPurpose.EMAIL_VERIFICATION
+                || resolved.purpose() == VerificationPurpose.PHONE_VERIFICATION) {
+            verificationService.completeChallengeVerification(user, resolved.purpose(), Instant.now());
+            var pending = firstPendingLoginObligation(authConfigService.configOf(organisation), user);
+            if (pending != null) {
+                LoginChallenge challenge = verificationService.startLoginChallenge(
+                        organisation, user, pending.purpose(), pending.channel());
+                return challengeResponse(user, challenge);
+            }
+        }
+        audit.logPersisted(LogLevel.INFO, LogCategory.AUTH, AuthAuditService.ORG_LOGIN_SUCCESS,
+                resolved.identifier(), organisation.getSlug(), organisation.getId(),
+                "challenge " + resolved.purpose().name());
+        return issueTokens(user, client, ipAddress, userAgent, hostname);
+    }
+
+    /** First unresolved login obligation of {@code user}, or null when tokens
+     * can be issued straight away. Address-verification flags take precedence
+     * over 2FA so a code an admin forced is consumed before the standing
+     * multi-factor rule. */
+    private LoginObligation firstPendingLoginObligation(OrganisationAuthConfig config, OrganisationUser user) {
+        if (user.isRequireEmailVerificationAtNextLogin()
+                && user.getEmail() != null && user.getEmailVerifiedAt() == null) {
+            return new LoginObligation(VerificationPurpose.EMAIL_VERIFICATION, VerificationChannel.EMAIL);
+        }
+        if (user.isRequirePhoneVerificationAtNextLogin()
+                && user.getPhone() != null && user.getPhoneVerifiedAt() == null) {
+            return new LoginObligation(VerificationPurpose.PHONE_VERIFICATION, VerificationChannel.SMS);
+        }
+        if (config.isTwoFactorEnabled()) {
+            VerificationChannel channel = user.getEmail() != null ? VerificationChannel.EMAIL
+                    : user.getPhone() != null ? VerificationChannel.SMS : null;
+            if (channel == null) {
+                throw new BadRequestException("Two-factor authentication requires a verified email or phone number");
+            }
+            return new LoginObligation(VerificationPurpose.TWO_FACTOR, channel);
+        }
+        return null;
+    }
+
+    private OrgAuthResponse challengeResponse(OrganisationUser user, LoginChallenge challenge) {
+        return OrgAuthResponse.challenge(challenge,
+                userMapper.toResponse(user, userFieldService.readMetadata(user.getId())),
+                orgUserActions.of(user));
+    }
+
+    record LoginObligation(VerificationPurpose purpose, VerificationChannel channel) {
+    }
+
+    /** OTP login: the user was sent a one-time code (LOGIN_OTP) and presents it
+     * here. The code is matched against the stored, hashed value for the
+     * identifier; success issues the same session as password login. */
+    private OrgAuthResponse otpLogin(Organisation organisation, OrgLoginRequest request,
+                                     OrganisationClient client, String ipAddress, String userAgent, String hostname) {
+        if (request.otpCode() == null || request.otpCode().isBlank()) {
+            throw new BadRequestException("A one-time code is required for the OTP auth method");
+        }
+        if (!authConfigService.configOf(organisation).isOtpLoginEnabled()) {
+            throw new BadRequestException("OTP login is not enabled for this organisation");
+        }
+        String identifier = request.identifier().trim();
+        String code = request.otpCode().trim();
+
+        // The code was sent to the identifier on a specific channel; derive it
+        // from the declared identifier type so the storage lookup is unambiguous.
+        com.nexxserve.nexxauth.entity.VerificationChannel channel = channelForIdentifier(request.identifierType());
+        String normalized = normalizedIdentifier(channel, identifier);
+        var token = verificationTokenRepository.findActive(organisation.getId(),
+                        com.nexxserve.nexxauth.entity.VerificationPurpose.LOGIN_OTP,
+                        channel, normalized, java.time.Instant.now())
+                .orElseThrow(() -> {
+                    audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY, AuthAuditService.ORG_LOGIN_FAILURE,
+                            identifier, organisation.getSlug(), organisation.getId(), "otp_no_token");
+                    accountLockout.recordFailure(organisation.getId(), identifier);
+                    return new InvalidCredentialsException();
+                });
+
+        if (!java.security.MessageDigest.isEqual(
+                hashHex(code).getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                token.getTokenHash().getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
+            audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY, AuthAuditService.ORG_LOGIN_FAILURE,
+                    identifier, organisation.getSlug(), organisation.getId(), "otp_invalid");
+            accountLockout.recordFailure(organisation.getId(), identifier);
+            token.setAttempts(token.getAttempts() + 1);
+            if (token.getAttempts() >= verificationProperties.getMaxAttempts()) {
+                token.setConsumedAt(java.time.Instant.now());
+            }
+            throw new InvalidCredentialsException();
+        }
+        if (accountLockout.isLocked(organisation.getId(), identifier)) {
+            throw new InvalidCredentialsException();
+        }
+
+        token.setConsumedAt(java.time.Instant.now());
+        // The account was already resolved when the code was issued, so the
+        // token carries it. Fall back to a fresh lookup (identifier rules do
+        // not apply: the user proved ownership of the address by receiving it).
+        OrganisationUser user = token.getOrganisationUser();
+        if (user == null) {
+            user = findByIdentifier(organisation, identifier, null)
+                    .or(() -> userFieldService.findUserByLoginField(organisation, identifier))
+                    .orElseThrow(() -> {
+                        audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY, AuthAuditService.ORG_LOGIN_FAILURE,
+                                identifier, organisation.getSlug(), organisation.getId(), "otp_no_account");
+                        return new InvalidCredentialsException();
+                    });
+        }
+        if (!user.isEnabled()) {
+            audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY, AuthAuditService.ORG_LOGIN_FAILURE,
+                    identifier, organisation.getSlug(), organisation.getId(), "disabled");
+            throw new InvalidCredentialsException();
+        }
+        accountLockout.clearFailures(organisation.getId(), identifier);
+        audit.logPersisted(LogLevel.INFO, LogCategory.AUTH, AuthAuditService.ORG_LOGIN_SUCCESS, identifier,
+                organisation.getSlug(), organisation.getId(), "otp");
+        enforceRoleRestrictions(client, user);
+        return issueTokens(user, client, ipAddress, userAgent, hostname);
+    }
+
+    private com.nexxserve.nexxauth.entity.VerificationChannel channelForIdentifier(
+            com.nexxserve.nexxauth.entity.OrgIdentifierType identifierType) {
+        if (identifierType == com.nexxserve.nexxauth.entity.OrgIdentifierType.PHONE) {
+            return com.nexxserve.nexxauth.entity.VerificationChannel.SMS;
+        }
+        // EMAIL, USERNAME and auto-detection all route through the email channel:
+        // a login code travels to the address the user asked to have it sent to.
+        return com.nexxserve.nexxauth.entity.VerificationChannel.EMAIL;
+    }
+
+    private String normalizedIdentifier(com.nexxserve.nexxauth.entity.VerificationChannel channel, String identifier) {
+        return switch (channel) {
+            case EMAIL -> com.nexxserve.nexxauth.util.Emails.normalize(identifier);
+            case SMS -> com.nexxserve.nexxauth.util.Phones.normalize(identifier);
+        };
+    }
+
+    private String hashHex(String raw) {
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            return java.util.Base64.getEncoder().encodeToString(
+                    digest.digest(raw.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 unavailable", e);
+        }
     }
 
     private OrgAuthResponse passwordLogin(Organisation organisation, OrgLoginRequest request,
@@ -213,6 +399,15 @@ public class OrganisationAuthService {
         audit.logPersisted(LogLevel.INFO, LogCategory.AUTH, AuthAuditService.ORG_LOGIN_SUCCESS, identifier,
                 organisation.getSlug(), organisation.getId(), null);
         enforceRoleRestrictions(client, user);
+        // A login may not hand out tokens immediately: 2FA (every login) and
+        // an admin-set "verify at next login" force a server-sent challenge
+        // that must be solved on the challenge endpoint first.
+        var pending = firstPendingLoginObligation(authConfigService.configOf(organisation), user);
+        if (pending != null) {
+            LoginChallenge challenge = verificationService.startLoginChallenge(
+                    organisation, user, pending.purpose(), pending.channel());
+            return challengeResponse(user, challenge);
+        }
         return issueTokens(user, client, ipAddress, userAgent, hostname);
     }
 
@@ -227,7 +422,7 @@ public class OrganisationAuthService {
                                     String ipAddress, String userAgent, String hostname) {
         OrganisationUser resolved = refreshTokenService.resolveSubject(rawRefreshToken);
         if (orgUserActions.hasPendingGatingAction(resolved))
-            throw new RefreshTokenException("Pending action required: change password");
+            throw new RefreshTokenException("Pending action required");
         OrganisationClient client = refreshTokenService.clientOf(rawRefreshToken);
         // Carry forward the session id from the old token
         String existingSessionId = refreshTokenService.sessionIdOf(rawRefreshToken);

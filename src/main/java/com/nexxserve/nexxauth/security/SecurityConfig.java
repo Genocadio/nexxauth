@@ -56,6 +56,18 @@ public class SecurityConfig {
                         // Platforms live at their own clean root origin: /{slug}/auth/*
                         .requestMatchers("/*/auth/login", "/*/auth/register",
                                 "/*/auth/refresh", "/*/auth/logout").permitAll()
+                        // Login challenges (2FA / verify-at-next-login) are
+                        // started by the server after a password check and
+                        // completed on a public endpoint.
+                        .requestMatchers("/*/auth/challenges/verify").permitAll()
+                        // Public verification endpoints (OTP / magic link via
+                        // nexxbotify): an unauthenticated user must be able to
+                        // request, verify and consume a code or link.
+                        .requestMatchers("/*/auth/verifications/request",
+                                "/*/auth/verifications/verify").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                "/*/auth/verifications/complete").permitAll()
+                        .requestMatchers("/*/auth/password-reset/confirm").permitAll()
                         // Public slug suggestions for the register form (rate
                         // limited per IP); organisation suggestions enforce
                         // authentication in the service.

@@ -15,9 +15,22 @@ public record OrganisationUserResponse(
         String phone,
         boolean enabled,
         boolean temporaryPassword,
-        /** The user's enabled auth methods (only PASSWORD exists today; the
-         * list is the extension point for future modes such as OTP or SSO).
-         * Empty when the user has no auth configured and cannot log in. */
+        /** True once the user's email address has been verified (an org-required
+         * email verification was completed). False while unverified or no email
+         * is set. */
+        boolean emailVerified,
+        /** True once the user's phone number has been verified. False while
+         * unverified or no phone is set. */
+        boolean phoneVerified,
+        /** True while the user's next password login must verify their email
+         * before completing (admin-set). Cleared automatically once verified. */
+        boolean requireEmailVerificationAtNextLogin,
+        /** True while the user's next password login must verify their phone
+         * before completing (admin-set). Cleared automatically once verified. */
+        boolean requirePhoneVerificationAtNextLogin,
+        /** The user's enabled auth methods (PASSWORD and OTP exist today; the
+         * list is the extension point for future modes such as SSO). Empty when
+         * the user has no auth configured and cannot log in. */
         List<AuthType> authTypes,
         /** The names of the roles the user holds — never ids, and never
          * permissions (permissions are an internal concept, resolved

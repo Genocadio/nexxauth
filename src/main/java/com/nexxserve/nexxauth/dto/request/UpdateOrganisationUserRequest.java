@@ -47,6 +47,15 @@ public record UpdateOrganisationUserRequest(
          * sessions; when false, clears any pending forced change. */
         Boolean temporaryPassword,
 
+        /** When true, the user's next password login does not complete until
+         * their email is verified: a one-time code is sent and the login
+         * resumes on the challenge endpoint, stamping the email verified. */
+        Boolean requireEmailVerificationAtNextLogin,
+
+        /** When true, the user's next password login does not complete until
+         * their phone is verified (same challenge flow). */
+        Boolean requirePhoneVerificationAtNextLogin,
+
         /** Optional user-field values: partial, only the keys present are
          * touched. A null or blank value removes the field from the user;
          * values are validated against each field's type and login-enabled
