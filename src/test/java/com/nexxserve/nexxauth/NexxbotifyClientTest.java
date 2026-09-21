@@ -53,7 +53,11 @@ class NexxbotifyClientTest {
 
         when(restClient.post()).thenReturn(uriSpec);
         when(uriSpec.uri("/send")).thenReturn(bodySpec);
+        when(uriSpec.uri("/flows")).thenReturn(bodySpec);
+        when(uriSpec.uri(org.mockito.ArgumentMatchers.eq("/flows/{id}/channels"), any(Object[].class))).thenReturn(bodySpec);
         when(bodySpec.body(any(NexxbotifyClient.SendRequest.class))).thenReturn(bodySpec);
+        when(bodySpec.body(any(NexxbotifyClient.CreateFlowRequest.class))).thenReturn(bodySpec);
+        when(bodySpec.body(any(NexxbotifyClient.CreateChannelRequest.class))).thenReturn(bodySpec);
         when(bodySpec.retrieve()).thenReturn(responseSpec);
 
         NexxbotifyProperties properties = new NexxbotifyProperties();
@@ -144,5 +148,68 @@ class NexxbotifyClientTest {
         assertThat(sent.flow_id()).isEqualTo("otp_sms");
         assertThat(sent.variables()).isEqualTo(Map.of("code", "123456"));
         assertThat(sent.receivers()).containsExactly(Map.of("phone", "+15551234567"));
+    }
+
+    @Test
+    void ensureOrganisationFlowCreatesEmailAndSmsChannels() {
+        com.nexxserve.nexxauth.entity.Organisation org = new com.nexxserve.nexxauth.entity.Organisation();
+        org.setId(42L);
+        org.setName("Acme Healthcare");
+        org.setSlug("acme");
+
+        client.ensureOrganisationFlow(org, true);
+
+        ArgumentCaptor<NexxbotifyClient.CreateFlowRequest> captor =
+                ArgumentCaptor.forClass(NexxbotifyClient.CreateFlowRequest.class);
+        verify(bodySpec).body(captor.capture());
+        NexxbotifyClient.CreateFlowRequest created = captor.getValue();
+
+        assertThat(created.id()).isEqualTo("org_42_auth");
+        assertThat(created.name()).isEqualTo("Acme Healthcare Auth");
+        assertThat(created.channels()).hasSize(2);
+        assertThat(created.channels().stream().map(NexxbotifyClient.CreateChannelRequest::channel))
+                .containsExactly("email", "sms");
+    }
+
+    @Test
+    void ensureOrganisationFlowCreatesEmailOnlyWhenSmsFalse() {
+        com.nexxserve.nexxauth.entity.Organisation org = new com.nexxserve.nexxauth.entity.Organisation();
+        org.setId(7L);
+        org.setName("Beta Clinic");
+        org.setSlug("beta");
+
+        client.ensureOrganisationFlow(org, false);
+
+        ArgumentCaptor<NexxbotifyClient.CreateFlowRequest> captor =
+                ArgumentCaptor.forClass(NexxbotifyClient.CreateFlowRequest.class);
+        verify(bodySpec).body(captor.capture());
+        NexxbotifyClient.CreateFlowRequest created = captor.getValue();
+
+        assertThat(created.id()).isEqualTo("org_7_auth");
+        assertThat(created.channels()).hasSize(1);
+        assertThat(created.channels().get(0).channel()).isEqualTo("email");
+    }
+
+    @Test
+    void sendForOrganisationUsesDedicatedFlowId() {
+        respond(new NexxbotifyClient.SendResponse("ntf_6", "completed",
+                List.of(sent("user@example.com", "email"))));
+
+        com.nexxserve.nexxauth.entity.Organisation org = new com.nexxserve.nexxauth.entity.Organisation();
+        org.setId(99L);
+        org.setName("Delta Org");
+        org.setSlug("delta");
+
+        client.sendForOrganisation(org, VerificationDelivery.OTP, VerificationChannel.EMAIL,
+                "user@example.com", Map.of("code", "654321"));
+
+        ArgumentCaptor<NexxbotifyClient.SendRequest> captor =
+                ArgumentCaptor.forClass(NexxbotifyClient.SendRequest.class);
+        verify(bodySpec).body(captor.capture());
+        NexxbotifyClient.SendRequest sent = captor.getValue();
+
+        assertThat(sent.flow_id()).isEqualTo("org_99_auth");
+        assertThat(sent.variables()).isEqualTo(Map.of("code", "654321"));
+        assertThat(sent.receivers()).containsExactly(Map.of("email", "user@example.com"));
     }
 }

@@ -587,7 +587,7 @@ public class OrganisationVerificationService {
             case LINK -> Map.of("link", buildLink(organisation, value));
         };
         try {
-            nexxbotifyClient.send(delivery, channel, identifier, variables);
+            nexxbotifyClient.sendForOrganisation(organisation, delivery, channel, identifier, variables);
         } catch (IllegalStateException e) {
             throw new ServiceUnavailableException(e.getMessage());
         }

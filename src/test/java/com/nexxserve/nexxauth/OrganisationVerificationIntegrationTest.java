@@ -320,7 +320,7 @@ class OrganisationVerificationIntegrationTest {
     @SuppressWarnings("unchecked")
     private String capturedCode() {
         ArgumentCaptor<Map<String, Object>> variables = ArgumentCaptor.forClass(Map.class);
-        verify(nexxbotifyClient).send(org.mockito.ArgumentMatchers.eq(VerificationDelivery.OTP),
+        verify(nexxbotifyClient).sendForOrganisation(any(), org.mockito.ArgumentMatchers.eq(VerificationDelivery.OTP),
                 org.mockito.ArgumentMatchers.any(VerificationChannel.class),
                 org.mockito.ArgumentMatchers.anyString(), variables.capture());
         return (String) variables.getValue().get("code");
@@ -329,7 +329,7 @@ class OrganisationVerificationIntegrationTest {
     @SuppressWarnings("unchecked")
     private String capturedLink() {
         ArgumentCaptor<Map<String, Object>> variables = ArgumentCaptor.forClass(Map.class);
-        verify(nexxbotifyClient).send(org.mockito.ArgumentMatchers.eq(VerificationDelivery.LINK),
+        verify(nexxbotifyClient).sendForOrganisation(any(), org.mockito.ArgumentMatchers.eq(VerificationDelivery.LINK),
                 org.mockito.ArgumentMatchers.any(VerificationChannel.class),
                 org.mockito.ArgumentMatchers.anyString(), variables.capture());
         return (String) variables.getValue().get("link");

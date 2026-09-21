@@ -33,16 +33,19 @@ public class OrganisationService {
     private final OrganisationAccess organisationAccess;
     private final OrganisationMapper organisationMapper;
     private final OrgKeyService orgKeyService;
+    private final NexxbotifyClient nexxbotifyClient;
     private final AuthAuditService audit;
 
     public OrganisationService(OrganisationRepository organisationRepository, PlatformAccess platformAccess,
                                OrganisationAccess organisationAccess, OrganisationMapper organisationMapper,
-                               OrgKeyService orgKeyService, AuthAuditService audit) {
+                               OrgKeyService orgKeyService, NexxbotifyClient nexxbotifyClient,
+                               AuthAuditService audit) {
         this.organisationRepository = organisationRepository;
         this.platformAccess = platformAccess;
         this.organisationAccess = organisationAccess;
         this.organisationMapper = organisationMapper;
         this.orgKeyService = orgKeyService;
+        this.nexxbotifyClient = nexxbotifyClient;
         this.audit = audit;
     }
 
@@ -92,6 +95,7 @@ public class OrganisationService {
         organisation.setSlug(slug);
         Organisation saved = organisationRepository.save(organisation);
         orgKeyService.activeKey(saved);
+        nexxbotifyClient.ensureOrganisationFlow(saved, saved.isPhoneCanLogin());
         audit.logPersisted(LogLevel.INFO, LogCategory.ORG_MANAGEMENT, AuthAuditService.ORG_CREATED, null,
                 saved.getSlug(), saved.getId(), saved.getName());
         return organisationMapper.toResponse(saved);
@@ -147,6 +151,9 @@ public class OrganisationService {
             organisation.setSlug(request.slug());
         }
         Organisation saved = organisationRepository.save(organisation);
+        if (request.phoneCanLogin() != null || request.name() != null) {
+            nexxbotifyClient.ensureOrganisationFlow(saved, saved.isPhoneCanLogin());
+        }
         audit.logPersisted(LogLevel.INFO, LogCategory.ORG_MANAGEMENT, AuthAuditService.ORG_UPDATED, null,
                 saved.getSlug(), saved.getId(), null);
         return organisationMapper.toResponse(saved);

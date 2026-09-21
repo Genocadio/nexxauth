@@ -18,6 +18,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.util.Map;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -348,7 +349,7 @@ class OrganisationLoginChallengeIntegrationTest {
     @SuppressWarnings("unchecked")
     private String capturedCode() {
         ArgumentCaptor<Map<String, Object>> variables = ArgumentCaptor.forClass(Map.class);
-        verify(nexxbotifyClient).send(org.mockito.ArgumentMatchers.eq(VerificationDelivery.OTP),
+        verify(nexxbotifyClient).sendForOrganisation(any(), org.mockito.ArgumentMatchers.eq(VerificationDelivery.OTP),
                 org.mockito.ArgumentMatchers.any(VerificationChannel.class),
                 org.mockito.ArgumentMatchers.anyString(), variables.capture());
         return (String) variables.getValue().get("code");
@@ -357,7 +358,7 @@ class OrganisationLoginChallengeIntegrationTest {
     @SuppressWarnings("unchecked")
     private String capturedLink() {
         ArgumentCaptor<Map<String, Object>> variables = ArgumentCaptor.forClass(Map.class);
-        verify(nexxbotifyClient).send(org.mockito.ArgumentMatchers.eq(VerificationDelivery.LINK),
+        verify(nexxbotifyClient).sendForOrganisation(any(), org.mockito.ArgumentMatchers.eq(VerificationDelivery.LINK),
                 org.mockito.ArgumentMatchers.any(VerificationChannel.class),
                 org.mockito.ArgumentMatchers.anyString(), variables.capture());
         return (String) variables.getValue().get("link");
