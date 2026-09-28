@@ -1,5 +1,6 @@
 package com.nexxserve.nexxauth.dto.request;
 
+import com.nexxserve.nexxauth.entity.OrgIdentifierType;
 import com.nexxserve.nexxauth.entity.VerificationChannel;
 import com.nexxserve.nexxauth.entity.VerificationDelivery;
 import com.nexxserve.nexxauth.entity.VerificationPurpose;
@@ -24,10 +25,13 @@ public record VerificationRequest(
         @Size(max = 255, message = "Identifier must be at most 255 characters")
         String identifier,
 
-        @NotNull(message = "Channel is required")
+        /** Explicit identifier type (EMAIL, PHONE, USERNAME); optional. */
+        OrgIdentifierType identifierType,
+
+        /** Channel (EMAIL or SMS); auto-detected from identifier or identifierType when omitted. */
         VerificationChannel channel,
 
-        @NotNull(message = "Purpose is required")
+        /** Purpose of the verification; defaults to LOGIN_OTP when omitted. */
         VerificationPurpose purpose,
 
         /** OTP (a code typed back in) or LINK (a magic link). Defaults to the
@@ -41,4 +45,9 @@ public record VerificationRequest(
          *  supplied. */
         Long organisationId
 ) {
+    public VerificationRequest(String identifier, VerificationChannel channel,
+                               VerificationPurpose purpose, VerificationDelivery delivery,
+                               Long organisationId) {
+        this(identifier, null, channel, purpose, delivery, organisationId);
+    }
 }

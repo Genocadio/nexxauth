@@ -1,9 +1,10 @@
-import { del, get, patch, post } from "@/lib/api-client";
+import { del, get, patch, post, put } from "@/lib/api-client";
 import { endpoints } from "@/lib/endpoints";
 import type {
   OrganisationAuthConfigResponse,
   OrganisationClientResponse,
   OrganisationKeyResponse,
+  OrganisationNotificationTemplates,
   OrganisationResponse,
   OrganisationRoleResponse,
   OrganisationSessionSettingsResponse,
@@ -23,6 +24,7 @@ import type {
   UpdateOrganisationRequest,
   UpdateOrganisationRoleRequest,
   UpdateOrganisationSessionSettingsRequest,
+  UpdateOrganisationTemplatesRequest,
   UpdateOrganisationUserFieldRequest,
   UpdateOrganisationUserRequest,
 } from "@/types/requests";
@@ -99,6 +101,21 @@ export const organisationsApi = {
   updateAuthConfig: (platformSlug: string, organisationId: number, body: UpdateOrganisationAuthConfigRequest) =>
     patch<OrganisationAuthConfigResponse>(
       endpoints.organisations(platformSlug).authConfig(organisationId),
+      body,
+      "platform",
+    ),
+  notificationTemplates: (platformSlug: string, organisationId: number) =>
+    get<OrganisationNotificationTemplates>(
+      endpoints.organisations(platformSlug).notificationTemplates(organisationId),
+      "platform",
+    ),
+  updateNotificationTemplates: (
+    platformSlug: string,
+    organisationId: number,
+    body: UpdateOrganisationTemplatesRequest,
+  ) =>
+    put<OrganisationNotificationTemplates>(
+      endpoints.organisations(platformSlug).notificationTemplates(organisationId),
       body,
       "platform",
     ),

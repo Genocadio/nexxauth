@@ -41,20 +41,20 @@ class AccountLockoutIntegrationTest {
             mockMvc.perform(post(orgAuth + "/login")
                             .header("X-Client-Id", clientKey)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(json(Map.of("identifier", "lockable", "password", "wrong" + i))))
+                            .content(json(Map.of("identifier", "lockable", "identifierType", "USERNAME", "password", "wrong" + i))))
                     .andExpect(status().isUnauthorized());
         }
 
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("identifier", "lockable", "password", "wrong9"))))
+                        .content(json(Map.of("identifier", "lockable", "identifierType", "USERNAME", "password", "wrong9"))))
                 .andExpect(status().isUnauthorized());
 
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("identifier", "lockable", "password", "correctpass1"))))
+                        .content(json(Map.of("identifier", "lockable", "identifierType", "USERNAME", "password", "correctpass1"))))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -73,34 +73,34 @@ class AccountLockoutIntegrationTest {
             mockMvc.perform(post(orgAuth + "/login")
                             .header("X-Client-Id", clientKey)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(json(Map.of("identifier", "recoverable", "password", "bad" + i))))
+                            .content(json(Map.of("identifier", "recoverable", "identifierType", "USERNAME", "password", "bad" + i))))
                     .andExpect(status().isUnauthorized());
         }
 
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("identifier", "recoverable", "password", "goodpass12"))))
+                        .content(json(Map.of("identifier", "recoverable", "identifierType", "USERNAME", "password", "goodpass12"))))
                 .andExpect(status().isOk());
 
         for (int i = 0; i < 9; i++) {
             mockMvc.perform(post(orgAuth + "/login")
                             .header("X-Client-Id", clientKey)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(json(Map.of("identifier", "recoverable", "password", "bad2_" + i))))
+                            .content(json(Map.of("identifier", "recoverable", "identifierType", "USERNAME", "password", "bad2_" + i))))
                     .andExpect(status().isUnauthorized());
         }
 
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("identifier", "recoverable", "password", "bad2_9"))))
+                        .content(json(Map.of("identifier", "recoverable", "identifierType", "USERNAME", "password", "bad2_9"))))
                 .andExpect(status().isUnauthorized());
 
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("identifier", "recoverable", "password", "goodpass12"))))
+                        .content(json(Map.of("identifier", "recoverable", "identifierType", "USERNAME", "password", "goodpass12"))))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -120,20 +120,20 @@ class AccountLockoutIntegrationTest {
             mockMvc.perform(post(orgAuth + "/login")
                             .header("X-Client-Id", clientKey)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(json(Map.of("identifier", "user_a", "password", "wrong" + i))))
+                            .content(json(Map.of("identifier", "user_a", "identifierType", "USERNAME", "password", "wrong" + i))))
                     .andExpect(status().isUnauthorized());
         }
 
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("identifier", "user_a", "password", "pass_a1234"))))
+                        .content(json(Map.of("identifier", "user_a", "identifierType", "USERNAME", "password", "pass_a1234"))))
                 .andExpect(status().isUnauthorized());
 
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("identifier", "user_b", "password", "pass_b1234"))))
+                        .content(json(Map.of("identifier", "user_b", "identifierType", "USERNAME", "password", "pass_b1234"))))
                 .andExpect(status().isOk());
     }
 

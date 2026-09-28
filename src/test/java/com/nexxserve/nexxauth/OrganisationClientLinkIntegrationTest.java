@@ -179,7 +179,7 @@ class OrganisationClientLinkIntegrationTest {
                 mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", webKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "testuser",
+                        .content(json(Map.of("organisationId", orgId, "identifier", "testuser", "identifierType", "USERNAME",
                                 "password", "password1"))))
                         .andExpect(status().isOk())
                         .andReturn().getResponse().getContentAsString()

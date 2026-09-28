@@ -11,17 +11,20 @@ public record OrganisationUserResponse(
         String firstName,
         String lastName,
         String username,
+        /** Primary email address (for backwards compatibility and quick access). */
         String email,
+        /** Primary phone number (for backwards compatibility and quick access). */
         String phone,
         boolean enabled,
         boolean temporaryPassword,
-        /** True once the user's email address has been verified (an org-required
-         * email verification was completed). False while unverified or no email
-         * is set. */
+        /** True if primary email is verified. */
         boolean emailVerified,
-        /** True once the user's phone number has been verified. False while
-         * unverified or no phone is set. */
+        /** True if primary phone is verified. */
         boolean phoneVerified,
+        /** Complete list of email addresses associated with this user. */
+        List<OrganisationUserEmailResponse> emails,
+        /** Complete list of phone numbers associated with this user. */
+        List<OrganisationUserPhoneResponse> phones,
         /** True while the user's next password login must verify their email
          * before completing (admin-set). Cleared automatically once verified. */
         boolean requireEmailVerificationAtNextLogin,

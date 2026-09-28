@@ -124,7 +124,7 @@ class HardeningIntegrationTest {
         mockMvc.perform(patch("/" + SLUGS[1] + "/organisations/" + enumOrgId + "/auth-config")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"authType\":\"OTP\"}"))
+                        .content("{\"authType\":\"INVALID_METHOD\"}"))
                 .andExpect(status().isBadRequest());
         // invalid role enum on platform user update
         mockMvc.perform(patch("/users/1")

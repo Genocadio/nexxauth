@@ -94,6 +94,15 @@ export function useOrgAuthConfig(organisationId: number) {
   });
 }
 
+export function useOrgNotificationTemplates(organisationId: number) {
+  const platformSlug = usePlatformSlug();
+  return useQuery({
+    queryKey: queryKeys.orgNotificationTemplates(organisationId),
+    queryFn: () => organisationsApi.notificationTemplates(platformSlug!, organisationId),
+    enabled: !!platformSlug && !!organisationId,
+  });
+}
+
 export function useOrgSessionSettings(organisationId: number) {
   const platformSlug = usePlatformSlug();
   return useQuery({

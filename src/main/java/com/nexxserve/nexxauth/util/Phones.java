@@ -16,4 +16,10 @@ public final class Phones {
         }
         return phone.trim().replaceAll("[\\s\\-().]", "");
     }
+
+    public static boolean looksLikePhone(String value) {
+        if (value == null) return false;
+        String trimmed = value.trim();
+        return trimmed.startsWith("+") || (trimmed.length() >= 7 && trimmed.replaceAll("[\\s\\-().0-9+]", "").isEmpty());
+    }
 }

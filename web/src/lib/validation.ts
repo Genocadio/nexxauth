@@ -160,17 +160,32 @@ export const roleSchema = z.object({
 
 export const authConfigSchema = z
   .object({
-    authType: z.enum(["PASSWORD"]),
+    authType: z.enum(["PASSWORD", "OTP", "PASSWORDLESS", "VERIFY"]),
     passwordEnabled: z.boolean(),
     passwordMinLength: z.number().int().min(1).max(72),
     passwordMaxLength: z.number().int().min(1).max(72),
     passwordExpirationDays: z.number().int().min(0).max(3650),
     passwordHistoryCount: z.number().int().min(0).max(50),
+    emailVerificationEnabled: z.boolean().optional(),
+    phoneVerificationEnabled: z.boolean().optional(),
+    passwordResetEnabled: z.boolean().optional(),
+    otpLoginEnabled: z.boolean().optional(),
+    twoFactorEnabled: z.boolean().optional(),
+    verificationMode: z.enum(["OTP", "LINK"]).optional(),
+    requireEmailVerificationOnRegister: z.boolean().optional(),
+    requirePhoneVerificationOnRegister: z.boolean().optional(),
   })
   .refine((v) => v.passwordMinLength <= v.passwordMaxLength, {
     message: "Minimum length cannot exceed maximum length",
     path: ["passwordMinLength"],
   });
+
+export const notificationTemplatesSchema = z.object({
+  emailSubject: z.string().trim().max(255, "Subject must be at most 255 characters").optional(),
+  emailBody: z.string().trim().max(4000, "Email body must be at most 4000 characters").optional(),
+  emailHtml: z.string().trim().max(20000, "Email HTML must be at most 20000 characters").optional(),
+  smsBody: z.string().trim().max(1600, "SMS body must be at most 1600 characters").optional(),
+});
 
 export const sessionSettingsSchema = z
   .object({

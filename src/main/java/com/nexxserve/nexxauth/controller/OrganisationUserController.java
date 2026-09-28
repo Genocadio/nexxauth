@@ -1,11 +1,14 @@
 package com.nexxserve.nexxauth.controller;
 
+import com.nexxserve.nexxauth.dto.request.AddUserEmailRequest;
+import com.nexxserve.nexxauth.dto.request.AddUserPhoneRequest;
 import com.nexxserve.nexxauth.dto.request.ChangePasswordRequest;
 import com.nexxserve.nexxauth.dto.request.CreateOrganisationUserRequest;
 import com.nexxserve.nexxauth.dto.request.UpdateOrganisationUserRequest;
 import com.nexxserve.nexxauth.dto.request.UpdateOwnProfileRequest;
 import com.nexxserve.nexxauth.dto.response.OrganisationUserResponse;
 import com.nexxserve.nexxauth.security.OrgActor;
+import com.nexxserve.nexxauth.security.OrgUserPrincipal;
 import com.nexxserve.nexxauth.service.OrganisationUserService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -17,6 +20,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -118,5 +122,127 @@ public class OrganisationUserController {
                                        @AuthenticationPrincipal OrgActor requester) {
         userService.delete(slug, organisationId, userId, requester);
         return ResponseEntity.noContent().build();
+    }
+
+    // -------------------------------------------------------------------------
+    // User Email Management (Self-Service & Admin)
+    // -------------------------------------------------------------------------
+
+    @PostMapping("/me/emails")
+    public OrganisationUserResponse addOwnEmail(@PathVariable String slug,
+                                                @PathVariable Long organisationId,
+                                                @AuthenticationPrincipal OrgActor requester,
+                                                @Valid @RequestBody AddUserEmailRequest request) {
+        Long userId = ((OrgUserPrincipal) requester).id();
+        return userService.addEmail(slug, organisationId, userId, requester, request);
+    }
+
+    @DeleteMapping("/me/emails/{emailId}")
+    public OrganisationUserResponse deleteOwnEmail(@PathVariable String slug,
+                                                   @PathVariable Long organisationId,
+                                                   @PathVariable Long emailId,
+                                                   @AuthenticationPrincipal OrgActor requester) {
+        Long userId = ((OrgUserPrincipal) requester).id();
+        return userService.deleteEmail(slug, organisationId, userId, emailId, requester);
+    }
+
+    @PutMapping("/me/emails/{emailId}/primary")
+    public OrganisationUserResponse setOwnPrimaryEmail(@PathVariable String slug,
+                                                       @PathVariable Long organisationId,
+                                                       @PathVariable Long emailId,
+                                                       @AuthenticationPrincipal OrgActor requester) {
+        Long userId = ((OrgUserPrincipal) requester).id();
+        return userService.setPrimaryEmail(slug, organisationId, userId, emailId, requester);
+    }
+
+    @PostMapping("/{userId}/emails")
+    @PreAuthorize("hasRole('SUPER_USER') or hasAuthority('PERM_ORGANISATION_USER_UPDATE')")
+    public OrganisationUserResponse addEmail(@PathVariable String slug,
+                                             @PathVariable Long organisationId,
+                                             @PathVariable Long userId,
+                                             @AuthenticationPrincipal OrgActor requester,
+                                             @Valid @RequestBody AddUserEmailRequest request) {
+        return userService.addEmail(slug, organisationId, userId, requester, request);
+    }
+
+    @DeleteMapping("/{userId}/emails/{emailId}")
+    @PreAuthorize("hasRole('SUPER_USER') or hasAuthority('PERM_ORGANISATION_USER_UPDATE')")
+    public OrganisationUserResponse deleteEmail(@PathVariable String slug,
+                                                @PathVariable Long organisationId,
+                                                @PathVariable Long userId,
+                                                @PathVariable Long emailId,
+                                                @AuthenticationPrincipal OrgActor requester) {
+        return userService.deleteEmail(slug, organisationId, userId, emailId, requester);
+    }
+
+    @PutMapping("/{userId}/emails/{emailId}/primary")
+    @PreAuthorize("hasRole('SUPER_USER') or hasAuthority('PERM_ORGANISATION_USER_UPDATE')")
+    public OrganisationUserResponse setPrimaryEmail(@PathVariable String slug,
+                                                    @PathVariable Long organisationId,
+                                                    @PathVariable Long userId,
+                                                    @PathVariable Long emailId,
+                                                    @AuthenticationPrincipal OrgActor requester) {
+        return userService.setPrimaryEmail(slug, organisationId, userId, emailId, requester);
+    }
+
+    // -------------------------------------------------------------------------
+    // User Phone Management (Self-Service & Admin)
+    // -------------------------------------------------------------------------
+
+    @PostMapping("/me/phones")
+    public OrganisationUserResponse addOwnPhone(@PathVariable String slug,
+                                                @PathVariable Long organisationId,
+                                                @AuthenticationPrincipal OrgActor requester,
+                                                @Valid @RequestBody AddUserPhoneRequest request) {
+        Long userId = ((OrgUserPrincipal) requester).id();
+        return userService.addPhone(slug, organisationId, userId, requester, request);
+    }
+
+    @DeleteMapping("/me/phones/{phoneId}")
+    public OrganisationUserResponse deleteOwnPhone(@PathVariable String slug,
+                                                   @PathVariable Long organisationId,
+                                                   @PathVariable Long phoneId,
+                                                   @AuthenticationPrincipal OrgActor requester) {
+        Long userId = ((OrgUserPrincipal) requester).id();
+        return userService.deletePhone(slug, organisationId, userId, phoneId, requester);
+    }
+
+    @PutMapping("/me/phones/{phoneId}/primary")
+    public OrganisationUserResponse setOwnPrimaryPhone(@PathVariable String slug,
+                                                       @PathVariable Long organisationId,
+                                                       @PathVariable Long phoneId,
+                                                       @AuthenticationPrincipal OrgActor requester) {
+        Long userId = ((OrgUserPrincipal) requester).id();
+        return userService.setPrimaryPhone(slug, organisationId, userId, phoneId, requester);
+    }
+
+    @PostMapping("/{userId}/phones")
+    @PreAuthorize("hasRole('SUPER_USER') or hasAuthority('PERM_ORGANISATION_USER_UPDATE')")
+    public OrganisationUserResponse addPhone(@PathVariable String slug,
+                                             @PathVariable Long organisationId,
+                                             @PathVariable Long userId,
+                                             @AuthenticationPrincipal OrgActor requester,
+                                             @Valid @RequestBody AddUserPhoneRequest request) {
+        return userService.addPhone(slug, organisationId, userId, requester, request);
+    }
+
+    @DeleteMapping("/{userId}/phones/{phoneId}")
+    @PreAuthorize("hasRole('SUPER_USER') or hasAuthority('PERM_ORGANISATION_USER_UPDATE')")
+    public OrganisationUserResponse deletePhone(@PathVariable String slug,
+                                                @PathVariable Long organisationId,
+                                                @PathVariable Long userId,
+                                                @PathVariable Long phoneId,
+                                                @AuthenticationPrincipal OrgActor requester) {
+        return userService.deletePhone(slug, organisationId, userId, phoneId, requester);
+    }
+
+    @PutMapping("/{userId}/phones/{phoneId}/primary")
+    @PreAuthorize("hasRole('SUPER_USER') or hasAuthority('PERM_ORGANISATION_USER_UPDATE')")
+    public OrganisationUserResponse setPrimaryPhone(@PathVariable String slug,
+                                                    @PathVariable Long organisationId,
+                                                    @PathVariable Long userId,
+                                                    @PathVariable Long phoneId,
+                                                    @AuthenticationPrincipal OrgActor requester) {
+        return userService.setPrimaryPhone(slug, organisationId, userId, phoneId, requester);
     }
 }

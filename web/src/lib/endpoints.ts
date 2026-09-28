@@ -38,6 +38,8 @@ export const endpoints = {
       `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/roles/${roleId}`,
     authConfig: (organisationId: number) =>
       `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/auth-config`,
+    notificationTemplates: (organisationId: number) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/notification-templates`,
     sessionSettings: (organisationId: number) =>
       `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/session-settings`,
     userFields: (organisationId: number) =>

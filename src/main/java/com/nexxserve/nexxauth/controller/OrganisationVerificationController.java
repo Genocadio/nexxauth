@@ -29,6 +29,7 @@ import java.util.Map;
 public class OrganisationVerificationController {
 
     static final String CLIENT_ID_HEADER = "X-Client-Id";
+    static final String AUTH_HEADER = "Authorization";
 
     private final OrganisationVerificationService verificationService;
 
@@ -49,8 +50,9 @@ public class OrganisationVerificationController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void verify(@PathVariable String slug,
                        @RequestHeader(value = CLIENT_ID_HEADER, required = false) String clientId,
+                       @RequestHeader(value = AUTH_HEADER, required = false) String authHeader,
                        @Valid @RequestBody VerificationVerifyRequest request) {
-        verificationService.verifyOtp(slug, request, clientId);
+        verificationService.verifyOtp(slug, request, clientId, authHeader);
     }
 
     /** Opens a magic link for email or phone verification. */
@@ -66,7 +68,8 @@ public class OrganisationVerificationController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void confirmPasswordReset(@PathVariable String slug,
                                      @RequestHeader(value = CLIENT_ID_HEADER, required = false) String clientId,
+                                     @RequestHeader(value = AUTH_HEADER, required = false) String authHeader,
                                      @Valid @RequestBody PasswordResetConfirmRequest request) {
-        verificationService.confirmPasswordReset(slug, request, clientId);
+        verificationService.confirmPasswordReset(slug, request, clientId, authHeader);
     }
 }

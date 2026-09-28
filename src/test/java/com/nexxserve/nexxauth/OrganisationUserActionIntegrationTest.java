@@ -63,7 +63,7 @@ class OrganisationUserActionIntegrationTest {
         MvcResult login = mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "tempuser", "password", "temp-pass1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "tempuser", "identifierType", "USERNAME", "password", "temp-pass1"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.actions.length()").value(1))
                 .andExpect(jsonPath("$.actions[0]").value("CHANGE_PASSWORD"))
@@ -90,7 +90,7 @@ class OrganisationUserActionIntegrationTest {
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "tempuser", "password", "new-pass-123"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "tempuser", "identifierType", "USERNAME", "password", "new-pass-123"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.actions.length()").value(0))
                 .andExpect(jsonPath("$.refreshToken").exists())
@@ -119,7 +119,7 @@ class OrganisationUserActionIntegrationTest {
         MvcResult login = mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "tempuser2", "password", "temp-pass1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "tempuser2", "identifierType", "USERNAME", "password", "temp-pass1"))))
                 .andExpect(status().isOk())
                 .andReturn();
         String gatedToken = objectMapper.readTree(login.getResponse().getContentAsString())
@@ -135,7 +135,7 @@ class OrganisationUserActionIntegrationTest {
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "tempuser2", "password", "temp-pass1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "tempuser2", "identifierType", "USERNAME", "password", "temp-pass1"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.actions[0]").value("CHANGE_PASSWORD"))
                 .andExpect(jsonPath("$.refreshToken").doesNotExist());
@@ -155,7 +155,7 @@ class OrganisationUserActionIntegrationTest {
         MvcResult login = mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "forced", "password", "org-pass-1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "forced", "identifierType", "USERNAME", "password", "org-pass-1"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.actions.length()").value(0))
                 .andReturn();
@@ -180,7 +180,7 @@ class OrganisationUserActionIntegrationTest {
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "forced", "password", "org-pass-1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "forced", "identifierType", "USERNAME", "password", "org-pass-1"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.actions[0]").value("CHANGE_PASSWORD"))
                 .andExpect(jsonPath("$.refreshToken").doesNotExist());
@@ -222,7 +222,7 @@ class OrganisationUserActionIntegrationTest {
         MvcResult login = mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "profuser", "password", "org-pass-1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "profuser", "identifierType", "USERNAME", "password", "org-pass-1"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.actions.length()").value(1))
                 .andExpect(jsonPath("$.actions[0]").value("UPDATE_PROFILE"))
@@ -248,7 +248,7 @@ class OrganisationUserActionIntegrationTest {
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "profuser", "password", "org-pass-1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "profuser", "identifierType", "USERNAME", "password", "org-pass-1"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.actions.length()").value(0));
     }

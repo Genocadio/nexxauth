@@ -12,6 +12,8 @@ export const queryKeys = {
   orgUsers: (organisationId: number) => [...queryKeys.organisation(organisationId), "users"] as const,
   orgRoles: (organisationId: number) => [...queryKeys.organisation(organisationId), "roles"] as const,
   orgAuthConfig: (organisationId: number) => [...queryKeys.organisation(organisationId), "auth-config"] as const,
+  orgNotificationTemplates: (organisationId: number) =>
+    [...queryKeys.organisation(organisationId), "notification-templates"] as const,
   orgSessionSettings: (organisationId: number) =>
     [...queryKeys.organisation(organisationId), "session-settings"] as const,
   orgUserFields: (organisationId: number) => [...queryKeys.organisation(organisationId), "user-fields"] as const,

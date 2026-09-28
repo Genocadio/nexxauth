@@ -150,7 +150,7 @@ class OrganisationVerificationIntegrationTest {
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "linkuser",
+                        .content(json(Map.of("organisationId", orgId, "identifier", "linkuser", "identifierType", "USERNAME",
                                 "password", "passw0rd1"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.user.phoneVerified").value(true))
@@ -176,36 +176,53 @@ class OrganisationVerificationIntegrationTest {
                                 "firstName", "R", "lastName", "S"))))
                 .andExpect(status().isCreated());
 
-        // request a reset OTP to the email
-        mockMvc.perform(post(orgAuth + "/verifications/request")
+        // request a reset OTP to the email - returns action token
+        MvcResult req = mockMvc.perform(post(orgAuth + "/verifications/request")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "organisationId", orgId, "identifier", "reset@example.com",
                                 "channel", "EMAIL", "purpose", "PASSWORD_RESET", "delivery", "OTP"))))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.expiresInSeconds").isNumber())
+                .andReturn();
 
+        String actionToken = objectMapper.readTree(req.getResponse().getContentAsString()).get("accessToken").asText();
         String code = capturedCode();
-        // confirm the reset with a new password
+
+        // confirming with a mismatched identifier on the action token fails
         mockMvc.perform(post(orgAuth + "/password-reset/confirm")
                         .header("X-Client-Id", clientKey)
+                        .header("Authorization", "Bearer " + actionToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
-                                "organisationId", orgId, "identifier", "reset@example.com",
+                                "organisationId", orgId, "identifier", "different@example.com",
                                 "channel", "EMAIL", "token", code, "newPassword", "newpass456"))))
+                .andExpect(status().isBadRequest());
+
+        // confirm the reset using the action token (identifier and channel inferred from token)
+        mockMvc.perform(post(orgAuth + "/password-reset/confirm")
+                        .header("X-Client-Id", clientKey)
+                        .header("Authorization", "Bearer " + actionToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "organisationId", orgId,
+                                "token", code, "newPassword", "newpass456"))))
                 .andExpect(status().isNoContent());
 
         // old password no longer works, new one does
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "resetuser",
+                        .content(json(Map.of("organisationId", orgId, "identifier", "resetuser", "identifierType", "USERNAME",
                                 "password", "oldpass123"))))
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "resetuser",
+                        .content(json(Map.of("organisationId", orgId, "identifier", "resetuser", "identifierType", "USERNAME",
                                 "password", "newpass456"))))
                 .andExpect(status().isOk());
     }

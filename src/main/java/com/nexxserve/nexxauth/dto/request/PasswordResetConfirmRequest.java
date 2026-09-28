@@ -2,7 +2,6 @@ package com.nexxserve.nexxauth.dto.request;
 
 import com.nexxserve.nexxauth.entity.VerificationChannel;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 /**
@@ -12,6 +11,9 @@ import jakarta.validation.constraints.Size;
  * identifier — the identical flow when the org delivers resets by link or by
  * OTP.
  * <p>
+ * {@code identifier} and {@code channel} are optional if passed via
+ * {@code Authorization: Bearer <action_token>}.
+ * <p>
  * <b>External clients must never send {@code organisationId}.</b> The
  * organisation is resolved automatically from the {@code X-Client-Id} header.
  * The {@code organisationId} field is an internal detail used only by the
@@ -19,11 +21,9 @@ import jakarta.validation.constraints.Size;
  */
 public record PasswordResetConfirmRequest(
 
-        @NotBlank(message = "Identifier is required")
         @Size(max = 255, message = "Identifier must be at most 255 characters")
         String identifier,
 
-        @NotNull(message = "Channel is required")
         VerificationChannel channel,
 
         /** The numeric OTP or the opaque magic-link token. */

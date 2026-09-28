@@ -2,39 +2,21 @@ package com.nexxserve.nexxauth.service;
 
 import com.nexxserve.nexxauth.entity.VerificationChannel;
 import com.nexxserve.nexxauth.entity.VerificationDelivery;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Thin HTTP client for the nexxbotify (notification) service. Sends a delivery
- * (OTP code or magic link) to an email address or phone number by calling
- * {@code POST /send} with the flow configured in {@link NexxbotifyProperties}.
- * <p>
- * nexxbotify resolves the channel from the receiver object: a receiver carrying
- * an {@code email} is delivered over the email channel, one carrying a
- * {@code phone} over the SMS channel. We only ever set the field matching the
- * requested {@link VerificationChannel}.
- * <p>
- * The call is best-effort guarded: timeouts are short and delivery failures are
- * surfaced as {@link IllegalStateException} so the caller returns a 502-style
- * error rather than a false success. A send is only considered delivered when
- * nexxbotify reports at least one result with status {@code sent}: an empty
- * result list (e.g. the flow has no enabled channel for the receiver) is a
- * failure, never a success.
- * <p>
- * When no base URL is configured the client is inert: {@link #isConfigured()}
- * returns {@code false} and {@link #send} fails fast, so dependent features
- * (verification, password reset, OTP/2FA delivery) lock cleanly instead of
- * attempting network calls.
- */
 @Component
 public class NexxbotifyClient {
 
@@ -42,15 +24,28 @@ public class NexxbotifyClient {
 
     private final RestClient restClient;
     private final NexxbotifyProperties properties;
+    private final ObjectMapper objectMapper;
 
     public NexxbotifyClient(RestClient.Builder builder, NexxbotifyProperties properties) {
+        this(builder, properties, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public NexxbotifyClient(RestClient.Builder builder, NexxbotifyProperties properties,
+                            @org.springframework.beans.factory.annotation.Autowired(required = false) ObjectMapper objectMapper) {
         this.properties = properties;
+        this.objectMapper = objectMapper != null ? objectMapper : JsonMapper.builder()
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .build();
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(properties.getConnectTimeoutMs());
         requestFactory.setReadTimeout(properties.getReadTimeoutMs());
         RestClient.Builder configured = builder
                 .requestFactory(requestFactory)
-                .defaultHeaders(headers -> headers.setContentType(MediaType.APPLICATION_JSON));
+                .defaultHeaders(headers -> {
+                    headers.setContentType(MediaType.APPLICATION_JSON);
+                    headers.setAccept(List.of(MediaType.APPLICATION_JSON, MediaType.ALL));
+                });
         if (properties.getBaseUrl() != null && !properties.getBaseUrl().isBlank()) {
             configured = configured.baseUrl(properties.getBaseUrl());
         }
@@ -183,8 +178,8 @@ public class NexxbotifyClient {
                 variables, receiverFor(channel, identifier));
         try {
             executeSend(body, flowId, identifier);
-        } catch (org.springframework.web.client.HttpClientErrorException.NotFound notFound) {
-            if (organisation != null) {
+        } catch (RestClientResponseException notFound) {
+            if (notFound.getStatusCode().value() == 404 && organisation != null) {
                 log.info("Flow {} not found for org {}; auto-provisioning and retrying send", flowId, organisation.getSlug());
                 ensureOrganisationFlow(organisation, organisation.isPhoneCanLogin());
                 executeSend(body, flowId, identifier);
@@ -214,11 +209,16 @@ public class NexxbotifyClient {
 
     private void executeSend(SendRequest body, String flowId, String identifier) {
         try {
-            SendResponse response = restClient.post()
+            String raw = restClient.post()
                     .uri("/send")
+                    .accept(MediaType.APPLICATION_JSON, MediaType.ALL)
                     .body(body)
                     .retrieve()
-                    .body(SendResponse.class);
+                    .body(String.class);
+            if (raw == null || raw.isBlank()) {
+                throw new IllegalStateException("nexxbotify returned an empty response");
+            }
+            SendResponse response = objectMapper.readValue(raw, SendResponse.class);
             if (response == null) {
                 throw new IllegalStateException("nexxbotify returned an empty response");
             }
@@ -237,13 +237,195 @@ public class NexxbotifyClient {
             log.debug("nexxbotify delivered flow {} to {} (send id {})", flowId, identifier, response.id);
         } catch (IllegalStateException e) {
             throw e;
-        } catch (org.springframework.web.client.HttpClientErrorException.NotFound e) {
-            throw e;
+        } catch (RestClientResponseException e) {
+            if (e.getStatusCode().value() == 404) {
+                throw e;
+            }
+            log.warn("nexxbotify send HTTP {} for flow {} to {}: {}",
+                    e.getStatusCode().value(), flowId, identifier, e.getResponseBodyAsString());
+            throw new IllegalStateException("The verification service returned an error", e);
         } catch (Exception e) {
             log.warn("nexxbotify send failed for flow {} to {}: {}",
                     flowId, identifier, e.getMessage());
             throw new IllegalStateException("The verification service is temporarily unavailable", e);
         }
+    }
+
+    /**
+     * Retrieves notification templates for an organisation from nexxnotify.
+     * Returns default values if nexxnotify is unreachable or not yet configured.
+     */
+    public com.nexxserve.nexxauth.dto.response.OrganisationTemplatesResponse getOrganisationTemplates(
+            com.nexxserve.nexxauth.entity.Organisation organisation) {
+        if (organisation == null || organisation.getId() == null) {
+            throw new IllegalArgumentException("Organisation is required");
+        }
+        String flowId = organisationFlowId(organisation);
+        String orgName = organisation.getName() != null && !organisation.getName().isBlank()
+                ? organisation.getName()
+                : organisation.getSlug();
+
+        String defaultEmailSubject = "Your " + orgName + " verification code";
+        String defaultEmailBody = "Your " + orgName + " verification code is {{code}}.";
+        String defaultEmailHtml = "<div style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px 24px; background-color: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0;\">\n" +
+                "  <h2 style=\"color: #0f172a; margin-top: 0; font-size: 20px; font-weight: 600;\">" + orgName + " Verification</h2>\n" +
+                "  <p style=\"color: #475569; font-size: 15px; line-height: 1.5; margin-bottom: 24px;\">Use the verification code below to complete your sign-in or verification request:</p>\n" +
+                "  <div style=\"background-color: #f1f5f9; border-radius: 6px; padding: 16px 24px; text-align: center; margin: 24px 0;\">\n" +
+                "    <span style=\"font-family: monospace; font-size: 32px; font-weight: 700; letter-spacing: 6px; color: #0f172a;\">{{code}}</span>\n" +
+                "  </div>\n" +
+                "  <p style=\"color: #64748b; font-size: 13px; line-height: 1.5;\">This code will expire in 10 minutes. If you did not make this request, you can safely ignore this email.</p>\n" +
+                "</div>";
+        String defaultSmsBody = "Your " + orgName + " verification code is: {{code}}.";
+
+        if (!isConfigured()) {
+            return new com.nexxserve.nexxauth.dto.response.OrganisationTemplatesResponse(
+                    flowId,
+                    new com.nexxserve.nexxauth.dto.response.OrganisationTemplatesResponse.EmailTemplate(
+                            true, defaultEmailSubject, defaultEmailBody, defaultEmailHtml),
+                    new com.nexxserve.nexxauth.dto.response.OrganisationTemplatesResponse.SmsTemplate(
+                            organisation.isPhoneCanLogin(), defaultSmsBody)
+            );
+        }
+
+        try {
+            String raw = restClient.get()
+                    .uri("/flows/{id}", flowId)
+                    .accept(MediaType.APPLICATION_JSON, MediaType.ALL)
+                    .retrieve()
+                    .body(String.class);
+
+            FlowResponse flow = raw != null && !raw.isBlank()
+                    ? objectMapper.readValue(raw, FlowResponse.class)
+                    : null;
+
+            if (flow != null && flow.channels() != null) {
+                com.nexxserve.nexxauth.dto.response.OrganisationTemplatesResponse.EmailTemplate email = null;
+                com.nexxserve.nexxauth.dto.response.OrganisationTemplatesResponse.SmsTemplate sms = null;
+
+                for (FlowChannelResponse ch : flow.channels()) {
+                    if ("email".equalsIgnoreCase(ch.channel())) {
+                        String subj = ch.default_content() != null && ch.default_content().subject() != null
+                                ? ch.default_content().subject()
+                                : defaultEmailSubject;
+                        String body = ch.default_content() != null && ch.default_content().body() != null
+                                ? ch.default_content().body()
+                                : defaultEmailBody;
+                        String html = ch.default_content() != null && ch.default_content().html() != null
+                                ? ch.default_content().html()
+                                : defaultEmailHtml;
+                        email = new com.nexxserve.nexxauth.dto.response.OrganisationTemplatesResponse.EmailTemplate(
+                                ch.enabled() == null || ch.enabled(),
+                                subj, body, html
+                        );
+                    } else if ("sms".equalsIgnoreCase(ch.channel())) {
+                        String body = ch.default_content() != null && ch.default_content().body() != null
+                                ? ch.default_content().body()
+                                : defaultSmsBody;
+                        sms = new com.nexxserve.nexxauth.dto.response.OrganisationTemplatesResponse.SmsTemplate(
+                                ch.enabled() == null || ch.enabled(),
+                                body
+                        );
+                    }
+                }
+
+                return new com.nexxserve.nexxauth.dto.response.OrganisationTemplatesResponse(
+                        flowId,
+                        email != null ? email : new com.nexxserve.nexxauth.dto.response.OrganisationTemplatesResponse.EmailTemplate(
+                                true, defaultEmailSubject, defaultEmailBody, defaultEmailHtml),
+                        sms != null ? sms : new com.nexxserve.nexxauth.dto.response.OrganisationTemplatesResponse.SmsTemplate(
+                                organisation.isPhoneCanLogin(), defaultSmsBody)
+                );
+            }
+        } catch (org.springframework.web.client.HttpClientErrorException.NotFound e) {
+            log.info("Flow {} not found; provisioning for org {}", flowId, organisation.getSlug());
+            ensureOrganisationFlow(organisation, organisation.isPhoneCanLogin());
+        } catch (Exception e) {
+            log.warn("Failed to fetch templates from nexxnotify for flow {}: {}", flowId, e.getMessage());
+        }
+
+        return new com.nexxserve.nexxauth.dto.response.OrganisationTemplatesResponse(
+                flowId,
+                new com.nexxserve.nexxauth.dto.response.OrganisationTemplatesResponse.EmailTemplate(
+                        true, defaultEmailSubject, defaultEmailBody, defaultEmailHtml),
+                new com.nexxserve.nexxauth.dto.response.OrganisationTemplatesResponse.SmsTemplate(
+                        organisation.isPhoneCanLogin(), defaultSmsBody)
+        );
+    }
+
+    /**
+     * Updates notification templates for an organisation in nexxnotify.
+     */
+    public com.nexxserve.nexxauth.dto.response.OrganisationTemplatesResponse updateOrganisationTemplates(
+            com.nexxserve.nexxauth.entity.Organisation organisation,
+            com.nexxserve.nexxauth.dto.request.UpdateOrganisationTemplatesRequest request) {
+        if (!isConfigured()) {
+            throw new IllegalStateException("The notification service is not configured");
+        }
+        if (organisation == null || organisation.getId() == null) {
+            throw new IllegalArgumentException("Organisation is required");
+        }
+
+        ensureOrganisationFlow(organisation, true);
+        String flowId = organisationFlowId(organisation);
+        String orgName = organisation.getName() != null && !organisation.getName().isBlank()
+                ? organisation.getName()
+                : organisation.getSlug();
+
+        if (request.emailSubject() != null || request.emailBody() != null || request.emailHtml() != null) {
+            Map<String, Object> emailContent = new java.util.HashMap<>();
+            if (request.emailSubject() != null) emailContent.put("subject", request.emailSubject());
+            if (request.emailBody() != null) emailContent.put("body", request.emailBody());
+            if (request.emailHtml() != null) emailContent.put("html", request.emailHtml());
+
+            try {
+                restClient.post()
+                        .uri("/flows/{id}/channels", flowId)
+                        .body(new CreateChannelRequest(
+                                "email",
+                                true,
+                                false,
+                                null,
+                                null,
+                                emailContent,
+                                List.of(),
+                                Map.of()
+                        ))
+                        .retrieve()
+                        .toBodilessEntity();
+                log.info("Updated email template for flow {}", flowId);
+            } catch (Exception e) {
+                log.warn("Failed to update email channel for flow {}: {}", flowId, e.getMessage());
+                throw new IllegalStateException("Failed to update email template in notification service: " + e.getMessage(), e);
+            }
+        }
+
+        if (request.smsBody() != null) {
+            Map<String, Object> smsContent = new java.util.HashMap<>();
+            smsContent.put("body", request.smsBody());
+
+            try {
+                restClient.post()
+                        .uri("/flows/{id}/channels", flowId)
+                        .body(new CreateChannelRequest(
+                                "sms",
+                                true,
+                                false,
+                                null,
+                                null,
+                                smsContent,
+                                List.of(),
+                                Map.of()
+                        ))
+                        .retrieve()
+                        .toBodilessEntity();
+                log.info("Updated SMS template for flow {}", flowId);
+            } catch (Exception e) {
+                log.warn("Failed to update SMS channel for flow {}: {}", flowId, e.getMessage());
+                throw new IllegalStateException("Failed to update SMS template in notification service: " + e.getMessage(), e);
+            }
+        }
+
+        return getOrganisationTemplates(organisation);
     }
 
     private List<Map<String, Object>> receiverFor(VerificationChannel channel, String identifier) {
@@ -267,6 +449,22 @@ public class NexxbotifyClient {
                                        Map<String, Object> default_content,
                                        List<String> required_variables,
                                        Map<String, Object> channel_config) {
+    }
+
+    /** Response structures for reading a flow from nexxnotify. */
+    public record FlowMessageContent(String subject, String body, String html) {
+    }
+
+    public record FlowChannelResponse(String id, String channel, Boolean enabled,
+                                      Boolean uses_template, String template_name,
+                                      List<String> template_param_order,
+                                      FlowMessageContent default_content,
+                                      List<String> required_variables,
+                                      Map<String, Object> channel_config) {
+    }
+
+    public record FlowResponse(String id, String name, Boolean active,
+                               List<FlowChannelResponse> channels) {
     }
 
     /** Request body for {@code POST /send}. The {@code id} doubles as the

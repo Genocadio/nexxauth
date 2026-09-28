@@ -79,16 +79,24 @@ class OrganisationAuthIntegrationTest {
         assertEquals("oa-org", claims.get("orgSlug").asText());
         assertEquals("org-access", claims.get("type").asText());
 
-        // login with the same identifier + password
+        // login without identifierType fails with 400 Bad Request
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("identifier", "jane", "password", "orgpass1"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Identifier type is required (EMAIL, PHONE, or USERNAME)"));
+
+        // login with the same identifier + password
+        mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("identifier", "jane", "identifierType", "USERNAME", "password", "orgpass1"))))
                 .andExpect(status().isOk());
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("identifier", "jane", "password", "wrong"))))
+                        .content(json(Map.of("identifier", "jane", "identifierType", "USERNAME", "password", "wrong"))))
                 .andExpect(status().isUnauthorized());
 
         // every org user can read their own profile regardless of permissions
@@ -359,7 +367,7 @@ class OrganisationAuthIntegrationTest {
         MvcResult login = mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "nora", "password", "orgpass1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "nora", "identifierType", "USERNAME", "password", "orgpass1"))))
                 .andExpect(status().isOk())
                 .andReturn();
         String refresh1 = objectMapper.readTree(login.getResponse().getContentAsString()).get("refreshToken").asText();
@@ -412,12 +420,12 @@ class OrganisationAuthIntegrationTest {
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "MIXEDCASE", "password", "orgpass1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "MIXEDCASE", "identifierType", "USERNAME", "password", "orgpass1"))))
                 .andExpect(status().isOk());
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "mixedcase", "password", "orgpass1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "mixedcase", "identifierType", "USERNAME", "password", "orgpass1"))))
                 .andExpect(status().isOk());
 
         // a differently-cased spelling of the same name cannot be registered twice
@@ -524,19 +532,19 @@ class OrganisationAuthIntegrationTest {
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("identifier", "clientreg", "authType", "PASSWORD", "password", "orgpass1"))))
+                        .content(json(Map.of("identifier", "clientreg", "identifierType", "USERNAME", "authType", "PASSWORD", "password", "orgpass1"))))
                 .andExpect(status().isOk());
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("identifier", "clientreg", "password", "orgpass1"))))
+                        .content(json(Map.of("identifier", "clientreg", "identifierType", "USERNAME", "password", "orgpass1"))))
                 .andExpect(status().isOk());
 
         // wrong credentials with a client are still rejected
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("identifier", "clientreg", "password", "wrong"))))
+                        .content(json(Map.of("identifier", "clientreg", "identifierType", "USERNAME", "password", "wrong"))))
                 .andExpect(status().isUnauthorized());
 
         // the registered users exist under the org
@@ -583,6 +591,7 @@ class OrganisationAuthIntegrationTest {
                         .content(json(Map.of(
                                 "organisationId", 999999L,
                                 "identifier", "conflict-user",
+                                "identifierType", "USERNAME",
                                 "password", "orgpass1"))))
                 .andExpect(status().isOk())
                 .andReturn();
@@ -778,7 +787,7 @@ class OrganisationAuthIntegrationTest {
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId,
-                                "identifier", "nopw", "password", "whatever1"))))
+                                "identifier", "nopw", "identifierType", "USERNAME", "password", "whatever1"))))
                 .andExpect(status().isUnauthorized());
 
         // re-enable password auth and set a password: the user can now log in
@@ -796,7 +805,7 @@ class OrganisationAuthIntegrationTest {
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId,
-                                "identifier", "nopw", "password", "newpass123"))))
+                                "identifier", "nopw", "identifierType", "USERNAME", "password", "newpass123"))))
                 .andExpect(status().isOk());
     }
 
@@ -815,7 +824,7 @@ class OrganisationAuthIntegrationTest {
         MvcResult login = mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "toby", "password", "orgpass1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "toby", "identifierType", "USERNAME", "password", "orgpass1"))))
                 .andExpect(status().isOk())
                 .andReturn();
         String refreshToken = objectMapper.readTree(login.getResponse().getContentAsString())
@@ -831,7 +840,7 @@ class OrganisationAuthIntegrationTest {
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "toby", "password", "orgpass1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "toby", "identifierType", "USERNAME", "password", "orgpass1"))))
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(post(orgAuth + "/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -847,7 +856,7 @@ class OrganisationAuthIntegrationTest {
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "toby", "password", "orgpass1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "toby", "identifierType", "USERNAME", "password", "orgpass1"))))
                 .andExpect(status().isOk());
     }
 
@@ -865,7 +874,7 @@ class OrganisationAuthIntegrationTest {
         MvcResult login = mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "pam", "password", "orgpass1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "pam", "identifierType", "USERNAME", "password", "orgpass1"))))
                 .andExpect(status().isOk())
                 .andReturn();
         String oldRefresh = objectMapper.readTree(login.getResponse().getContentAsString())
@@ -888,12 +897,12 @@ class OrganisationAuthIntegrationTest {
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "pam", "password", "orgpass1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "pam", "identifierType", "USERNAME", "password", "orgpass1"))))
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "pam", "password", "newpass123"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "pam", "identifierType", "USERNAME", "password", "newpass123"))))
                 .andExpect(status().isOk());
     }
 
@@ -924,7 +933,7 @@ class OrganisationAuthIntegrationTest {
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId,
-                                "identifier", "nolast", "password", "orgpass1"))))
+                                "identifier", "nolast", "identifierType", "USERNAME", "password", "orgpass1"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.user.lastName").value(org.hamcrest.Matchers.nullValue()));
 
@@ -975,7 +984,7 @@ class OrganisationAuthIntegrationTest {
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId,
-                                "identifier", "EMAIL-USER@nexx.io", "password", "orgpass1"))))
+                                "identifier", "EMAIL-USER@nexx.io", "identifierType", "EMAIL", "password", "orgpass1"))))
                 .andExpect(status().isOk());
     }
 
@@ -987,7 +996,7 @@ class OrganisationAuthIntegrationTest {
                         .content(json(Map.of(
                                 "firstName", "F", "lastName", "L",
                                 "email", email, "password", "password1",
-                                "platformName", "Org Auth Platform", "platformSlug", slug))))
+                                "platformName", "OrgAuth Platform", "platformSlug", slug))))
                 .andExpect(status().isCreated())
                 .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("accessToken").asText();
@@ -997,7 +1006,7 @@ class OrganisationAuthIntegrationTest {
         MvcResult result = mockMvc.perform(post(platform + "/organisations")
                         .header("Authorization", bearer(boss))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("name", "OA Org", "slug", ORG_SLUG))))
+                        .content(json(Map.of("name", "OrgAuth Org", "slug", "oa-org"))))
                 .andExpect(status().isCreated())
                 .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
@@ -1034,13 +1043,12 @@ class OrganisationAuthIntegrationTest {
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
     }
 
-    private long registerOrgUser(String orgAuth, String clientKey, String identifier, String password) throws Exception {
+    private long registerOrgUser(String orgAuth, String clientKey, String username, String password) throws Exception {
         MvcResult result = mockMvc.perform(post(orgAuth + "/register")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
-                                "username", identifier,
-                                "password", password,
+                                "username", username, "password", password,
                                 "firstName", "F", "lastName", "L"))))
                 .andExpect(status().isCreated())
                 .andReturn();
@@ -1048,10 +1056,11 @@ class OrganisationAuthIntegrationTest {
     }
 
     private String loginOrg(String orgAuth, String clientKey, String identifier, String password) throws Exception {
+        String idType = identifier.contains("@") ? "EMAIL" : (identifier.startsWith("+") ? "PHONE" : "USERNAME");
         MvcResult result = mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("identifier", identifier, "password", password))))
+                        .content(json(Map.of("identifier", identifier, "identifierType", idType, "password", password))))
                 .andExpect(status().isOk())
                 .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("accessToken").asText();

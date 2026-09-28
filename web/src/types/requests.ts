@@ -111,13 +111,20 @@ export interface OrgRegisterRequest {
 export type OrgIdentifierType = "USERNAME" | "EMAIL" | "PHONE";
 
 export interface OrgLoginRequest {
-  identifier: string;
-  /** What kind of identifier is being sent; omit for auto-detection. */
+  /** Email, phone, or username. Can be omitted if using an action token in the Authorization header. */
+  identifier?: string;
+  /** What kind of identifier is being sent (EMAIL, PHONE, USERNAME); required for PASSWORD and PASSWORDLESS modes. */
   identifierType?: OrgIdentifierType;
-  /** Defaults to PASSWORD; future methods (passkey, OTP, ...) extend this. */
-  authType?: "PASSWORD";
-  /** Required when authType is PASSWORD (the only method today). */
+  /** Authentication mode: PASSWORD, PASSWORDLESS, OTP, or VERIFY. */
+  mode?: AuthType;
+  /** Legacy auth method alias; defaults to PASSWORD. */
+  authType?: AuthType;
+  /** Required when mode/authType is PASSWORD. */
   password?: string;
+  /** Verification code for VERIFY or OTP / PASSWORDLESS login. */
+  verificationCode?: string;
+  /** Legacy alias for verificationCode. */
+  otpCode?: string;
   /** Organisation ID — used by the portal flow when no X-Client-Id header is present. */
   organisationId?: number;
 }
@@ -186,6 +193,21 @@ export interface UpdateOrganisationAuthConfigRequest {
   passwordMaxLength?: number;
   passwordExpirationDays?: number;
   passwordHistoryCount?: number;
+  emailVerificationEnabled?: boolean;
+  phoneVerificationEnabled?: boolean;
+  passwordResetEnabled?: boolean;
+  otpLoginEnabled?: boolean;
+  twoFactorEnabled?: boolean;
+  verificationMode?: "OTP" | "LINK";
+  requireEmailVerificationOnRegister?: boolean;
+  requirePhoneVerificationOnRegister?: boolean;
+}
+
+export interface UpdateOrganisationTemplatesRequest {
+  emailSubject?: string;
+  emailBody?: string;
+  emailHtml?: string;
+  smsBody?: string;
 }
 
 export interface UpdateOrganisationSessionSettingsRequest {

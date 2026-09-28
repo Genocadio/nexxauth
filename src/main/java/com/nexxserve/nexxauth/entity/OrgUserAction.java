@@ -10,6 +10,9 @@ package com.nexxserve.nexxauth.entity;
  */
 public enum OrgUserAction {
 
+    /** An OTP code is needed to complete authentication (e.g. passwordless sign-in, 2FA, or login challenge). Gating. */
+    OTP_NEEDED(true),
+
     /** The password is temporary (or a forced change was triggered) and the
      * user must set a new one before anything else. Gating. */
     CHANGE_PASSWORD(true),

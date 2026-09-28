@@ -18,6 +18,7 @@ import com.nexxserve.nexxauth.entity.OrganisationUser;
 import com.nexxserve.nexxauth.entity.OrgUserAction;
 import com.nexxserve.nexxauth.entity.Platform;
 import com.nexxserve.nexxauth.entity.VerificationChannel;
+import com.nexxserve.nexxauth.entity.VerificationDelivery;
 import com.nexxserve.nexxauth.entity.VerificationPurpose;
 import com.nexxserve.nexxauth.exception.BadRequestException;
 import com.nexxserve.nexxauth.exception.ConflictException;
@@ -143,13 +144,19 @@ public class OrganisationAuthService {
         user.setOrganisation(organisation);
         user.setFirstName(request.firstName());
         user.setLastName(cleanedName(request.lastName()));
-        user.setEmail(email);
         user.setUsername(username);
-        user.setPhone(phone);
+        if (email != null) {
+            user.addEmail(email, true, null);
+        }
+        if (phone != null) {
+            user.addPhone(phone, true, null);
+        }
         if (request.password() != null && !request.password().isBlank()) {
             authConfigService.setPassword(user, request.password());
         } else if (authConfigService.configOf(organisation).isPasswordEnabled()) {
             throw new BadRequestException("Password is required for the PASSWORD auth method");
+        } else if (authConfigService.configOf(organisation).getAuthType() == AuthType.OTP) {
+            user.setAuthType(AuthType.OTP);
         }
         OrganisationUser saved = userRepository.save(user);
         applyRegisterMetadata(request, saved);
@@ -170,20 +177,106 @@ public class OrganisationAuthService {
     @Transactional
     public OrgAuthResponse login(String platformSlug, OrgLoginRequest request, String clientId,
                                   String ipAddress, String userAgent) {
-        return login(platformSlug, request, clientId, ipAddress, userAgent, null);
+        return login(platformSlug, request, clientId, ipAddress, userAgent, null, null);
     }
 
     @Transactional
     public OrgAuthResponse login(String platformSlug, OrgLoginRequest request, String clientId,
                                   String ipAddress, String userAgent, String hostname) {
+        return login(platformSlug, request, clientId, ipAddress, userAgent, hostname, null);
+    }
+
+    @Transactional
+    public OrgAuthResponse login(String platformSlug, OrgLoginRequest request, String clientId,
+                                  String ipAddress, String userAgent, String hostname, String authHeader) {
         OrganisationClient client = resolveClient(clientId);
         enforceClientRestrictions(client, "login");
+
+        String extractedIdentifier = request.identifier() != null && !request.identifier().isBlank()
+                ? request.identifier().trim()
+                : null;
+        OrgIdentifierType extractedIdType = request.identifierType();
+        Long actionTokenUserId = null;
+
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7).trim();
+            try {
+                var claims = orgJwtService.parseActionToken(token);
+                if (extractedIdentifier == null) {
+                    String tokenIdent = claims.get(OrgJwtService.CLAIM_IDENTIFIER, String.class);
+                    if (tokenIdent != null && !tokenIdent.isBlank()) {
+                        extractedIdentifier = tokenIdent.trim();
+                    }
+                }
+                if (extractedIdType == null) {
+                    String tokenType = claims.get(OrgJwtService.CLAIM_IDENTIFIER_TYPE, String.class);
+                    if (tokenType != null && !tokenType.isBlank()) {
+                        try {
+                            extractedIdType = OrgIdentifierType.valueOf(tokenType);
+                        } catch (Exception ignored) {}
+                    }
+                }
+                String sub = claims.getSubject();
+                if (sub != null && sub.matches("\\d+")) {
+                    actionTokenUserId = Long.valueOf(sub);
+                }
+            } catch (Exception e) {
+                // Ignore if not a valid action token
+            }
+        }
+
         Organisation organisation = resolveOrganisation(platformSlug, client, request.organisationId());
-        AuthType method = request.authType() != null ? request.authType() : AuthType.PASSWORD;
-        return switch (method) {
-            case PASSWORD -> passwordLogin(organisation, request, client, ipAddress, userAgent, hostname);
-            case OTP -> otpLogin(organisation, request, client, ipAddress, userAgent, hostname);
-        };
+        AuthType method = request.resolvedMode();
+        String code = request.resolvedVerificationCode();
+
+        if (method == null) {
+            if (code != null && !code.isBlank()) {
+                method = AuthType.VERIFY;
+            } else if (request.password() != null && !request.password().isBlank()) {
+                method = AuthType.PASSWORD;
+            } else {
+                var config = authConfigService.configOf(organisation);
+                if (!config.isPasswordEnabled() || config.getAuthType() == AuthType.OTP || config.getAuthType() == AuthType.PASSWORDLESS) {
+                    method = AuthType.PASSWORDLESS;
+                } else {
+                    method = AuthType.PASSWORD;
+                }
+            }
+        }
+
+        if (method != AuthType.VERIFY) {
+            if (extractedIdentifier == null || extractedIdentifier.isBlank()) {
+                throw new BadRequestException("Identifier is required");
+            }
+            if (extractedIdType == null) {
+                throw new BadRequestException("Identifier type is required (EMAIL, PHONE, or USERNAME)");
+            }
+        }
+
+        if (method == AuthType.VERIFY || method == AuthType.OTP || method == AuthType.PASSWORDLESS) {
+            if (code == null || code.isBlank()) {
+                if (method == AuthType.VERIFY) {
+                    throw new BadRequestException("Verification code is required for VERIFY mode");
+                }
+                if (request.password() != null && !request.password().isBlank() && authConfigService.configOf(organisation).isPasswordEnabled()) {
+                    return passwordLogin(organisation, request, extractedIdType, client, ipAddress, userAgent, hostname);
+                }
+                var sendResp = verificationService.request(platformSlug,
+                        new com.nexxserve.nexxauth.dto.request.VerificationRequest(
+                                extractedIdentifier, extractedIdType, null,
+                                VerificationPurpose.LOGIN_OTP, VerificationDelivery.OTP, request.organisationId()),
+                        clientId);
+                String actionToken = orgJwtService.generateActionToken(
+                        organisation, extractedIdentifier, extractedIdType, actionTokenUserId,
+                        List.of(OrgUserAction.OTP_NEEDED));
+                return OrgAuthResponse.of(actionToken, null, OrgJwtService.ACTION_TOKEN_TTL.toSeconds(),
+                        null, List.of(OrgUserAction.OTP_NEEDED));
+            }
+            return otpLogin(organisation, extractedIdentifier, extractedIdType, code, actionTokenUserId,
+                    client, ipAddress, userAgent, hostname);
+        }
+
+        return passwordLogin(organisation, request, extractedIdType, client, ipAddress, userAgent, hostname);
     }
 
     /** Completes a login that was paused by a server-sent challenge (2FA or
@@ -227,16 +320,16 @@ public class OrganisationAuthService {
      * multi-factor rule. */
     private LoginObligation firstPendingLoginObligation(OrganisationAuthConfig config, OrganisationUser user) {
         if (user.isRequireEmailVerificationAtNextLogin()
-                && user.getEmail() != null && user.getEmailVerifiedAt() == null) {
+                && user.getPrimaryEmail() != null && !user.isEmailVerified()) {
             return new LoginObligation(VerificationPurpose.EMAIL_VERIFICATION, VerificationChannel.EMAIL);
         }
         if (user.isRequirePhoneVerificationAtNextLogin()
-                && user.getPhone() != null && user.getPhoneVerifiedAt() == null) {
+                && user.getPrimaryPhone() != null && !user.isPhoneVerified()) {
             return new LoginObligation(VerificationPurpose.PHONE_VERIFICATION, VerificationChannel.SMS);
         }
         if (config.isTwoFactorEnabled()) {
-            VerificationChannel channel = user.getEmail() != null ? VerificationChannel.EMAIL
-                    : user.getPhone() != null ? VerificationChannel.SMS : null;
+            VerificationChannel channel = user.getPrimaryEmail() != null ? VerificationChannel.EMAIL
+                    : user.getPrimaryPhone() != null ? VerificationChannel.SMS : null;
             if (channel == null) {
                 throw new BadRequestException("Two-factor authentication requires a verified email or phone number");
             }
@@ -246,35 +339,63 @@ public class OrganisationAuthService {
     }
 
     private OrgAuthResponse challengeResponse(OrganisationUser user, LoginChallenge challenge) {
-        return OrgAuthResponse.challenge(challenge,
+        List<OrgUserAction> actions = new java.util.ArrayList<>(orgUserActions.of(user));
+        if (challenge != null) {
+            if (challenge.purpose() == VerificationPurpose.TWO_FACTOR || challenge.purpose() == VerificationPurpose.LOGIN_OTP) {
+                if (!actions.contains(OrgUserAction.OTP_NEEDED)) {
+                    actions.add(0, OrgUserAction.OTP_NEEDED);
+                }
+            } else if (challenge.purpose() == VerificationPurpose.EMAIL_VERIFICATION) {
+                if (!actions.contains(OrgUserAction.VERIFY_EMAIL)) {
+                    actions.add(0, OrgUserAction.VERIFY_EMAIL);
+                }
+            } else if (challenge.purpose() == VerificationPurpose.PHONE_VERIFICATION) {
+                if (!actions.contains(OrgUserAction.VERIFY_PHONE)) {
+                    actions.add(0, OrgUserAction.VERIFY_PHONE);
+                }
+            }
+        }
+        String actionToken = orgJwtService.generateActionToken(
+                user.getOrganisation(),
+                user.getPrimaryEmail() != null ? user.getPrimaryEmail() : (user.getPrimaryPhone() != null ? user.getPrimaryPhone() : user.getUsername()),
+                null,
+                user.getId(),
+                actions);
+        return OrgAuthResponse.of(
+                actionToken,
+                null,
+                OrgJwtService.ACTION_TOKEN_TTL.toSeconds(),
                 userMapper.toResponse(user, userFieldService.readMetadata(user.getId())),
-                orgUserActions.of(user));
+                actions);
     }
 
     record LoginObligation(VerificationPurpose purpose, VerificationChannel channel) {
     }
 
-    /** OTP login: the user was sent a one-time code (LOGIN_OTP) and presents it
-     * here. The code is matched against the stored, hashed value for the
-     * identifier; success issues the same session as password login. */
-    private OrgAuthResponse otpLogin(Organisation organisation, OrgLoginRequest request,
+    /** OTP/Verification login: validates code against active tokens. */
+    private OrgAuthResponse otpLogin(Organisation organisation, String identifier,
+                                     OrgIdentifierType identifierType, String code, Long actionTokenUserId,
                                      OrganisationClient client, String ipAddress, String userAgent, String hostname) {
-        if (request.otpCode() == null || request.otpCode().isBlank()) {
-            throw new BadRequestException("A one-time code is required for the OTP auth method");
+        if (code == null || code.isBlank()) {
+            throw new BadRequestException("A verification code is required");
         }
-        if (!authConfigService.configOf(organisation).isOtpLoginEnabled()) {
-            throw new BadRequestException("OTP login is not enabled for this organisation");
+        if (identifier == null || identifier.isBlank()) {
+            throw new BadRequestException("Identifier is required");
         }
-        String identifier = request.identifier().trim();
-        String code = request.otpCode().trim();
-
-        // The code was sent to the identifier on a specific channel; derive it
-        // from the declared identifier type so the storage lookup is unambiguous.
-        com.nexxserve.nexxauth.entity.VerificationChannel channel = channelForIdentifier(request.identifierType());
+        VerificationChannel channel = channelForIdentifier(identifierType, identifier);
         String normalized = normalizedIdentifier(channel, identifier);
         var token = verificationTokenRepository.findActive(organisation.getId(),
                         com.nexxserve.nexxauth.entity.VerificationPurpose.LOGIN_OTP,
                         channel, normalized, java.time.Instant.now())
+                .or(() -> verificationTokenRepository.findActive(organisation.getId(),
+                        com.nexxserve.nexxauth.entity.VerificationPurpose.TWO_FACTOR,
+                        channel, normalized, java.time.Instant.now()))
+                .or(() -> verificationTokenRepository.findActive(organisation.getId(),
+                        com.nexxserve.nexxauth.entity.VerificationPurpose.EMAIL_VERIFICATION,
+                        channel, normalized, java.time.Instant.now()))
+                .or(() -> verificationTokenRepository.findActive(organisation.getId(),
+                        com.nexxserve.nexxauth.entity.VerificationPurpose.PHONE_VERIFICATION,
+                        channel, normalized, java.time.Instant.now()))
                 .orElseThrow(() -> {
                     audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY, AuthAuditService.ORG_LOGIN_FAILURE,
                             identifier, organisation.getSlug(), organisation.getId(), "otp_no_token");
@@ -299,10 +420,10 @@ public class OrganisationAuthService {
         }
 
         token.setConsumedAt(java.time.Instant.now());
-        // The account was already resolved when the code was issued, so the
-        // token carries it. Fall back to a fresh lookup (identifier rules do
-        // not apply: the user proved ownership of the address by receiving it).
         OrganisationUser user = token.getOrganisationUser();
+        if (user == null && actionTokenUserId != null) {
+            user = userRepository.findById(actionTokenUserId).orElse(null);
+        }
         if (user == null) {
             user = findByIdentifier(organisation, identifier, null)
                     .or(() -> userFieldService.findUserByLoginField(organisation, identifier))
@@ -317,21 +438,41 @@ public class OrganisationAuthService {
                     identifier, organisation.getSlug(), organisation.getId(), "disabled");
             throw new InvalidCredentialsException();
         }
+        if (token.getPurpose() == com.nexxserve.nexxauth.entity.VerificationPurpose.EMAIL_VERIFICATION) {
+            var emailItem = user.getEmails().stream().filter(e -> e.getEmail().equalsIgnoreCase(identifier)).findFirst();
+            if (emailItem.isPresent()) {
+                emailItem.get().setVerifiedAt(java.time.Instant.now());
+            } else if (user.getEmails().isEmpty()) {
+                user.addEmail(identifier, true, java.time.Instant.now());
+            }
+            user.setRequireEmailVerificationAtNextLogin(false);
+            userRepository.save(user);
+        } else if (token.getPurpose() == com.nexxserve.nexxauth.entity.VerificationPurpose.PHONE_VERIFICATION) {
+            var phoneItem = user.getPhones().stream().filter(p -> p.getPhone().equals(identifier)).findFirst();
+            if (phoneItem.isPresent()) {
+                phoneItem.get().setVerifiedAt(java.time.Instant.now());
+            } else if (user.getPhones().isEmpty()) {
+                user.addPhone(identifier, true, java.time.Instant.now());
+            }
+            user.setRequirePhoneVerificationAtNextLogin(false);
+            userRepository.save(user);
+        }
         accountLockout.clearFailures(organisation.getId(), identifier);
         audit.logPersisted(LogLevel.INFO, LogCategory.AUTH, AuthAuditService.ORG_LOGIN_SUCCESS, identifier,
-                organisation.getSlug(), organisation.getId(), "otp");
+                organisation.getSlug(), organisation.getId(), "verify");
         enforceRoleRestrictions(client, user);
         return issueTokens(user, client, ipAddress, userAgent, hostname);
     }
 
-    private com.nexxserve.nexxauth.entity.VerificationChannel channelForIdentifier(
-            com.nexxserve.nexxauth.entity.OrgIdentifierType identifierType) {
-        if (identifierType == com.nexxserve.nexxauth.entity.OrgIdentifierType.PHONE) {
-            return com.nexxserve.nexxauth.entity.VerificationChannel.SMS;
+    private VerificationChannel channelForIdentifier(
+            OrgIdentifierType identifierType, String identifier) {
+        if (identifierType == OrgIdentifierType.PHONE) {
+            return VerificationChannel.SMS;
         }
-        // EMAIL, USERNAME and auto-detection all route through the email channel:
-        // a login code travels to the address the user asked to have it sent to.
-        return com.nexxserve.nexxauth.entity.VerificationChannel.EMAIL;
+        if (identifierType == OrgIdentifierType.EMAIL) {
+            return VerificationChannel.EMAIL;
+        }
+        return OrganisationVerificationService.detectChannel(identifier);
     }
 
     private String normalizedIdentifier(com.nexxserve.nexxauth.entity.VerificationChannel channel, String identifier) {
@@ -352,6 +493,7 @@ public class OrganisationAuthService {
     }
 
     private OrgAuthResponse passwordLogin(Organisation organisation, OrgLoginRequest request,
+                                          OrgIdentifierType identifierType,
                                           OrganisationClient client, String ipAddress, String userAgent, String hostname) {
         if (request.password() == null || request.password().isBlank())
             throw new BadRequestException("Password is required for the PASSWORD auth method");
@@ -370,7 +512,7 @@ public class OrganisationAuthService {
             authTiming.equalsUnknown(request.password());
             throw new InvalidCredentialsException();
         }
-        OrganisationUser user = findByIdentifier(organisation, identifier, request.identifierType())
+        OrganisationUser user = findByIdentifier(organisation, identifier, identifierType)
                 .or(() -> userFieldService.findUserByLoginField(organisation, identifier))
                 .orElseThrow(() -> {
                     audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY, AuthAuditService.ORG_LOGIN_FAILURE, identifier,
@@ -453,8 +595,8 @@ public class OrganisationAuthService {
 
     private String identifierOf(OrganisationUser user) {
         return user.getUsername() != null ? user.getUsername()
-                : user.getEmail() != null ? user.getEmail()
-                : user.getPhone() != null ? user.getPhone() : "unknown";
+                : user.getPrimaryEmail() != null ? user.getPrimaryEmail()
+                : user.getPrimaryPhone() != null ? user.getPrimaryPhone() : "unknown";
     }
 
     private void assertIdentifiersFree(Organisation organisation, String email, String username, String phone) {
@@ -478,7 +620,13 @@ public class OrganisationAuthService {
     private java.util.Optional<OrganisationUser> findByIdentifier(Organisation o, String id, OrgIdentifierType t) {
         if (t != null) return switch (t) {
             case EMAIL -> o.isEmailCanLogin() ? userRepository.findWithRolesByOrganisationIdAndEmail(o.getId(), Emails.normalize(id)) : java.util.Optional.empty();
-            case USERNAME -> o.isUsernameCanLogin() ? userRepository.findWithRolesByOrganisationIdAndUsername(o.getId(), Usernames.normalize(id)) : java.util.Optional.empty();
+            case USERNAME -> {
+                if (o.isUsernameCanLogin()) {
+                    var u = userRepository.findWithRolesByOrganisationIdAndUsername(o.getId(), Usernames.normalize(id));
+                    if (u.isPresent()) yield u;
+                }
+                yield userFieldService.findUserByLoginField(o, id);
+            }
             case PHONE -> o.isPhoneCanLogin() ? userRepository.findWithRolesByOrganisationIdAndPhone(o.getId(), Phones.normalize(id)) : java.util.Optional.empty();
         };
         java.util.Optional<OrganisationUser> direct = enabledIdentifierLookup(o, id);
@@ -581,7 +729,18 @@ public class OrganisationAuthService {
     private OrgAuthResponse issueTokens(OrganisationUser user, OrganisationClient client,
                                          String ipAddress, String userAgent, String hostname) {
         Organisation organisation = user.getOrganisation();
-        if (orgUserActions.hasPendingGatingAction(user)) return issueTokens(user, null, OrgUserActions.GATING_ACCESS_TTL, null, null, null, hostname);
+        if (orgUserActions.hasPendingGatingAction(user)) {
+            List<OrgUserAction> actions = orgUserActions.of(user);
+            String actionToken = orgJwtService.generateActionToken(
+                    organisation,
+                    user.getPrimaryEmail() != null ? user.getPrimaryEmail() : (user.getPrimaryPhone() != null ? user.getPrimaryPhone() : user.getUsername()),
+                    null,
+                    user.getId(),
+                    actions);
+            Map<String, String> metadata = userFieldService.readMetadata(user.getId());
+            return OrgAuthResponse.of(actionToken, null, OrgJwtService.ACTION_TOKEN_TTL.toSeconds(),
+                    userMapper.toResponse(user, metadata), actions);
+        }
         refreshTokenService.enforceSessionLimit(organisation, user.getId(), client, user);
         // Dedup: if the user is logging in from the same IP+UA, reuse the existing session id
         String sessionId = sessionService.findExistingSessionId(user.getId(), ipAddress, userAgent);

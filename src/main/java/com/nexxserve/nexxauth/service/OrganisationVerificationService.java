@@ -23,6 +23,7 @@ import com.nexxserve.nexxauth.repository.OrganisationClientRepository;
 import com.nexxserve.nexxauth.repository.OrganisationRepository;
 import com.nexxserve.nexxauth.repository.OrganisationUserRepository;
 import com.nexxserve.nexxauth.repository.OrganisationVerificationTokenRepository;
+import com.nexxserve.nexxauth.security.OrgJwtService;
 import com.nexxserve.nexxauth.util.Emails;
 import com.nexxserve.nexxauth.util.Phones;
 import io.jsonwebtoken.Claims;
@@ -44,6 +45,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -72,6 +74,7 @@ public class OrganisationVerificationService {
     private final NexxbotifyClient nexxbotifyClient;
     private final VerificationProperties properties;
     private final AuthAuditService audit;
+    private final OrgJwtService orgJwtService;
     private final SecureRandom random = new SecureRandom();
     private final String jwtSecret;
 
@@ -92,6 +95,7 @@ public class OrganisationVerificationService {
                                            NexxbotifyClient nexxbotifyClient,
                                            VerificationProperties properties,
                                            AuthAuditService audit,
+                                           OrgJwtService orgJwtService,
                                            @Value("${app.jwt.secret}") String jwtSecret) {
         this.organisationRepository = organisationRepository;
         this.clientRepository = clientRepository;
@@ -102,6 +106,7 @@ public class OrganisationVerificationService {
         this.nexxbotifyClient = nexxbotifyClient;
         this.properties = properties;
         this.audit = audit;
+        this.orgJwtService = orgJwtService;
         this.jwtSecret = jwtSecret;
     }
 
@@ -109,15 +114,36 @@ public class OrganisationVerificationService {
     // Request a code / link
     // ---------------------------------------------------------------------
 
+    public static VerificationChannel detectChannel(String rawIdentifier) {
+        if (rawIdentifier == null || rawIdentifier.isBlank()) {
+            return VerificationChannel.EMAIL;
+        }
+        String trimmed = rawIdentifier.trim();
+        if (trimmed.contains("@")) {
+            return VerificationChannel.EMAIL;
+        }
+        String digits = trimmed.replaceAll("[^0-9]", "");
+        if (trimmed.startsWith("+") || (digits.length() >= 7 && digits.length() <= 15 && trimmed.matches("^[+0-9\\s\\-\\(\\)]{7,25}$"))) {
+            return VerificationChannel.SMS;
+        }
+        return VerificationChannel.EMAIL;
+    }
+
     @Transactional
     public VerificationRequestResponse request(String platformSlug, VerificationRequest request,
                                                String clientId) {
         Organisation organisation = resolveOrganisation(platformSlug, request.organisationId(), clientId);
-        VerificationPurpose purpose = request.purpose();
+        VerificationPurpose purpose = request.purpose() != null ? request.purpose() : VerificationPurpose.LOGIN_OTP;
         requireFeature(organisation, purpose);
         requireNotifier();
 
-        VerificationChannel channel = request.channel();
+        VerificationChannel channel = request.channel() != null
+                ? request.channel()
+                : (request.identifierType() == com.nexxserve.nexxauth.entity.OrgIdentifierType.PHONE
+                        ? VerificationChannel.SMS
+                        : (request.identifierType() == com.nexxserve.nexxauth.entity.OrgIdentifierType.EMAIL
+                                ? VerificationChannel.EMAIL
+                                : detectChannel(request.identifier())));
         validatePurposeVsChannel(purpose, channel);
         // Default delivery comes from the org's verification mode when the
         // request does not pick one. A login OTP is only ever a code typed
@@ -125,8 +151,8 @@ public class OrganisationVerificationService {
         VerificationDelivery delivery = request.delivery() != null
                 ? request.delivery()
                 : authConfigService.configOf(organisation).getVerificationMode();
-        if (purpose == VerificationPurpose.LOGIN_OTP && delivery != VerificationDelivery.OTP) {
-            throw new BadRequestException("OTP login only supports numeric codes");
+        if (delivery == null || (purpose == VerificationPurpose.LOGIN_OTP && delivery != VerificationDelivery.OTP)) {
+            delivery = VerificationDelivery.OTP;
         }
 
         String identifier = normalize(channel, request.identifier());
@@ -143,10 +169,11 @@ public class OrganisationVerificationService {
         token.setOrganisationUser(user);
         token.setPurpose(purpose);
         token.setChannel(channel);
+        Duration ttl = properties.ttlFor(delivery);
         token.setDelivery(delivery);
         token.setIdentifier(identifier);
         token.setTokenHash(hashToken(value));
-        token.setExpiresAt(now.plus(properties.ttlFor(delivery)));
+        token.setExpiresAt(now.plus(ttl));
         token.setSentAt(now);
         // One active value per (org, purpose, channel, identifier): supersede any old one.
         tokenRepository.deleteActiveForIdentifier(organisation.getId(), purpose, channel, identifier);
@@ -157,8 +184,14 @@ public class OrganisationVerificationService {
                 identifier, organisation.getSlug(), organisation.getId(),
                 purpose.name() + " " + channel.name() + " " + delivery.name());
 
+        List<com.nexxserve.nexxauth.entity.OrgUserAction> actions = purpose == VerificationPurpose.PASSWORD_RESET
+                ? List.of(com.nexxserve.nexxauth.entity.OrgUserAction.CHANGE_PASSWORD)
+                : List.of(com.nexxserve.nexxauth.entity.OrgUserAction.OTP_NEEDED);
+        String actionToken = orgJwtService.generateActionToken(
+                organisation, identifier, request.identifierType(), user != null ? user.getId() : null, actions, purpose.name(), ttl);
+
         return new VerificationRequestResponse(purpose, channel, delivery, identifier,
-                properties.ttlFor(delivery).toSeconds());
+                ttl.toSeconds(), actionToken, "Bearer");
     }
 
     // ---------------------------------------------------------------------
@@ -170,6 +203,11 @@ public class OrganisationVerificationService {
      * as verified on the owning user. */
     @Transactional
     public void verifyOtp(String platformSlug, VerificationVerifyRequest request, String clientId) {
+        verifyOtp(platformSlug, request, clientId, null);
+    }
+
+    @Transactional
+    public void verifyOtp(String platformSlug, VerificationVerifyRequest request, String clientId, String authHeader) {
         VerificationPurpose purpose = request.purpose();
         if (purpose != VerificationPurpose.EMAIL_VERIFICATION
                 && purpose != VerificationPurpose.PHONE_VERIFICATION) {
@@ -178,8 +216,34 @@ public class OrganisationVerificationService {
         Organisation organisation = resolveOrganisation(platformSlug, request.organisationId(), clientId);
         requireFeature(organisation, purpose);
 
+        String extractedIdentifier = request.identifier();
+        String rawActionToken = extractBearerToken(authHeader);
+        if (rawActionToken != null && !rawActionToken.isBlank()) {
+            try {
+                Claims claims = orgJwtService.parseActionToken(rawActionToken);
+                Long tokenOrgId = claims.get(OrgJwtService.CLAIM_ORG_ID, Long.class);
+                if (tokenOrgId != null && !tokenOrgId.equals(organisation.getId())) {
+                    throw new BadRequestException("Action token belongs to another organisation");
+                }
+                String tokenIdentifier = claims.get(OrgJwtService.CLAIM_IDENTIFIER, String.class);
+                if (tokenIdentifier != null && !tokenIdentifier.isBlank()) {
+                    if (extractedIdentifier != null && !extractedIdentifier.isBlank()
+                            && !extractedIdentifier.equalsIgnoreCase(tokenIdentifier)) {
+                        throw new BadRequestException("Action token identifier does not match request identifier");
+                    }
+                    extractedIdentifier = tokenIdentifier;
+                }
+            } catch (JwtException e) {
+                throw new BadRequestException("Invalid or expired action token: " + e.getMessage());
+            }
+        }
+
+        if (extractedIdentifier == null || extractedIdentifier.isBlank()) {
+            throw new BadRequestException("Identifier is required");
+        }
+
         VerificationChannel channel = channelFor(purpose);
-        String identifier = normalize(channel, request.identifier());
+        String identifier = normalize(channel, extractedIdentifier);
         OrganisationUser user = findUser(organisation, identifier, purpose);
         if (user == null) {
             throw new BadRequestException("No account found for this " + channel.name().toLowerCase());
@@ -196,7 +260,7 @@ public class OrganisationVerificationService {
         }
 
         token.setConsumedAt(now);
-        markVerified(user, purpose, now);
+        markVerified(user, purpose, identifier, now);
         audit.logPersisted(LogLevel.INFO, LogCategory.AUTH, AuthAuditService.ORG_IDENTIFIER_VERIFIED,
                 identifier, organisation.getSlug(), organisation.getId(),
                 purpose.name() + " " + channel.name());
@@ -228,7 +292,7 @@ public class OrganisationVerificationService {
             throw new BadRequestException("Invalid or expired link");
         }
         token.setConsumedAt(now);
-        markVerified(user, purpose, now);
+        markVerified(user, purpose, token.getIdentifier(), now);
         audit.logPersisted(LogLevel.INFO, LogCategory.AUTH, AuthAuditService.ORG_IDENTIFIER_VERIFIED,
                 token.getIdentifier(), token.getOrganisation().getSlug(),
                 token.getOrganisation().getId(), purpose.name() + " via link");
@@ -243,14 +307,54 @@ public class OrganisationVerificationService {
      * so concurrent sign-ins with the old password are cut off. */
     @Transactional
     public void confirmPasswordReset(String platformSlug, PasswordResetConfirmRequest request, String clientId) {
+        confirmPasswordReset(platformSlug, request, clientId, null);
+    }
+
+    @Transactional
+    public void confirmPasswordReset(String platformSlug, PasswordResetConfirmRequest request, String clientId, String authHeader) {
         Organisation organisation = resolveOrganisation(platformSlug, request.organisationId(), clientId);
         requireFeature(organisation, VerificationPurpose.PASSWORD_RESET);
-        VerificationChannel channel = request.channel();
-        String identifier = normalize(channel, request.identifier());
+
+        String extractedIdentifier = request.identifier();
+        VerificationChannel extractedChannel = request.channel();
+
+        String rawActionToken = extractBearerToken(authHeader);
+        if (rawActionToken != null && !rawActionToken.isBlank()) {
+            try {
+                Claims claims = orgJwtService.parseActionToken(rawActionToken);
+                Long tokenOrgId = claims.get(OrgJwtService.CLAIM_ORG_ID, Long.class);
+                if (tokenOrgId != null && !tokenOrgId.equals(organisation.getId())) {
+                    throw new BadRequestException("Action token belongs to another organisation");
+                }
+                String tokenIdentifier = claims.get(OrgJwtService.CLAIM_IDENTIFIER, String.class);
+                if (tokenIdentifier != null && !tokenIdentifier.isBlank()) {
+                    if (extractedIdentifier != null && !extractedIdentifier.isBlank()
+                            && !extractedIdentifier.equalsIgnoreCase(tokenIdentifier)) {
+                        throw new BadRequestException("Action token identifier does not match request identifier");
+                    }
+                    extractedIdentifier = tokenIdentifier;
+                }
+                String tokenPurpose = claims.get(OrgJwtService.CLAIM_PURPOSE, String.class);
+                if (tokenPurpose != null && !tokenPurpose.isBlank() && !VerificationPurpose.PASSWORD_RESET.name().equals(tokenPurpose)) {
+                    throw new BadRequestException("Action token purpose does not match PASSWORD_RESET");
+                }
+            } catch (JwtException e) {
+                throw new BadRequestException("Invalid or expired action token: " + e.getMessage());
+            }
+        }
+
+        if (extractedIdentifier == null || extractedIdentifier.isBlank()) {
+            throw new BadRequestException("Identifier is required");
+        }
+        if (extractedChannel == null) {
+            extractedChannel = detectChannel(extractedIdentifier);
+        }
+
+        String identifier = normalize(extractedChannel, extractedIdentifier);
 
         Instant now = Instant.now();
         OrganisationVerificationToken token = tokenRepository.findActive(
-                        organisation.getId(), VerificationPurpose.PASSWORD_RESET, channel, identifier, now)
+                        organisation.getId(), VerificationPurpose.PASSWORD_RESET, extractedChannel, identifier, now)
                 .orElseThrow(() -> new BadRequestException("Invalid or expired reset code"));
         if (!MessageDigest.isEqual(hashToken(request.token()).getBytes(),
                 token.getTokenHash().getBytes())) {
@@ -270,7 +374,14 @@ public class OrganisationVerificationService {
         refreshTokenService.revokeAllForUser(user.getId());
         audit.logPersisted(LogLevel.INFO, LogCategory.AUTH, AuthAuditService.ORG_PASSWORD_RESET,
                 identifier, organisation.getSlug(), organisation.getId(),
-                "channel=" + channel.name());
+                "channel=" + extractedChannel.name());
+    }
+
+    private String extractBearerToken(String authHeader) {
+        if (authHeader == null || !authHeader.regionMatches(true, 0, "Bearer ", 0, 7)) {
+            return null;
+        }
+        return authHeader.substring(7).trim();
     }
 
     // ---------------------------------------------------------------------
@@ -364,10 +475,16 @@ public class OrganisationVerificationService {
     @Transactional
     public void completeChallengeVerification(OrganisationUser user, VerificationPurpose purpose, Instant now) {
         if (purpose == VerificationPurpose.EMAIL_VERIFICATION) {
-            user.setEmailVerifiedAt(now);
+            user.getEmails().stream().filter(com.nexxserve.nexxauth.entity.OrganisationUserEmail::isPrimary).findFirst().ifPresent(e -> e.setVerifiedAt(now));
+            if (user.getEmailVerifiedAt() == null && !user.getEmails().isEmpty()) {
+                user.getEmails().iterator().next().setVerifiedAt(now);
+            }
             user.setRequireEmailVerificationAtNextLogin(false);
         } else if (purpose == VerificationPurpose.PHONE_VERIFICATION) {
-            user.setPhoneVerifiedAt(now);
+            user.getPhones().stream().filter(com.nexxserve.nexxauth.entity.OrganisationUserPhone::isPrimary).findFirst().ifPresent(p -> p.setVerifiedAt(now));
+            if (user.getPhoneVerifiedAt() == null && !user.getPhones().isEmpty()) {
+                user.getPhones().iterator().next().setVerifiedAt(now);
+            }
             user.setRequirePhoneVerificationAtNextLogin(false);
         }
         user.bumpDataHash();
@@ -389,9 +506,9 @@ public class OrganisationVerificationService {
     public void sendOnRegisterVerification(Organisation organisation, OrganisationUser user) {
         OrganisationAuthConfig config = authConfigService.configOf(organisation);
         boolean sendEmail = config.isRequireEmailVerificationOnRegister()
-                && user.getEmail() != null && !user.getEmail().isBlank() && user.getEmailVerifiedAt() == null;
+                && user.getPrimaryEmail() != null && !user.getPrimaryEmail().isBlank() && !user.isEmailVerified();
         boolean sendPhone = config.isRequirePhoneVerificationOnRegister()
-                && user.getPhone() != null && !user.getPhone().isBlank() && user.getPhoneVerifiedAt() == null;
+                && user.getPrimaryPhone() != null && !user.getPrimaryPhone().isBlank() && !user.isPhoneVerified();
         if (!sendEmail && !sendPhone) {
             return;
         }
@@ -551,10 +668,28 @@ public class OrganisationVerificationService {
     }
 
     private void markVerified(OrganisationUser user, VerificationPurpose purpose, Instant now) {
+        markVerified(user, purpose, null, now);
+    }
+
+    private void markVerified(OrganisationUser user, VerificationPurpose purpose, String identifier, Instant now) {
         if (purpose == VerificationPurpose.EMAIL_VERIFICATION) {
-            user.setEmailVerifiedAt(now);
+            if (identifier != null) {
+                user.getEmails().stream()
+                        .filter(e -> e.getEmail().equalsIgnoreCase(identifier))
+                        .findFirst()
+                        .ifPresentOrElse(e -> e.setVerifiedAt(now), () -> user.addEmail(identifier, true, now));
+            } else {
+                user.getEmails().stream().filter(com.nexxserve.nexxauth.entity.OrganisationUserEmail::isPrimary).findFirst().ifPresent(e -> e.setVerifiedAt(now));
+            }
         } else if (purpose == VerificationPurpose.PHONE_VERIFICATION) {
-            user.setPhoneVerifiedAt(now);
+            if (identifier != null) {
+                user.getPhones().stream()
+                        .filter(p -> p.getPhone().equals(identifier))
+                        .findFirst()
+                        .ifPresentOrElse(p -> p.setVerifiedAt(now), () -> user.addPhone(identifier, true, now));
+            } else {
+                user.getPhones().stream().filter(com.nexxserve.nexxauth.entity.OrganisationUserPhone::isPrimary).findFirst().ifPresent(p -> p.setVerifiedAt(now));
+            }
         }
         user.bumpDataHash();
         userRepository.save(user);
@@ -632,8 +767,8 @@ public class OrganisationVerificationService {
     /** The normalized address of {@code user} on the given channel. */
     private String normalizedIdentifier(OrganisationUser user, VerificationChannel channel) {
         String raw = switch (channel) {
-            case EMAIL -> user.getEmail();
-            case SMS -> user.getPhone();
+            case EMAIL -> user.getPrimaryEmail();
+            case SMS -> user.getPrimaryPhone();
         };
         String normalized = normalize(channel, raw);
         return normalized;

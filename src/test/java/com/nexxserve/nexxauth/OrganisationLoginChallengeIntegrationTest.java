@@ -72,33 +72,34 @@ class OrganisationLoginChallengeIntegrationTest {
         registerUser(orgAuth, clientKey, orgId, "ch2fa", "ch2fa@example.com", "passw0rd1");
 
         // password alone is no longer enough: the server sends an OTP and the
-        // response carries a challenge instead of tokens
+        // response carries an action token and OTP_NEEDED action
         MvcResult login = mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "ch2fa",
+                                "identifierType", "USERNAME",
                                 "password", "passw0rd1"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").doesNotExist())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
                 .andExpect(jsonPath("$.refreshToken").doesNotExist())
-                .andExpect(jsonPath("$.challenge.challengeToken").isNotEmpty())
-                .andExpect(jsonPath("$.challenge.purpose").value(VerificationPurpose.TWO_FACTOR.name()))
-                .andExpect(jsonPath("$.challenge.channel").value(VerificationChannel.EMAIL.name()))
-                .andExpect(jsonPath("$.challenge.delivery").value(VerificationDelivery.OTP.name()))
+                .andExpect(jsonPath("$.expiresInSeconds").value(300))
+                .andExpect(jsonPath("$.actions[0]").value("OTP_NEEDED"))
                 .andReturn();
 
-        String challengeToken = objectMapper.readTree(login.getResponse().getContentAsString())
-                .get("challenge").get("challengeToken").asText();
+        String actionToken = objectMapper.readTree(login.getResponse().getContentAsString())
+                .get("accessToken").asText();
         String code = capturedCode();
 
-        // solving the challenge issues the full session
-        MvcResult solved = mockMvc.perform(post(orgAuth + "/challenges/verify")
+        // solving via VERIFY mode with action token bearer issues the full session
+        MvcResult solved = mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
+                        .header("Authorization", bearer(actionToken))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("challengeToken", challengeToken, "code", code))))
+                        .content(json(Map.of("mode", "VERIFY", "verificationCode", code))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.challenge").doesNotExist())
+                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
+                .andExpect(jsonPath("$.actions.length()").value(0))
                 .andExpect(jsonPath("$.user.username").value("ch2fa"))
                 .andReturn();
 
@@ -123,28 +124,35 @@ class OrganisationLoginChallengeIntegrationTest {
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "ch2fa2",
+                                "identifierType", "USERNAME",
                                 "password", "passw0rd1"))))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.actions[0]").value("OTP_NEEDED"))
                 .andReturn();
-        String challengeToken = objectMapper.readTree(login.getResponse().getContentAsString())
-                .get("challenge").get("challengeToken").asText();
+        String actionToken = objectMapper.readTree(login.getResponse().getContentAsString())
+                .get("accessToken").asText();
         String code = capturedCode();
         clearInvocations(nexxbotifyClient);
 
         // a wrong code is rejected...
-        mockMvc.perform(post(orgAuth + "/challenges/verify")
+        mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
+                        .header("Authorization", bearer(actionToken))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("challengeToken", challengeToken, "code", "000000"))))
+                        .content(json(Map.of("mode", "VERIFY", "verificationCode", "000000"))))
                 .andExpect(status().isUnauthorized());
 
         // ...the right code still completes the login
-        mockMvc.perform(post(orgAuth + "/challenges/verify")
+        mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
+                        .header("Authorization", bearer(actionToken))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("challengeToken", challengeToken, "code", code))))
+                        .content(json(Map.of("mode", "VERIFY", "verificationCode", code))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").isNotEmpty());
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
+                .andExpect(jsonPath("$.actions.length()").value(0));
     }
 
     @Test
@@ -179,23 +187,26 @@ class OrganisationLoginChallengeIntegrationTest {
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "chnext",
+                                "identifierType", "USERNAME",
                                 "password", "passw0rd1"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").doesNotExist())
-                .andExpect(jsonPath("$.challenge.purpose").value(VerificationPurpose.EMAIL_VERIFICATION.name()))
-                .andExpect(jsonPath("$.challenge.channel").value(VerificationChannel.EMAIL.name()))
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(jsonPath("$.actions[0]").value("VERIFY_EMAIL"))
                 .andReturn();
 
-        String challengeToken = objectMapper.readTree(login.getResponse().getContentAsString())
-                .get("challenge").get("challengeToken").asText();
+        String actionToken = objectMapper.readTree(login.getResponse().getContentAsString())
+                .get("accessToken").asText();
         String code = capturedCode();
 
-        MvcResult solved = mockMvc.perform(post(orgAuth + "/challenges/verify")
+        MvcResult solved = mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
+                        .header("Authorization", bearer(actionToken))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("challengeToken", challengeToken, "code", code))))
+                        .content(json(Map.of("mode", "VERIFY", "verificationCode", code))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
                 .andExpect(jsonPath("$.user.emailVerified").value(true))
                 .andReturn();
         String token = objectMapper.readTree(solved.getResponse().getContentAsString()).get("accessToken").asText();
@@ -205,10 +216,12 @@ class OrganisationLoginChallengeIntegrationTest {
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "chnext",
+                                "identifierType", "USERNAME",
                                 "password", "passw0rd1"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.challenge").doesNotExist());
+                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
+                .andExpect(jsonPath("$.actions.length()").value(0));
 
         mockMvc.perform(get(org + "/users/me").header("Authorization", bearer(token)))
                 .andExpect(status().isOk());
@@ -255,6 +268,7 @@ class OrganisationLoginChallengeIntegrationTest {
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "chgate",
+                                "identifierType", "USERNAME",
                                 "password", "passw0rd1"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.refreshToken").isNotEmpty())
@@ -280,6 +294,7 @@ class OrganisationLoginChallengeIntegrationTest {
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("organisationId", orgId, "identifier", "chlock",
+                                "identifierType", "USERNAME",
                                 "password", "passw0rd1"))))
                 .andExpect(status().isBadRequest());
     }

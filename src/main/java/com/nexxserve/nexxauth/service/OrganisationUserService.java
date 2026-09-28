@@ -25,13 +25,21 @@ import com.nexxserve.nexxauth.security.OrgUserPrincipal;
 import com.nexxserve.nexxauth.util.Emails;
 import com.nexxserve.nexxauth.util.Phones;
 import com.nexxserve.nexxauth.util.Usernames;
+import com.nexxserve.nexxauth.dto.request.AddUserEmailRequest;
+import com.nexxserve.nexxauth.dto.request.AddUserPhoneRequest;
+import com.nexxserve.nexxauth.entity.OrganisationUserEmail;
+import com.nexxserve.nexxauth.entity.OrganisationUserPhone;
+import com.nexxserve.nexxauth.repository.OrganisationUserEmailRepository;
+import com.nexxserve.nexxauth.repository.OrganisationUserPhoneRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Organisation users: managed data, no authentication. A person may exist in
@@ -44,6 +52,8 @@ public class OrganisationUserService {
 
     private final OrganisationUserRepository userRepository;
     private final OrganisationRoleRepository roleRepository;
+    private final OrganisationUserEmailRepository emailRepository;
+    private final OrganisationUserPhoneRepository phoneRepository;
     private final PlatformAccess platformAccess;
     private final OrganisationAccess organisationAccess;
     private final OrganisationUserMapper userMapper;
@@ -54,7 +64,10 @@ public class OrganisationUserService {
     private final AuthAuditService audit;
 
     public OrganisationUserService(OrganisationUserRepository userRepository,
-                                   OrganisationRoleRepository roleRepository, PlatformAccess platformAccess,
+                                   OrganisationRoleRepository roleRepository,
+                                   OrganisationUserEmailRepository emailRepository,
+                                   OrganisationUserPhoneRepository phoneRepository,
+                                   PlatformAccess platformAccess,
                                    OrganisationAccess organisationAccess, OrganisationUserMapper userMapper,
                                    OrganisationAuthConfigService authConfigService,
                                    OrganisationRefreshTokenService refreshTokenService,
@@ -62,6 +75,8 @@ public class OrganisationUserService {
                                    PasswordEncoder passwordEncoder, AuthAuditService audit) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
+        this.emailRepository = emailRepository;
+        this.phoneRepository = phoneRepository;
         this.platformAccess = platformAccess;
         this.organisationAccess = organisationAccess;
         this.userMapper = userMapper;
@@ -103,7 +118,7 @@ public class OrganisationUserService {
         Organisation organisation = organisationAccess.findOrganisationById(organisationId);
         organisationAccess.requireOrgUserOf(organisation, requester);
         OrganisationUser user = findUser(organisation,
-                ((com.nexxserve.nexxauth.security.OrgUserPrincipal) requester).id());
+                ((OrgUserPrincipal) requester).id());
         return userMapper.toResponse(user, userFieldService.readMetadata(user.getId()));
     }
 
@@ -126,10 +141,14 @@ public class OrganisationUserService {
 
         OrganisationUser user = userMapper.toEntity(request);
         user.setOrganisation(organisation);
-        user.setEmail(email);
         user.setUsername(username);
-        user.setPhone(phone);
         user.setLastName(cleanedName(request.lastName()));
+        if (email != null) {
+            user.addEmail(email, true, null);
+        }
+        if (phone != null) {
+            user.addPhone(phone, true, null);
+        }
         if (request.roleIds() != null) {
             user.setRoles(resolveRoles(organisation, request.roleIds()));
         }
@@ -169,15 +188,19 @@ public class OrganisationUserService {
             if (organisation.isEmailRequired() && email == null) {
                 throw new BadRequestException("Email is required for this organisation");
             }
-            assertIdentifiersFree(organisation, email, user.getUsername(), user.getPhone(), user);
-            user.setEmail(email);
+            assertIdentifiersFree(organisation, email, user.getUsername(), user.getPrimaryPhone(), user);
+            if (email == null) {
+                user.getEmails().clear();
+            } else {
+                user.addEmail(email, true, null);
+            }
         }
         if (request.username() != null) {
             String username = cleanedUsername(request.username());
             if (organisation.isUsernameRequired() && username == null) {
                 throw new BadRequestException("Username is required for this organisation");
             }
-            assertIdentifiersFree(organisation, user.getEmail(), username, user.getPhone(), user);
+            assertIdentifiersFree(organisation, user.getPrimaryEmail(), username, user.getPrimaryPhone(), user);
             user.setUsername(username);
         }
         if (request.phone() != null) {
@@ -185,8 +208,12 @@ public class OrganisationUserService {
             if (organisation.isPhoneRequired() && phone == null) {
                 throw new BadRequestException("Phone is required for this organisation");
             }
-            assertIdentifiersFree(organisation, user.getEmail(), user.getUsername(), phone, user);
-            user.setPhone(phone);
+            assertIdentifiersFree(organisation, user.getPrimaryEmail(), user.getUsername(), phone, user);
+            if (phone == null) {
+                user.getPhones().clear();
+            } else {
+                user.addPhone(phone, true, null);
+            }
         }
 
         if (request.enabled() != null && request.enabled() != user.isEnabled()) {
@@ -198,7 +225,7 @@ public class OrganisationUserService {
                     request.enabled() ? AuthAuditService.ORG_USER_ENABLED : AuthAuditService.ORG_USER_DISABLED,
                     identifierOf(user), organisation.getSlug(), organisation.getId(), null);
         }
-        Set<Long> previousRoleIds = user.getRoles().stream().map(OrganisationRole::getId).collect(java.util.stream.Collectors.toSet());
+        Set<Long> previousRoleIds = user.getRoles().stream().map(OrganisationRole::getId).collect(Collectors.toSet());
         if (request.roleIds() != null) {
             user.setRoles(resolveRoles(organisation, request.roleIds()));
         }
@@ -235,7 +262,7 @@ public class OrganisationUserService {
         }
         user.bumpDataHash();
         OrganisationUser saved = userRepository.save(user);
-        Set<Long> newRoleIds = saved.getRoles().stream().map(OrganisationRole::getId).collect(java.util.stream.Collectors.toSet());
+        Set<Long> newRoleIds = saved.getRoles().stream().map(OrganisationRole::getId).collect(Collectors.toSet());
         if (!previousRoleIds.equals(newRoleIds)) {
             audit.logPersisted(LogLevel.INFO, LogCategory.USER_MANAGEMENT, AuthAuditService.ORG_USER_ROLES_CHANGED,
                     identifierOf(saved), organisation.getSlug(), organisation.getId(),
@@ -262,16 +289,13 @@ public class OrganisationUserService {
     public void changePassword(String platformSlug, Long organisationId, OrgActor requester,
                                ChangePasswordRequest request) {
         OrganisationUser user = ownUser(platformSlug, organisationId, requester);
-        String hash = user.getPasswordHash();
-        if (hash == null || !passwordEncoder.matches(request.currentPassword(), hash)) {
+        if (user.getPasswordHash() != null && !passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
             throw new InvalidCredentialsException();
         }
-        // Validated against the org's password rules (length + reuse history).
         authConfigService.setPassword(user, request.newPassword());
         user.setTemporaryPassword(false);
         userRepository.save(user);
-        // Force re-authentication: revoke every outstanding refresh token so no
-        // session survives under the old password.
+        // Invalidate all other sessions so stolen tokens can't ride on the password change.
         refreshTokenService.revokeAllForUser(user.getId());
         audit.logPersisted(LogLevel.INFO, LogCategory.AUTH, AuthAuditService.ORG_PASSWORD_CHANGED,
                 identifierOf(user), user.getOrganisation().getSlug(), user.getOrganisation().getId(), null);
@@ -298,6 +322,154 @@ public class OrganisationUserService {
         return userMapper.toResponse(userRepository.save(user), userFieldService.readMetadata(user.getId()));
     }
 
+    @Transactional
+    public OrganisationUserResponse addEmail(String platformSlug, Long organisationId, Long userId,
+                                             OrgActor requester, AddUserEmailRequest request) {
+        Organisation organisation = resolveForUser(platformSlug, organisationId, userId, requester);
+        OrganisationUser user = findUser(organisation, userId);
+        String email = normalizedEmail(request.email());
+        if (email == null) {
+            throw new BadRequestException("Email is required");
+        }
+        emailRepository.findByOrganisationIdAndEmailIgnoreCase(organisation.getId(), email)
+                .ifPresent(existing -> {
+                    if (existing.getUser() != null && !existing.getUser().getId().equals(user.getId())) {
+                        throw new ConflictException("Email is already registered in this organisation");
+                    }
+                });
+        boolean isPrimary = Boolean.TRUE.equals(request.isPrimary()) || user.getEmails().isEmpty();
+        if (isPrimary) {
+            user.getEmails().forEach(e -> e.setPrimary(false));
+        }
+        user.addEmail(email, isPrimary, null);
+        user.bumpDataHash();
+        OrganisationUser saved = userRepository.save(user);
+        audit.logPersisted(LogLevel.INFO, LogCategory.USER_MANAGEMENT, AuthAuditService.ORG_USER_UPDATED,
+                identifierOf(saved), organisation.getSlug(), organisation.getId(), "added email " + email);
+        return userMapper.toResponse(saved, userFieldService.readMetadata(saved.getId()));
+    }
+
+    @Transactional
+    public OrganisationUserResponse deleteEmail(String platformSlug, Long organisationId, Long userId,
+                                                Long emailId, OrgActor requester) {
+        Organisation organisation = resolveForUser(platformSlug, organisationId, userId, requester);
+        OrganisationUser user = findUser(organisation, userId);
+        OrganisationUserEmail target = user.getEmails().stream()
+                .filter(e -> e.getId() != null && e.getId().equals(emailId))
+                .findFirst()
+                .orElseThrow(() -> ResourceNotFoundException.of("Organisation user email", emailId));
+        if (organisation.isEmailRequired() && user.getEmails().size() <= 1) {
+            throw new BadRequestException("Cannot remove the only email address when organisation requires email");
+        }
+        boolean wasPrimary = target.isPrimary();
+        user.removeEmail(target.getEmail());
+        if (wasPrimary && !user.getEmails().isEmpty()) {
+            user.getEmails().stream().findFirst().ifPresent(e -> e.setPrimary(true));
+        }
+        user.bumpDataHash();
+        OrganisationUser saved = userRepository.save(user);
+        audit.logPersisted(LogLevel.INFO, LogCategory.USER_MANAGEMENT, AuthAuditService.ORG_USER_UPDATED,
+                identifierOf(saved), organisation.getSlug(), organisation.getId(), "removed email " + target.getEmail());
+        return userMapper.toResponse(saved, userFieldService.readMetadata(saved.getId()));
+    }
+
+    @Transactional
+    public OrganisationUserResponse setPrimaryEmail(String platformSlug, Long organisationId, Long userId,
+                                                    Long emailId, OrgActor requester) {
+        Organisation organisation = resolveForUser(platformSlug, organisationId, userId, requester);
+        OrganisationUser user = findUser(organisation, userId);
+        OrganisationUserEmail target = user.getEmails().stream()
+                .filter(e -> e.getId() != null && e.getId().equals(emailId))
+                .findFirst()
+                .orElseThrow(() -> ResourceNotFoundException.of("Organisation user email", emailId));
+        user.getEmails().forEach(e -> e.setPrimary(false));
+        target.setPrimary(true);
+        user.bumpDataHash();
+        OrganisationUser saved = userRepository.save(user);
+        audit.logPersisted(LogLevel.INFO, LogCategory.USER_MANAGEMENT, AuthAuditService.ORG_USER_UPDATED,
+                identifierOf(saved), organisation.getSlug(), organisation.getId(), "set primary email " + target.getEmail());
+        return userMapper.toResponse(saved, userFieldService.readMetadata(saved.getId()));
+    }
+
+    @Transactional
+    public OrganisationUserResponse addPhone(String platformSlug, Long organisationId, Long userId,
+                                             OrgActor requester, AddUserPhoneRequest request) {
+        Organisation organisation = resolveForUser(platformSlug, organisationId, userId, requester);
+        OrganisationUser user = findUser(organisation, userId);
+        String phone = cleanedPhone(request.phone());
+        if (phone == null) {
+            throw new BadRequestException("Phone is required");
+        }
+        phoneRepository.findByOrganisationIdAndPhone(organisation.getId(), phone)
+                .ifPresent(existing -> {
+                    if (existing.getUser() != null && !existing.getUser().getId().equals(user.getId())) {
+                        throw new ConflictException("Phone number is already registered in this organisation");
+                    }
+                });
+        boolean isPrimary = Boolean.TRUE.equals(request.isPrimary()) || user.getPhones().isEmpty();
+        if (isPrimary) {
+            user.getPhones().forEach(p -> p.setPrimary(false));
+        }
+        user.addPhone(phone, isPrimary, null);
+        user.bumpDataHash();
+        OrganisationUser saved = userRepository.save(user);
+        audit.logPersisted(LogLevel.INFO, LogCategory.USER_MANAGEMENT, AuthAuditService.ORG_USER_UPDATED,
+                identifierOf(saved), organisation.getSlug(), organisation.getId(), "added phone " + phone);
+        return userMapper.toResponse(saved, userFieldService.readMetadata(saved.getId()));
+    }
+
+    @Transactional
+    public OrganisationUserResponse deletePhone(String platformSlug, Long organisationId, Long userId,
+                                                Long phoneId, OrgActor requester) {
+        Organisation organisation = resolveForUser(platformSlug, organisationId, userId, requester);
+        OrganisationUser user = findUser(organisation, userId);
+        OrganisationUserPhone target = user.getPhones().stream()
+                .filter(p -> p.getId() != null && p.getId().equals(phoneId))
+                .findFirst()
+                .orElseThrow(() -> ResourceNotFoundException.of("Organisation user phone", phoneId));
+        if (organisation.isPhoneRequired() && user.getPhones().size() <= 1) {
+            throw new BadRequestException("Cannot remove the only phone number when organisation requires phone");
+        }
+        boolean wasPrimary = target.isPrimary();
+        user.removePhone(target.getPhone());
+        if (wasPrimary && !user.getPhones().isEmpty()) {
+            user.getPhones().stream().findFirst().ifPresent(p -> p.setPrimary(true));
+        }
+        user.bumpDataHash();
+        OrganisationUser saved = userRepository.save(user);
+        audit.logPersisted(LogLevel.INFO, LogCategory.USER_MANAGEMENT, AuthAuditService.ORG_USER_UPDATED,
+                identifierOf(saved), organisation.getSlug(), organisation.getId(), "removed phone " + target.getPhone());
+        return userMapper.toResponse(saved, userFieldService.readMetadata(saved.getId()));
+    }
+
+    @Transactional
+    public OrganisationUserResponse setPrimaryPhone(String platformSlug, Long organisationId, Long userId,
+                                                    Long phoneId, OrgActor requester) {
+        Organisation organisation = resolveForUser(platformSlug, organisationId, userId, requester);
+        OrganisationUser user = findUser(organisation, userId);
+        OrganisationUserPhone target = user.getPhones().stream()
+                .filter(p -> p.getId() != null && p.getId().equals(phoneId))
+                .findFirst()
+                .orElseThrow(() -> ResourceNotFoundException.of("Organisation user phone", phoneId));
+        user.getPhones().forEach(p -> p.setPrimary(false));
+        target.setPrimary(true);
+        user.bumpDataHash();
+        OrganisationUser saved = userRepository.save(user);
+        audit.logPersisted(LogLevel.INFO, LogCategory.USER_MANAGEMENT, AuthAuditService.ORG_USER_UPDATED,
+                identifierOf(saved), organisation.getSlug(), organisation.getId(), "set primary phone " + target.getPhone());
+        return userMapper.toResponse(saved, userFieldService.readMetadata(saved.getId()));
+    }
+
+    private Organisation resolveForUser(String platformSlug, Long organisationId, Long userId, OrgActor requester) {
+        if (!requester.isPlatformUser() && requester instanceof OrgUserPrincipal principal && principal.id().equals(userId)) {
+            Platform platform = platformAccess.findPlatform(platformSlug);
+            Organisation organisation = organisationAccess.findOrganisationById(organisationId);
+            organisationAccess.requireOrgUserOf(organisation, requester);
+            return organisation;
+        }
+        return resolve(platformSlug, organisationId, requester, true, Permission.ORGANISATION_USER_UPDATE);
+    }
+
     /** Resolves the requesting org user's own account, forbidding platform
      * users (they have no organisation profile). */
     private OrganisationUser ownUser(String platformSlug, Long organisationId, OrgActor requester) {
@@ -311,34 +483,37 @@ public class OrganisationUserService {
     }
 
     private String identifierOf(OrganisationUser user) {
-        // First non-null identifier, so phone-only users stay attributable.
         return user.getUsername() != null ? user.getUsername()
-                : user.getEmail() != null ? user.getEmail()
-                : user.getPhone() != null ? user.getPhone() : "unknown";
+                : user.getPrimaryEmail() != null ? user.getPrimaryEmail()
+                : user.getPrimaryPhone() != null ? user.getPrimaryPhone() : "unknown";
     }
 
     private void assertIdentifiersFree(Organisation organisation, String email, String username,
                                        String phone, OrganisationUser exclude) {
-        if (email != null && (exclude == null || !email.equals(exclude.getEmail()))
-                && userRepository.existsByOrganisationIdAndEmail(organisation.getId(), email)) {
-            throw new ConflictException("An organisation user with email " + email
-                    + " already exists in this organisation");
+        if (email != null) {
+            Optional<OrganisationUser> existing = userRepository.findByOrganisationIdAndEmail(organisation.getId(), email);
+            if (existing.isPresent() && (exclude == null || !existing.get().getId().equals(exclude.getId()))) {
+                throw new ConflictException("An organisation user with email " + email
+                        + " already exists in this organisation");
+            }
         }
-        if (username != null && (exclude == null || !username.equals(exclude.getUsername()))
-                && userRepository.existsByOrganisationIdAndUsername(organisation.getId(), username)) {
-            throw new ConflictException("An organisation user with username " + username
-                    + " already exists in this organisation");
+        if (username != null) {
+            Optional<OrganisationUser> existing = userRepository.findByOrganisationIdAndUsername(organisation.getId(), username);
+            if (existing.isPresent() && (exclude == null || !existing.get().getId().equals(exclude.getId()))) {
+                throw new ConflictException("An organisation user with username " + username
+                        + " already exists in this organisation");
+            }
         }
-        if (phone != null && (exclude == null || !phone.equals(exclude.getPhone()))
-                && userRepository.existsByOrganisationIdAndPhone(organisation.getId(), phone)) {
-            throw new ConflictException("An organisation user with phone " + phone
-                    + " already exists in this organisation");
+        if (phone != null) {
+            Optional<OrganisationUser> existing = userRepository.findByOrganisationIdAndPhone(organisation.getId(), phone);
+            if (existing.isPresent() && (exclude == null || !existing.get().getId().equals(exclude.getId()))) {
+                throw new ConflictException("An organisation user with phone " + phone
+                        + " already exists in this organisation");
+            }
         }
     }
 
     private Set<OrganisationRole> resolveRoles(Organisation organisation, Set<Long> roleIds) {
-        // Mutable set: Hibernate mutates the collection when syncing the join
-        // table, and Set.of()/List.of() are immutable (UnsupportedOperationException).
         Set<OrganisationRole> roles = new java.util.HashSet<>();
         if (!roleIds.isEmpty()) {
             Set<OrganisationRole> found = roleRepository.findByIdInAndOrganisationId(roleIds, organisation.getId());
@@ -376,40 +551,26 @@ public class OrganisationUserService {
         return organisation;
     }
 
-    /** null/blank -> null; otherwise trimmed. */
     private String cleanedName(String value) {
-        if (value == null) {
-            return null;
-        }
+        if (value == null) return null;
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
     }
 
-    /** null/blank -> null (clears the identifier); otherwise trimmed + normalized. */
     private String normalizedEmail(String email) {
-        if (email == null) {
-            return null;
-        }
+        if (email == null) return null;
         String normalized = Emails.normalize(email);
         return normalized.isBlank() ? null : normalized;
     }
 
-    /** null/blank -> null (clears the identifier); otherwise trimmed + lowercased
-     * so Bob and bob are the same account. */
     private String cleanedUsername(String value) {
-        if (value == null) {
-            return null;
-        }
+        if (value == null) return null;
         String normalized = Usernames.normalize(value);
         return normalized.isEmpty() ? null : normalized;
     }
 
-    /** null/blank -> null (clears the identifier); otherwise trimmed with
-     * separators stripped so +1 (555) 123-4567 == +15551234567. */
     private String cleanedPhone(String value) {
-        if (value == null) {
-            return null;
-        }
+        if (value == null) return null;
         String normalized = Phones.normalize(value);
         return normalized.isEmpty() ? null : normalized;
     }

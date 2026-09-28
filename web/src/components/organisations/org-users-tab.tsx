@@ -84,9 +84,91 @@ export function OrgUsersTab({ platformSlug, organisationId, useEmailAsUsername }
                         <InitialsAvatar name={fullName(user)} />
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium">{fullName(user)}</p>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {user.email ?? user.username ?? `#${user.id}`}
-                          </p>
+                          <div className="flex flex-col gap-1 text-xs text-muted-foreground mt-0.5">
+                            {user.emails && user.emails.length > 0 ? (
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                {user.emails.map((e) => (
+                                  <span key={e.id} className="inline-flex items-center gap-1 rounded bg-muted/60 px-1.5 py-0.5">
+                                    <span className={e.isPrimary ? "font-medium text-foreground" : "text-muted-foreground"}>{e.email}</span>
+                                    {e.isPrimary && (
+                                      <span className="rounded bg-primary/10 px-1 text-[9px] font-semibold text-primary">
+                                        primary
+                                      </span>
+                                    )}
+                                    {e.verified ? (
+                                      <span
+                                        className="rounded-full bg-emerald-500/10 px-1.5 py-0.2 text-[10px] font-medium text-emerald-600 dark:text-emerald-400"
+                                        title={`Verified${e.verifiedAt ? ` on ${formatDate(e.verifiedAt)}` : ""}`}
+                                      >
+                                        ✓ verified
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] text-muted-foreground/60" title="Unverified">
+                                        unverified
+                                      </span>
+                                    )}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : user.email ? (
+                              <span className="inline-flex items-center gap-1">
+                                {user.email}
+                                {user.emailVerified ? (
+                                  <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-1.5 py-0.2 text-[10px] font-medium text-emerald-600 dark:text-emerald-400" title="Email Verified">
+                                    ✓ verified
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center text-[10px] text-muted-foreground/70" title="Email Unverified">
+                                    unverified
+                                  </span>
+                                )}
+                              </span>
+                            ) : null}
+
+                            {user.phones && user.phones.length > 0 ? (
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                {user.phones.map((p) => (
+                                  <span key={p.id} className="inline-flex items-center gap-1 rounded bg-muted/60 px-1.5 py-0.5">
+                                    <span className={p.isPrimary ? "font-medium text-foreground" : "text-muted-foreground"}>{p.phone}</span>
+                                    {p.isPrimary && (
+                                      <span className="rounded bg-primary/10 px-1 text-[9px] font-semibold text-primary">
+                                        primary
+                                      </span>
+                                    )}
+                                    {p.verified ? (
+                                      <span
+                                        className="rounded-full bg-emerald-500/10 px-1.5 py-0.2 text-[10px] font-medium text-emerald-600 dark:text-emerald-400"
+                                        title={`Verified${p.verifiedAt ? ` on ${formatDate(p.verifiedAt)}` : ""}`}
+                                      >
+                                        ✓ verified
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] text-muted-foreground/60" title="Unverified">
+                                        unverified
+                                      </span>
+                                    )}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : user.phone ? (
+                              <span className="inline-flex items-center gap-1">
+                                {user.phone}
+                                {user.phoneVerified ? (
+                                  <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-1.5 py-0.2 text-[10px] font-medium text-emerald-600 dark:text-emerald-400" title="Phone Verified">
+                                    ✓ verified
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center text-[10px] text-muted-foreground/70" title="Phone Unverified">
+                                    unverified
+                                  </span>
+                                )}
+                              </span>
+                            ) : null}
+
+                            {!user.email && (!user.emails || user.emails.length === 0) && !user.phone && (!user.phones || user.phones.length === 0) && user.username ? (
+                              <span>@{user.username}</span>
+                            ) : null}
+                          </div>
                           {user.metadata && Object.keys(user.metadata).length > 0 ? (
                             <p className="truncate text-xs text-muted-foreground">
                               {Object.entries(user.metadata)

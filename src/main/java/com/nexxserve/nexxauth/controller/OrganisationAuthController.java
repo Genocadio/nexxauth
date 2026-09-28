@@ -59,9 +59,11 @@ public class OrganisationAuthController {
     @PostMapping("/login")
     public OrgAuthResponse login(@PathVariable String slug,
                                  @RequestHeader(value = CLIENT_ID_HEADER, required = false) String clientId,
+                                 @RequestHeader(value = "Authorization", required = false) String authHeader,
                                  @Valid @RequestBody OrgLoginRequest request,
                                  HttpServletRequest httpRequest) {
-        return authService.login(slug, request, clientId, resolveIp(httpRequest), httpRequest.getHeader("User-Agent"), resolveHostname(httpRequest));
+        return authService.login(slug, request, clientId, resolveIp(httpRequest),
+                httpRequest.getHeader("User-Agent"), resolveHostname(httpRequest), authHeader);
     }
 
     @PostMapping("/challenges/verify")

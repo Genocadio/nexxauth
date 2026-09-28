@@ -83,6 +83,24 @@ export interface OrganisationRoleResponse {
   isDefault: boolean;
 }
 
+export interface OrganisationUserEmailResponse {
+  id: number;
+  email: string;
+  isPrimary: boolean;
+  verified: boolean;
+  verifiedAt: IsoDate | null;
+  createdAt: IsoDate;
+}
+
+export interface OrganisationUserPhoneResponse {
+  id: number;
+  phone: string;
+  isPrimary: boolean;
+  verified: boolean;
+  verifiedAt: IsoDate | null;
+  createdAt: IsoDate;
+}
+
 export interface OrganisationUserResponse {
   id: number;
   firstName: string;
@@ -92,6 +110,12 @@ export interface OrganisationUserResponse {
   email: string | null;
   phone: string | null;
   enabled: boolean;
+  emailVerified?: boolean;
+  phoneVerified?: boolean;
+  emails?: OrganisationUserEmailResponse[];
+  phones?: OrganisationUserPhoneResponse[];
+  requireEmailVerificationAtNextLogin?: boolean;
+  requirePhoneVerificationAtNextLogin?: boolean;
   /** The user's enabled auth methods (only PASSWORD exists today). Empty when
    * the user has no auth configured and cannot log in. */
   authTypes: AuthType[];
@@ -117,9 +141,35 @@ export interface OrganisationAuthConfigResponse {
   passwordMaxLength: number;
   passwordExpirationDays: number;
   passwordHistoryCount: number;
+  emailVerificationEnabled: boolean;
+  phoneVerificationEnabled: boolean;
+  passwordResetEnabled: boolean;
+  otpLoginEnabled: boolean;
+  twoFactorEnabled: boolean;
+  verificationMode: "OTP" | "LINK";
+  requireEmailVerificationOnRegister: boolean;
+  requirePhoneVerificationOnRegister: boolean;
   /** False when the notification service (nexxbotify) is not configured:
    * email/phone verification, password reset, OTP login and 2FA are locked. */
   verificationServiceAvailable: boolean;
+}
+
+export interface EmailTemplateConfig {
+  enabled: boolean;
+  subject: string;
+  body: string;
+  html: string;
+}
+
+export interface SmsTemplateConfig {
+  enabled: boolean;
+  body: string;
+}
+
+export interface OrganisationNotificationTemplates {
+  flowId: string;
+  email: EmailTemplateConfig;
+  sms: SmsTemplateConfig;
 }
 
 export interface OrganisationSessionSettingsResponse {

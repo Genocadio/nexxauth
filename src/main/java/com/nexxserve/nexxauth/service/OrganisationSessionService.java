@@ -227,8 +227,8 @@ public class OrganisationSessionService {
                     .anyMatch(t -> !t.isRevoked() && !t.isEvicted() && !t.isExpired());
 
             String identifier = user.getUsername() != null ? user.getUsername()
-                    : user.getEmail() != null ? user.getEmail()
-                    : user.getPhone() != null ? user.getPhone() : "unknown";
+                    : user.getPrimaryEmail() != null ? user.getPrimaryEmail()
+                    : user.getPrimaryPhone() != null ? user.getPrimaryPhone() : "unknown";
 
             // Use the client key from the most recent token in the session
             String clientKey = sessionTokens.stream()

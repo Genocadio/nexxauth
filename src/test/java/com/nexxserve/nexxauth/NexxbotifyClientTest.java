@@ -55,6 +55,7 @@ class NexxbotifyClientTest {
         when(uriSpec.uri("/send")).thenReturn(bodySpec);
         when(uriSpec.uri("/flows")).thenReturn(bodySpec);
         when(uriSpec.uri(org.mockito.ArgumentMatchers.eq("/flows/{id}/channels"), any(Object[].class))).thenReturn(bodySpec);
+        when(bodySpec.accept(any(org.springframework.http.MediaType[].class))).thenReturn(bodySpec);
         when(bodySpec.body(any(NexxbotifyClient.SendRequest.class))).thenReturn(bodySpec);
         when(bodySpec.body(any(NexxbotifyClient.CreateFlowRequest.class))).thenReturn(bodySpec);
         when(bodySpec.body(any(NexxbotifyClient.CreateChannelRequest.class))).thenReturn(bodySpec);
@@ -65,8 +66,14 @@ class NexxbotifyClientTest {
         client = new NexxbotifyClient(builder, properties);
     }
 
+    private final tools.jackson.databind.ObjectMapper objectMapper = new tools.jackson.databind.ObjectMapper();
+
     private void respond(NexxbotifyClient.SendResponse response) {
-        when(responseSpec.body(NexxbotifyClient.SendResponse.class)).thenReturn(response);
+        try {
+            when(responseSpec.body(String.class)).thenReturn(objectMapper.writeValueAsString(response));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private NexxbotifyClient.SendResult sent(String receiver, String channel) {

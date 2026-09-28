@@ -9,5 +9,15 @@ package com.nexxserve.nexxauth.entity;
  */
 public enum AuthType {
     PASSWORD,
-    OTP
+    OTP,
+    PASSWORDLESS,
+    VERIFY;
+
+    public boolean isPasswordless() {
+        return this == OTP || this == PASSWORDLESS;
+    }
+
+    public boolean isVerify() {
+        return this == VERIFY;
+    }
 }

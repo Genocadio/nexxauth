@@ -24,7 +24,7 @@ function forceLogout() {
 export type AuthMode = "platform" | "none";
 
 interface RequestOptions {
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   auth?: AuthMode;
   signal?: AbortSignal;
@@ -145,6 +145,9 @@ export const get = <T>(path: string, auth: AuthMode = "none", signal?: AbortSign
 
 export const post = <T>(path: string, body?: unknown, auth: AuthMode = "none") =>
   request<T>(path, { method: "POST", body, auth });
+
+export const put = <T>(path: string, body?: unknown, auth: AuthMode = "none") =>
+  request<T>(path, { method: "PUT", body, auth });
 
 export const patch = <T>(path: string, body?: unknown, auth: AuthMode = "none") =>
   request<T>(path, { method: "PATCH", body, auth });

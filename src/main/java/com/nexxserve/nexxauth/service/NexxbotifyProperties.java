@@ -18,9 +18,9 @@ public class NexxbotifyProperties {
      * time. */
     private String baseUrl = "";
 
-    private int connectTimeoutMs = 2000;
+    private int connectTimeoutMs = 5000;
 
-    private int readTimeoutMs = 5000;
+    private int readTimeoutMs = 10000;
 
     /** Flow id for an OTP delivered by email. */
     private String otpEmailFlowId = "otp_email";

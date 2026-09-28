@@ -30,11 +30,6 @@ public class OrgUserActions {
      * regardless of the organisation's session settings. */
     public static final Duration GATING_ACCESS_TTL = Duration.ofMinutes(5);
 
-    /** When true, the user must resolve a gating action before (or alongside)
-     * normal access: refresh is rejected until it is cleared, and issued
-     * sessions are restricted. CHANGE_PASSWORD and a register-required
-     * verification are the gating actions today. */
-
     private final OrganisationUserFieldRepository fieldRepository;
     private final OrganisationUserFieldValueRepository valueRepository;
     private final OrganisationAuthConfigService authConfigService;
@@ -66,14 +61,16 @@ public class OrgUserActions {
      * verification (VERIFY_EMAIL / VERIFY_PHONE) when the org demands it on
      * registration, are the gating actions today. */
     public boolean hasPendingGatingAction(OrganisationUser user) {
-        if (user.isTemporaryPassword()) {
+        if (user.isTemporaryPassword()
+                || (user.isRequireEmailVerificationAtNextLogin() && user.getPrimaryEmail() != null && user.getEmailVerifiedAt() == null)
+                || (user.isRequirePhoneVerificationAtNextLogin() && user.getPrimaryPhone() != null && user.getPhoneVerifiedAt() == null)) {
             return true;
         }
         OrganisationAuthConfig config = authConfigService.configOf(user.getOrganisation());
         boolean unverifiedRequiredEmail = config.isRequireEmailVerificationOnRegister()
-                && user.getEmail() != null && user.getEmailVerifiedAt() == null;
+                && user.getPrimaryEmail() != null && user.getEmailVerifiedAt() == null;
         boolean unverifiedRequiredPhone = config.isRequirePhoneVerificationOnRegister()
-                && user.getPhone() != null && user.getPhoneVerifiedAt() == null;
+                && user.getPrimaryPhone() != null && user.getPhoneVerifiedAt() == null;
         return unverifiedRequiredEmail || unverifiedRequiredPhone;
     }
 
@@ -92,16 +89,20 @@ public class OrgUserActions {
 
     /** Surfaces VERIFY_EMAIL / VERIFY_PHONE for users whose organisation
      * requires the respective verification (either the standing enabled
-     * flow or the register-time requirement) and the address is
+     * flow or the register-time requirement or forced at next login) and the address is
      * unverified. */
     private void addVerificationActions(OrganisationUser user, List<OrgUserAction> actions) {
         OrganisationAuthConfig config = authConfigService.configOf(user.getOrganisation());
-        boolean emailRequired = config.isEmailVerificationEnabled() || config.isRequireEmailVerificationOnRegister();
-        if (emailRequired && user.getEmail() != null && user.getEmailVerifiedAt() == null) {
+        boolean emailRequired = config.isEmailVerificationEnabled()
+                || config.isRequireEmailVerificationOnRegister()
+                || user.isRequireEmailVerificationAtNextLogin();
+        if (emailRequired && user.getPrimaryEmail() != null && user.getEmailVerifiedAt() == null) {
             actions.add(OrgUserAction.VERIFY_EMAIL);
         }
-        boolean phoneRequired = config.isPhoneVerificationEnabled() || config.isRequirePhoneVerificationOnRegister();
-        if (phoneRequired && user.getPhone() != null && user.getPhoneVerifiedAt() == null) {
+        boolean phoneRequired = config.isPhoneVerificationEnabled()
+                || config.isRequirePhoneVerificationOnRegister()
+                || user.isRequirePhoneVerificationAtNextLogin();
+        if (phoneRequired && user.getPrimaryPhone() != null && user.getPhoneVerifiedAt() == null) {
             actions.add(OrgUserAction.VERIFY_PHONE);
         }
     }

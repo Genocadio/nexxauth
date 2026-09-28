@@ -143,30 +143,30 @@ class OrganisationUserFieldIntegrationTest {
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "EMP123", "password", "orgpass1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "EMP123", "identifierType", "USERNAME", "password", "orgpass1"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.user.metadata['employee-id']").value("EMP123"));
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "1.5", "password", "orgpass1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "1.5", "identifierType", "USERNAME", "password", "orgpass1"))))
                 .andExpect(status().isOk());
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "1.50", "password", "orgpass1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "1.50", "identifierType", "USERNAME", "password", "orgpass1"))))
                 .andExpect(status().isOk());
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "2026-01-05", "password", "orgpass1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "2026-01-05", "identifierType", "USERNAME", "password", "orgpass1"))))
                 .andExpect(status().isOk());
 
         // STRING login values match case-insensitively
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "emp123", "password", "orgpass1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "emp123", "identifierType", "USERNAME", "password", "orgpass1"))))
                 .andExpect(status().isOk());
 
         // ...so case-differing values count as duplicates on a login field
@@ -182,7 +182,7 @@ class OrganisationUserFieldIntegrationTest {
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "true", "password", "orgpass1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "true", "identifierType", "USERNAME", "password", "orgpass1"))))
                 .andExpect(status().isUnauthorized());
 
         // login-enabled values must stay unique (raw and normalized duplicates)
@@ -386,7 +386,7 @@ class OrganisationUserFieldIntegrationTest {
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "E1", "password", "orgpass1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "E1", "identifierType", "USERNAME", "password", "orgpass1"))))
                 .andExpect(status().isOk());
 
         // deleting the field removes its values
@@ -404,7 +404,7 @@ class OrganisationUserFieldIntegrationTest {
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "E1", "password", "orgpass1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "E1", "identifierType", "USERNAME", "password", "orgpass1"))))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -500,7 +500,7 @@ class OrganisationUserFieldIntegrationTest {
         MvcResult result = mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("identifier", identifier, "password", password))))
+                        .content(json(Map.of("identifier", identifier, "identifierType", "USERNAME", "password", password))))
                 .andExpect(status().isOk())
                 .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("accessToken").asText();

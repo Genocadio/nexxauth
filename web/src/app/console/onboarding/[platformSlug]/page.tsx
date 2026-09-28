@@ -914,10 +914,19 @@ function StepClient({
         {error ? (
           <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
         ) : null}
-        <div className="flex justify-end">
+        <div className="flex items-center justify-between pt-2">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => void advance(7)}
+            disabled={busy}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Skip for now (set up later)
+          </Button>
           <Button onClick={submit} disabled={busy} className="gap-2">
             {busy ? <Loader2 className="animate-spin" /> : null}
-            Create client
+            Create client &amp; continue
           </Button>
         </div>
 
@@ -988,20 +997,29 @@ function StepKeys({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <KeyRound className="h-4 w-4 text-primary" /> Your client is ready 🎉
+          <KeyRound className="h-4 w-4 text-primary" /> {client ? "Your client is ready 🎉" : "Organisation Integration & Keys"}
         </CardTitle>
         <CardDescription>
-          Here is everything your client needs to authenticate users. All values are available from
-          the console at any time.
+          {client
+            ? "Here is everything your client needs to authenticate users. All values are available from the console at any time."
+            : "Your organisation setup is complete! Here are your API endpoints and signing keys. You can connect applications (Web, Mobile, Server) anytime from the console."}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="rounded-lg border p-3">
           <p className="text-sm font-medium">Client id</p>
-          <p className="font-mono text-xs break-all">{client?.clientKey ?? "—"}</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Send it as the <code>X-Client-Id</code> header on every request.
-          </p>
+          {client ? (
+            <>
+              <p className="font-mono text-xs break-all">{client.clientKey}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Send it as the <code>X-Client-Id</code> header on every request.
+              </p>
+            </>
+          ) : (
+            <p className="mt-1 text-xs text-muted-foreground">
+              No client created yet. You can create clients anytime under <strong>Clients</strong> in the console.
+            </p>
+          )}
         </div>
         <div className="rounded-lg border p-3">
           <p className="text-sm font-medium">Issuer / API base</p>

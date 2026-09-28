@@ -316,7 +316,7 @@ class OrganisationClientIntegrationTest {
         String aliceToken = objectMapper.readTree(mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", webKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "alice", "password", "password1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "alice", "identifierType", "USERNAME", "password", "password1"))))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString()).get("accessToken").asText();
 
@@ -372,7 +372,7 @@ class OrganisationClientIntegrationTest {
         String bobToken = objectMapper.readTree(mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", tempKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "bob", "password", "password1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "bob", "identifierType", "USERNAME", "password", "password1"))))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString()).get("accessToken").asText();
 
@@ -533,12 +533,12 @@ long adminRole = createRole(boss, org, "admin", true, "ORGANISATION_USER_READ");
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", allowKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("identifier", "alice", "password", "password1"))))
+                        .content(json(Map.of("identifier", "alice", "identifierType", "USERNAME", "password", "password1"))))
                 .andExpect(status().isOk());
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", allowKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("identifier", "bob", "password", "password1"))))
+                        .content(json(Map.of("identifier", "bob", "identifierType", "USERNAME", "password", "password1"))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Your role is not permitted to authenticate from this client"));
 
@@ -546,25 +546,25 @@ long adminRole = createRole(boss, org, "admin", true, "ORGANISATION_USER_READ");
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", blockKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("identifier", "alice", "password", "password1"))))
+                        .content(json(Map.of("identifier", "alice", "identifierType", "USERNAME", "password", "password1"))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Your role is not permitted to authenticate from this client"));
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", blockKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("identifier", "bob", "password", "password1"))))
+                        .content(json(Map.of("identifier", "bob", "identifierType", "USERNAME", "password", "password1"))))
                 .andExpect(status().isOk());
 
         // NO RESTRICTION: both can login
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", openKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("identifier", "alice", "password", "password1"))))
+                        .content(json(Map.of("identifier", "alice", "identifierType", "USERNAME", "password", "password1"))))
                 .andExpect(status().isOk());
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", openKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("identifier", "bob", "password", "password1"))))
+                        .content(json(Map.of("identifier", "bob", "identifierType", "USERNAME", "password", "password1"))))
                 .andExpect(status().isOk());
 
         // response carries the roleRestrictionMode
@@ -589,7 +589,7 @@ long adminRole = createRole(boss, org, "admin", true, "ORGANISATION_USER_READ");
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", allowKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("identifier", "bob", "password", "password1"))))
+                        .content(json(Map.of("identifier", "bob", "identifierType", "USERNAME", "password", "password1"))))
                 .andExpect(status().isOk());
     }
 

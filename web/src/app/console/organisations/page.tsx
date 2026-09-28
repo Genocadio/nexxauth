@@ -10,10 +10,9 @@ import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { CardsSkeleton } from "@/components/shared/loading";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { useOrganisations, usePlatformSlug } from "@/hooks/queries";
 import { organisationsHealthApi, type OrganisationHealth } from "@/api/organisations-health";
-import { formatDate } from "@/lib/constants";
 
 export default function OrganisationsPage() {
   const platformSlug = usePlatformSlug() ?? "";
@@ -97,17 +96,6 @@ export default function OrganisationsPage() {
                     <OrgHealthBar health={healthMap[org.id]} />
                   )}
                 </CardContent>
-                <CardFooter className="flex items-center justify-between border-t px-5 py-3 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1.5">
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${
-                        org.useEmailAsUsername ? "bg-emerald-500" : "bg-blue-500"
-                      }`}
-                    />
-                    {org.useEmailAsUsername ? "Email as username" : "Username login"}
-                  </span>
-                  <span>Created {formatDate(org.createdAt)}</span>
-                </CardFooter>
               </Card>
             </motion.div>
           ))}

@@ -14,10 +14,13 @@ export const ROLE_META: Record<Role, { label: string; description: string }> = {
   READ_ONLY: { label: "Read only", description: "Can authenticate and read platform data only" },
 };
 
-export type AuthType = "PASSWORD";
+export type AuthType = "PASSWORD" | "OTP" | "PASSWORDLESS" | "VERIFY";
 
 export const AUTH_TYPE_META: Record<AuthType, { label: string; description: string }> = {
   PASSWORD: { label: "Password", description: "Users authenticate with an identifier and password" },
+  OTP: { label: "One-Time Password (OTP)", description: "Passwordless authentication via one-time codes sent to email or SMS" },
+  PASSWORDLESS: { label: "Passwordless", description: "Authenticate via one-time codes sent to email or SMS" },
+  VERIFY: { label: "Verify", description: "Submit verification code to complete sign-in or multi-factor authentication" },
 };
 
 export type UserFieldType = "STRING" | "NUMBER" | "BOOLEAN" | "DATE" | "EMAIL" | "LINK";

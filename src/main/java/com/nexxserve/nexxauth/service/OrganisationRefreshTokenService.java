@@ -216,7 +216,7 @@ public class OrganisationRefreshTokenService
     private String identifierOf(OrganisationUser user) {
         // First non-null identifier, so phone-only users stay attributable.
         return user.getUsername() != null ? user.getUsername()
-                : user.getEmail() != null ? user.getEmail()
-                : user.getPhone() != null ? user.getPhone() : "unknown";
+                : user.getPrimaryEmail() != null ? user.getPrimaryEmail()
+                : user.getPrimaryPhone() != null ? user.getPrimaryPhone() : "unknown";
     }
 }

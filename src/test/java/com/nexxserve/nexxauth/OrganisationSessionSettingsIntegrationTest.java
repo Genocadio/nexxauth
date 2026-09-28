@@ -197,7 +197,7 @@ class OrganisationSessionSettingsIntegrationTest {
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "acluser", "password", "pass1234"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "acluser", "identifierType", "USERNAME", "password", "pass1234"))))
                 .andExpect(status().isOk());
     }
 
@@ -412,7 +412,7 @@ class OrganisationSessionSettingsIntegrationTest {
         MvcResult result = mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("identifier", identifier, "password", password))))
+                        .content(json(Map.of("identifier", identifier, "identifierType", "USERNAME", "password", password))))
                 .andExpect(status().isOk())
                 .andReturn();
         return toTokens(result.getResponse().getContentAsString());

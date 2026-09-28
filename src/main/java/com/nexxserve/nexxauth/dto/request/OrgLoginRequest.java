@@ -22,23 +22,27 @@ import jakarta.validation.constraints.Size;
  */
 public record OrgLoginRequest(
 
-        @NotBlank(message = "Identifier is required")
         @Size(max = 255, message = "Identifier must be at most 255 characters")
         String identifier,
 
-        /** Type of the identifier; defaults to auto-detection when omitted. */
+        /** Type of the identifier (EMAIL, PHONE, USERNAME); required for PASSWORD and PASSWORDLESS modes. */
         OrgIdentifierType identifierType,
 
-        /** Authentication method; defaults to {@code PASSWORD} when omitted. */
+        /** Authentication method; defaults to PASSWORD when omitted. */
         AuthType authType,
 
-        /** Credential for the {@code PASSWORD} method; required for it. */
+        /** Mode alias: PASSWORD, PASSWORDLESS, OTP, or VERIFY. */
+        AuthType mode,
+
+        /** Credential for the PASSWORD method; required for it. */
         @Size(max = 72, message = "Password must be at most 72 characters")
         String password,
 
-        /** One-time code for the {@code OTP} method. Request the code first via
-         * the org verification endpoint (purpose {@code LOGIN_OTP}), then send
-         * it here. Required for OTP login; ignored for PASSWORD. */
+        /** Verification code for VERIFY or OTP / PASSWORDLESS method. */
+        @Size(max = 100, message = "Code must be at most 100 characters")
+        String verificationCode,
+
+        /** Legacy alias for verificationCode. */
         @Size(max = 100, message = "Code must be at most 100 characters")
         String otpCode,
 
@@ -49,4 +53,19 @@ public record OrgLoginRequest(
          *  supplied. */
         Long organisationId
 ) {
+    public AuthType resolvedMode() {
+        if (mode != null) return mode;
+        if (authType != null) return authType;
+        return null;
+    }
+
+    public String resolvedVerificationCode() {
+        if (verificationCode != null && !verificationCode.isBlank()) {
+            return verificationCode.trim();
+        }
+        if (otpCode != null && !otpCode.isBlank()) {
+            return otpCode.trim();
+        }
+        return null;
+    }
 }

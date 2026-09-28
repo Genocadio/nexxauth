@@ -82,14 +82,27 @@ public class OrgJwtAuthenticationFilter extends OncePerRequestFilter {
         String header = request.getHeader("Authorization");
         if (header != null && header.startsWith(BEARER_PREFIX)
                 && SecurityContextHolder.getContext().getAuthentication() == null) {
+            String token = header.substring(BEARER_PREFIX.length());
             try {
-                Claims claims = orgJwtService.parseAccessToken(header.substring(BEARER_PREFIX.length()));
+                Claims claims;
+                boolean isActionToken = false;
+                try {
+                    claims = orgJwtService.parseAccessToken(token);
+                } catch (JwtException e) {
+                    if (isActionEndpoint(request)) {
+                        claims = orgJwtService.parseActionToken(token);
+                        isActionToken = true;
+                    } else {
+                        throw e;
+                    }
+                }
+                final boolean actionToken = isActionToken;
                 Long userId = Long.valueOf(claims.getSubject());
                 organisationUserRepository.findWithRolesById(userId)
                         .filter(OrganisationUser::isEnabled)
                         // A pending gating action (temporary password -> change
                         // password) restricts access to the action endpoints.
-                        .filter(user -> !user.isTemporaryPassword() || isActionEndpoint(request))
+                        .filter(user -> (!user.isTemporaryPassword() && !actionToken) || isActionEndpoint(request))
                         .ifPresent(user -> {
                             Set<Permission> permissions = user.getRoles().stream()
                                     .flatMap(role -> role.getPermissions().stream())

@@ -17,6 +17,7 @@ import type {
   OrganisationClientLinkResponse,
   OrganisationClientResponse,
   OrganisationKeyResponse,
+  OrganisationNotificationTemplates,
   OrganisationResponse,
   OrganisationRoleResponse,
   OrganisationSessionSettingsResponse,
@@ -38,6 +39,7 @@ import type {
   UpdateOrganisationRequest,
   UpdateOrganisationRoleRequest,
   UpdateOrganisationSessionSettingsRequest,
+  UpdateOrganisationTemplatesRequest,
   UpdateOrganisationUserFieldRequest,
   UpdateOrganisationUserRequest,
   UpdateUserRequest,
@@ -207,6 +209,14 @@ export function useUpdateOrgAuthConfig(platformSlug: string, organisationId: num
     mutationFn: (body) => organisationsApi.updateAuthConfig(platformSlug, organisationId, body),
     invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgAuthConfig(organisationId) })],
     successMessage: "Authentication settings saved",
+  });
+}
+
+export function useUpdateOrgNotificationTemplates(platformSlug: string, organisationId: number) {
+  return useApiMutation<OrganisationNotificationTemplates, UpdateOrganisationTemplatesRequest>({
+    mutationFn: (body) => organisationsApi.updateNotificationTemplates(platformSlug, organisationId, body),
+    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgNotificationTemplates(organisationId) })],
+    successMessage: "Notification templates updated",
   });
 }
 

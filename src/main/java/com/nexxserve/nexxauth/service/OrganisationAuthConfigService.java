@@ -91,12 +91,6 @@ public class OrganisationAuthConfigService {
                                                  UpdateOrganisationAuthConfigRequest request) {
         OrganisationAuthConfig config = configOf(organisation);
         if (request.authType() != null) {
-            // The config sets the DEFAULT auth type on register; OTP is a
-            // per-login method (the user asks for a code), never a default.
-            if (request.authType() == com.nexxserve.nexxauth.entity.AuthType.OTP) {
-                throw new com.nexxserve.nexxauth.exception.BadRequestException(
-                        "OTP cannot be the organisation's default auth type");
-            }
             config.setAuthType(request.authType());
         }
         if (request.passwordEnabled() != null) {

@@ -136,12 +136,12 @@ class AuthAuditIntegrationTest {
         mockMvc.perform(post(platform + "/auth/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "gary", "password", "wrong"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "gary", "identifierType", "USERNAME", "password", "wrong"))))
                 .andExpect(status().isUnauthorized());
         MvcResult login = mockMvc.perform(post(platform + "/auth/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "gary", "password", "orgpass1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "gary", "identifierType", "USERNAME", "password", "orgpass1"))))
                 .andExpect(status().isOk())
                 .andReturn();
         String refresh = objectMapper.readTree(login.getResponse().getContentAsString()).get("refreshToken").asText();
@@ -193,7 +193,7 @@ class AuthAuditIntegrationTest {
         MvcResult login = mockMvc.perform(post(platform + "/auth/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "heidi", "password", "orgpass1"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "heidi", "identifierType", "USERNAME", "password", "orgpass1"))))
                 .andExpect(status().isOk())
                 .andReturn();
         String refresh1 = objectMapper.readTree(login.getResponse().getContentAsString()).get("refreshToken").asText();

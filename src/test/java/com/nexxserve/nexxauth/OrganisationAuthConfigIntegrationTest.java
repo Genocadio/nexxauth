@@ -126,7 +126,7 @@ class OrganisationAuthConfigIntegrationTest {
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "nobody", "password", "whatever"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "nobody", "identifierType", "USERNAME", "password", "whatever"))))
                 .andExpect(status().isUnauthorized());
 
         // set a password via PATCH: now the user can log in
@@ -139,7 +139,7 @@ class OrganisationAuthConfigIntegrationTest {
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "nobody", "password", "newpass123"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "nobody", "identifierType", "USERNAME", "password", "newpass123"))))
                 .andExpect(status().isOk());
 
         // clearing auth (empty password) disables login again
@@ -152,7 +152,7 @@ class OrganisationAuthConfigIntegrationTest {
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "nobody", "password", "newpass123"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "nobody", "identifierType", "USERNAME", "password", "newpass123"))))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -209,7 +209,7 @@ class OrganisationAuthConfigIntegrationTest {
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
-"organisationId", orgId, "username", "aged",
+                                "organisationId", orgId, "username", "aged",
                                 "password", "oldpass12", "firstName", "A", "lastName", "G"))))
                 .andExpect(status().isCreated());
 
@@ -222,7 +222,7 @@ class OrganisationAuthConfigIntegrationTest {
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("organisationId", orgId, "identifier", "aged", "password", "oldpass12"))))
+                        .content(json(Map.of("organisationId", orgId, "identifier", "aged", "identifierType", "USERNAME", "password", "oldpass12"))))
                 .andExpect(status().isOk());
     }
 
