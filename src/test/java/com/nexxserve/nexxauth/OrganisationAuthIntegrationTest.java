@@ -79,15 +79,16 @@ class OrganisationAuthIntegrationTest {
         assertEquals("oa-org", claims.get("orgSlug").asText());
         assertEquals("org-access", claims.get("type").asText());
 
-        // login without identifierType fails with 400 Bad Request
+        // identifierType is optional — omitting it falls back to trying each
+        // identifier the org has enabled (USERNAME here), so the same
+        // identifier + password signs in without it.
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("identifier", "jane", "password", "orgpass1"))))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Identifier type is required (EMAIL, PHONE, or USERNAME)"));
+                .andExpect(status().isOk());
 
-        // login with the same identifier + password
+        // an explicit identifierType still works
         mockMvc.perform(post(orgAuth + "/login")
                         .header("X-Client-Id", clientKey)
                         .contentType(MediaType.APPLICATION_JSON)

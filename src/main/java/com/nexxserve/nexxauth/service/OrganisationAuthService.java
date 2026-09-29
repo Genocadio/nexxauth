@@ -248,9 +248,10 @@ public class OrganisationAuthService {
             if (extractedIdentifier == null || extractedIdentifier.isBlank()) {
                 throw new BadRequestException("Identifier is required");
             }
-            if (extractedIdType == null) {
-                throw new BadRequestException("Identifier type is required (EMAIL, PHONE, or USERNAME)");
-            }
+            // identifierType stays optional: the password path falls back to
+            // trying each enabled identifier (findByIdentifier) and the OTP
+            // path infers the channel from the identifier's shape
+            // (channelForIdentifier -> detectChannel).
         }
 
         if (method == AuthType.VERIFY || method == AuthType.OTP || method == AuthType.PASSWORDLESS) {
