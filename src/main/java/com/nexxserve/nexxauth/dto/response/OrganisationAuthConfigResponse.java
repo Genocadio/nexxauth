@@ -27,7 +27,7 @@ public record OrganisationAuthConfigResponse(
         boolean requirePhoneVerificationOnRegister,
         /**
          * False when the notification service (nexxbotify) is not configured
-         * (NEXXBOTIFY_URL unset): the verification features in this response
+         * (NEXXNOTIFY_URL unset): the verification features in this response
          * are then locked — email/phone verification, password reset, OTP
          * login and 2FA challenges are rejected with a 400 instead of
          * delivering codes/links.

@@ -276,7 +276,7 @@ class OrganisationVerificationIntegrationTest {
 
     @Test
     void verificationRequestIsLockedWhenNotifierNotConfigured() throws Exception {
-        // Simulate a deployment without NEXXBOTIFY_URL: the feature is locked
+        // Simulate a deployment without NEXXNOTIFY_URL: the feature is locked
         // and the request is rejected up front instead of failing at send time.
         when(nexxbotifyClient.isConfigured()).thenReturn(false);
         String platform = "/" + SLUGS[5];
