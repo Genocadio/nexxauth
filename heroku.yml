@@ -1,0 +1,7 @@
+# Heroku build manifest: the app is deployed from the multi-stage Dockerfile
+# (JDK builds the Boot jar, the JRE image runs it). The image's ENTRYPOINT
+# starts the app, so no Procfile is needed. Heroku routes traffic to $PORT,
+# which application.properties binds via server.port=${PORT:8080}.
+build:
+  docker:
+    web: Dockerfile
