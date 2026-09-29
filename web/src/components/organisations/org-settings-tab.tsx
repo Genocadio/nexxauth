@@ -253,7 +253,7 @@ function VerificationFeaturesCard({
               Verification features are currently unavailable
             </p>
             <p className="text-xs text-muted-foreground">
-              Configure <code className="font-mono text-xs">NEXXBOTIFY_URL</code> on the server to deliver verification OTPs and magic links.
+              Configure <code className="font-mono text-xs">NEXXNOTIFY_URL</code> on the server to deliver verification OTPs and magic links.
             </p>
           </div>
         ) : null}
@@ -440,15 +440,22 @@ function NotificationTemplatesCard({ platformSlug, organisationId }: OrgSettings
   const [copiedTag, setCopiedTag] = useState<string | null>(null);
   const [channelTab, setChannelTab] = useState("email");
 
-  /* Hydrate state from fetched templates */
-  useEffect(() => {
-    if (templates.data) {
-      setEmailSubject(templates.data.email.subject || "");
-      setEmailBody(templates.data.email.body || "");
-      setEmailHtml(templates.data.email.html || "");
-      setSmsBody(templates.data.sms.body || "");
-    }
-  }, [templates.data]);
+  const hydrate = (data: typeof templates.data) => {
+    setEmailSubject(data?.email.subject || "");
+    setEmailBody(data?.email.body || "");
+    setEmailHtml(data?.email.html || "");
+    setSmsBody(data?.sms.body || "");
+  };
+
+  /* Hydrate state from fetched templates. Adjusting state during render (React's
+     "derive state from props" pattern) rather than in an effect: the effect
+     version rendered once with empty inputs, then again with server values,
+     which react-hooks/set-state-in-effect flags as a cascading render. */
+  const [hydratedFrom, setHydratedFrom] = useState(templates.data);
+  if (templates.data !== hydratedFrom) {
+    setHydratedFrom(templates.data);
+    hydrate(templates.data);
+  }
 
   const defaultTemplates = useMemo(() => {
     const defaultSubject = `Your ${orgName} verification code`;
@@ -480,12 +487,7 @@ function NotificationTemplatesCard({ platformSlug, organisationId }: OrgSettings
   };
 
   const handleCancel = () => {
-    if (templates.data) {
-      setEmailSubject(templates.data.email.subject || "");
-      setEmailBody(templates.data.email.body || "");
-      setEmailHtml(templates.data.email.html || "");
-      setSmsBody(templates.data.sms.body || "");
-    }
+    hydrate(templates.data);
     setIsEditing(false);
   };
 

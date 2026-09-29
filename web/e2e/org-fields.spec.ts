@@ -16,7 +16,7 @@ test.describe("organisation user fields", () => {
 
     const row = authedPage.locator("tr", { hasText: "employee-code" });
     await expect(row).toHaveCount(1);
-    await expect(row.getByText("Can be used to log in")).toBeVisible();
+    await expect(row.getByText("Can log in")).toBeVisible();
 
     // the attribute name (key) is immutable on edit
     await row.getByRole("button", { name: /Edit/i }).click();

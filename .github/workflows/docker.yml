@@ -1,79 +1,94 @@
-name: Build and Push x86 Docker Image
+name: Build and Push Docker Images
 
+# Gated on CI: only a green run on main publishes an image, so `latest` always
+# points at code that passed tests. workflow_run fires for the commit CI tested,
+# which is why the checkout uses head_sha rather than the default branch tip.
 on:
   workflow_run:
-    workflows: [CI]
+    workflows: ["CI"]
     types: [completed]
     branches: [main]
 
-  workflow_dispatch:
-    inputs:
-      force_backend:
-        description: "Force rebuild backend image"
-        type: boolean
-        default: false
-      force_web:
-        description: "Force rebuild web image"
-        type: boolean
-        default: false
+# One publish at a time. Without this two pushes close together can interleave
+# and let the older image land last, so `latest` would point at stale code.
+concurrency:
+  group: docker-publish-main
+  cancel-in-progress: false
 
 jobs:
   changes:
-    name: Detect changes
+    name: Detect changed components
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') }}
-
+    permissions:
+      actions: read
+      contents: read
     outputs:
-      backend: ${{ steps.filter.outputs.backend }}
-      web: ${{ steps.filter.outputs.web }}
-
+      backend: ${{ steps.detect.outputs.backend }}
+      web: ${{ steps.detect.outputs.web }}
     steps:
-      - name: Checkout CI-validated commit
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-          fetch-depth: 2
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
 
-      - name: Detect changed areas
-        id: filter
-        shell: bash
+      - name: Compare against the previously tested commit
+        id: detect
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          # Start with force overrides
-          backend="${{ inputs.force_backend }}"
-          web="${{ inputs.force_web }}"
+          set -euo pipefail
+          # The previous successful CI run on main is the last commit known to
+          # be green. Diffing against it (rather than HEAD^1) keeps multi-commit
+          # pushes correct — HEAD^1 misses everything but the final commit.
+          base=$(gh run list \
+            --workflow ci.yml \
+            --branch main \
+            --event push \
+            --status success \
+            --limit 20 \
+            --json headSha,conclusion \
+            --jq "[.[] | select(.headSha != \"$HEAD_SHA\")][0].headSha // empty")
 
-          # If not forced, detect from git diff
-          if [ "$backend" != "true" ]; then
-            if git diff --quiet HEAD^ HEAD -- . ':!web'; then
-              backend="false"
-            else
-              backend="true"
-            fi
+          if [ -z "$base" ]; then
+            echo "No earlier green run found; building both images."
+            echo "backend=true" >> "$GITHUB_OUTPUT"
+            echo "web=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
-          if [ "$web" != "true" ]; then
-            if git diff --quiet HEAD^ HEAD -- web; then
-              web="false"
-            else
-              web="true"
-            fi
+          echo "Base: $base"
+          echo "Head: $HEAD_SHA"
+          changed=$(git diff --name-only "$base" "$HEAD_SHA")
+          echo "Changed files:"; echo "$changed"
+
+          # Root-level build files can change either image, so treat them as
+          # touching both rather than risking a stale publish.
+          if echo "$changed" | grep -qE '^(src/|build\.gradle|settings\.gradle|gradle/|gradlew|Dockerfile|heroku\.yml)'; then
+            backend=true
+          else
+            backend=false
+          fi
+          if echo "$changed" | grep -qE '^(web/|Dockerfile\.web|\.github/workflows/docker\.yml)'; then
+            web=true
+          else
+            web=false
           fi
 
           echo "backend=$backend" >> "$GITHUB_OUTPUT"
           echo "web=$web" >> "$GITHUB_OUTPUT"
-          echo "Backend changed: $backend"
-          echo "Web changed: $web"
 
-  build-and-push:
-    name: Build and push changed images
+  backend:
+    name: Build and push backend image
     needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: read
     steps:
-      - name: Checkout CI-validated commit
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
@@ -84,25 +99,51 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and push backend
-        if: ${{ needs.changes.outputs.backend == 'true' }}
-        uses: docker/build-push-action@v5
+      - name: Build and push
+        uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64
+          file: ./Dockerfile
           push: true
-          tags: genoyves/nexxauth-backend:latest
-          cache-from: type=gha,scope=nexxauth-backend
-          cache-to: type=gha,mode=max,scope=nexxauth-backend
+          # amd64 only: Heroku and Render both run x86_64, and the runner is
+          # already amd64, so `platforms` only adds a needless QEMU emulation.
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/nexxauth-backend:latest
+            ${{ secrets.DOCKER_USERNAME }}/nexxauth-backend:${{ github.event.workflow_run.head_sha }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
 
-      - name: Build and push web
-        if: ${{ needs.changes.outputs.web == 'true' }}
-        uses: docker/build-push-action@v5
+  web:
+    name: Build and push web image
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
         with:
           context: ./web
-          platforms: linux/amd64
+          file: ./web/Dockerfile
           push: true
-          tags: genoyves/nexxauth-web:latest
-          build-args: BACKEND_URL=http://backend:8080
-          cache-from: type=gha,scope=nexxauth-web
-          cache-to: type=gha,mode=max,scope=nexxauth-web
+          build-args: |
+            BACKEND_URL=http://backend:8080
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/nexxauth-web:latest
+            ${{ secrets.DOCKER_USERNAME }}/nexxauth-web:${{ github.event.workflow_run.head_sha }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
