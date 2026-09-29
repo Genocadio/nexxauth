@@ -12,16 +12,17 @@ FROM ${BUILD_JAVA_IMAGE} AS build
 
 WORKDIR /workspace
 
-# Use the project's Gradle wrapper for reproducible builds. --chmod keeps the
-# exec bit without a separate RUN layer.
-COPY --chmod=+x gradlew .
+# Use the project's Gradle wrapper for reproducible builds. Only classic-builder
+# syntax is used here (no --chmod, no cache mounts) so the same Dockerfile builds
+# on Heroku, whose builders do not run BuildKit.
+COPY gradlew .
+RUN chmod +x gradlew
 COPY gradle gradle
 COPY settings.gradle build.gradle ./
 
-# Resolve dependencies in a cacheable layer. The BuildKit cache mount keeps the
-# Gradle caches out of the image layers and warm across local rebuilds.
-RUN --mount=type=cache,target=/root/.gradle \
-    ./gradlew dependencies --no-daemon
+# Resolve dependencies in a cacheable layer: they are downloaded before the
+# source is copied, so source-only changes reuse this layer.
+RUN ./gradlew dependencies --no-daemon
 
 # Copy application source only after dependency resolution.
 COPY src src
@@ -29,8 +30,7 @@ COPY src src
 # CI runs tests separately. Produce the Boot jar and split it into its layers
 # so the runtime stage can copy each as a separate image layer (Boot 4 jarmode
 # emits application/nexxauth.jar + dependencies/lib/ + empty loader layers).
-RUN --mount=type=cache,target=/root/.gradle \
-    ./gradlew bootJar --no-daemon -x test \
+RUN ./gradlew bootJar --no-daemon -x test \
     && java -Djarmode=tools -jar build/libs/nexxauth.jar extract --layers --destination extracted
 
 # ---- Runtime stage ----------------------------------------------------------
