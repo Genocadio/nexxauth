@@ -11,6 +11,11 @@ build/
 !.env.example
 !.env.prod.example
 
+# Private keys — never commit. The nexxnotify signing key reaches the app
+# through the NEXXNOTIFY_PRIVATE_KEY config var, not through the repo.
+*.pem
+*.key
+
 # Docker
 docker-compose.override.yml
 
