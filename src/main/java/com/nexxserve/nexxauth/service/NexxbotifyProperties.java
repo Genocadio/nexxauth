@@ -18,6 +18,16 @@ public class NexxbotifyProperties {
      * time. */
     private String baseUrl = "";
 
+    /** Shared secret sent as {@code X-Api-Key} on every request to nexxnotify.
+     * Must match {@code NEXXNOTIFY_API_KEY} set on the nexxnotify service.
+     * Leave blank to skip authentication (not recommended in production). */
+    private String apiKey = "";
+
+    /** PEM or Base64 Ed25519 or RSA PKCS8 private key used to sign ephemeral
+     * single-use tokens for nexxnotify. When set, each request sends a fresh
+     * 60-second token with a unique JTI to prevent replay attacks. */
+    private String privateKey = "";
+
     private int connectTimeoutMs = 5000;
 
     private int readTimeoutMs = 10000;
@@ -40,6 +50,22 @@ public class NexxbotifyProperties {
 
     public void setBaseUrl(String baseUrl) {
         this.baseUrl = baseUrl;
+    }
+
+    public String getApiKey() {
+        return apiKey;
+    }
+
+    public void setApiKey(String apiKey) {
+        this.apiKey = apiKey;
+    }
+
+    public String getPrivateKey() {
+        return privateKey;
+    }
+
+    public void setPrivateKey(String privateKey) {
+        this.privateKey = privateKey;
     }
 
     public int getConnectTimeoutMs() {

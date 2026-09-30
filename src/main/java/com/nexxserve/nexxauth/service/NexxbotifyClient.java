@@ -25,15 +25,23 @@ public class NexxbotifyClient {
     private final RestClient restClient;
     private final NexxbotifyProperties properties;
     private final ObjectMapper objectMapper;
+    private final NexxbotifyTokenSigner tokenSigner;
 
     public NexxbotifyClient(RestClient.Builder builder, NexxbotifyProperties properties) {
-        this(builder, properties, null);
+        this(builder, properties, null, null);
+    }
+
+    public NexxbotifyClient(RestClient.Builder builder, NexxbotifyProperties properties,
+                            ObjectMapper objectMapper) {
+        this(builder, properties, objectMapper, null);
     }
 
     @org.springframework.beans.factory.annotation.Autowired
     public NexxbotifyClient(RestClient.Builder builder, NexxbotifyProperties properties,
-                            @org.springframework.beans.factory.annotation.Autowired(required = false) ObjectMapper objectMapper) {
+                            @org.springframework.beans.factory.annotation.Autowired(required = false) ObjectMapper objectMapper,
+                            @org.springframework.beans.factory.annotation.Autowired(required = false) NexxbotifyTokenSigner tokenSigner) {
         this.properties = properties;
+        this.tokenSigner = tokenSigner;
         this.objectMapper = objectMapper != null ? objectMapper : JsonMapper.builder()
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .build();
@@ -46,8 +54,34 @@ public class NexxbotifyClient {
                     headers.setContentType(MediaType.APPLICATION_JSON);
                     headers.setAccept(List.of(MediaType.APPLICATION_JSON, MediaType.ALL));
                 });
+        if (configured == null) {
+            configured = builder;
+        }
+        try {
+            var withInterceptor = configured.requestInterceptor((request, body, execution) -> {
+                // Generate a fresh, single-use signed token for each individual request
+                if (this.tokenSigner != null && this.tokenSigner.isConfigured()) {
+                    String token = this.tokenSigner.generateToken();
+                    if (token != null) {
+                        request.getHeaders().setBearerAuth(token);
+                    }
+                }
+                if (properties.getApiKey() != null && !properties.getApiKey().isBlank()) {
+                    request.getHeaders().set("X-Api-Key", properties.getApiKey());
+                }
+                return execution.execute(request, body);
+            });
+            if (withInterceptor != null) {
+                configured = withInterceptor;
+            }
+        } catch (Exception ignored) {
+        }
+
         if (properties.getBaseUrl() != null && !properties.getBaseUrl().isBlank()) {
-            configured = configured.baseUrl(properties.getBaseUrl());
+            var withBase = configured.baseUrl(properties.getBaseUrl());
+            if (withBase != null) {
+                configured = withBase;
+            }
         }
         this.restClient = configured.build();
     }
@@ -56,6 +90,25 @@ public class NexxbotifyClient {
      * features that deliver codes/links through this client are unavailable. */
     public boolean isConfigured() {
         return properties.getBaseUrl() != null && !properties.getBaseUrl().isBlank();
+    }
+
+    /**
+     * Performs a health check against nexxnotify's {@code GET /healthz} endpoint.
+     * Returns {@code true} if the service responds with HTTP 200, {@code false} otherwise.
+     * The health endpoint is public (no API key required) so this always works.
+     */
+    public boolean checkHealth() {
+        if (!isConfigured()) return false;
+        try {
+            var response = restClient.get()
+                    .uri("/healthz")
+                    .retrieve()
+                    .toBodilessEntity();
+            return response.getStatusCode().is2xxSuccessful();
+        } catch (Exception e) {
+            log.warn("nexxnotify health check failed: {}", e.getMessage());
+            return false;
+        }
     }
 
     /**
