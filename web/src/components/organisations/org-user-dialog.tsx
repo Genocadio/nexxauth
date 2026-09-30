@@ -5,7 +5,6 @@ import { Loader2 } from "lucide-react";
 import { RoleCheckboxes } from "@/components/organisations/role-checkboxes";
 import { FormField } from "@/components/shared/form-field";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -15,25 +14,20 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { useCreateOrgUser, useUpdateOrgUser } from "@/hooks/mutations";
+import { useCreateOrgUser } from "@/hooks/mutations";
 import { useForm } from "@/hooks/use-form";
 import { orgUserFormSchema } from "@/lib/validation";
 import { z } from "zod";
-import type { OrganisationRoleResponse, OrganisationUserFieldResponse, OrganisationUserResponse } from "@/types/api";
+import type { OrganisationRoleResponse, OrganisationUserFieldResponse } from "@/types/api";
 
 interface OrgUserDialogProps {
   platformSlug: string;
   organisationId: number;
-  open: boolean;
   onOpenChange: (open: boolean) => void;
   roles: OrganisationRoleResponse[];
   fields: OrganisationUserFieldResponse[];
   useEmailAsUsername: boolean;
-  /** When provided the dialog edits this user, otherwise it creates one. */
-  user?: OrganisationUserResponse;
 }
 
 const EMPTY_VALUES = {
@@ -48,15 +42,14 @@ const EMPTY_VALUES = {
 } satisfies z.input<typeof orgUserFormSchema>;
 
 /**
- * Controlled dialog. The inner component is keyed by the edited user so its
- * form/metadata state is seeded fresh every time the dialog opens — no effects
- * needed to re-seed state.
+ * Create dialog. Editing an existing user lives in OrgUserSettingsDialog, which
+ * is where addresses, roles, profile and credentials are managed — this stays
+ * the single "add user" path so there is one place that creates accounts.
  */
-export function OrgUserDialog(props: OrgUserDialogProps) {
-  const { open, onOpenChange, user } = props;
+export function OrgUserDialog({ open, onOpenChange, ...rest }: OrgUserDialogProps & { open: boolean }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {open ? <OrgUserDialogInner key={user?.id ?? "new"} {...props} /> : null}
+      {open ? <OrgUserDialogInner {...rest} onOpenChange={onOpenChange} /> : null}
     </Dialog>
   );
 }
@@ -68,77 +61,40 @@ function OrgUserDialogInner({
   roles,
   fields,
   useEmailAsUsername,
-  user,
-}: OrgUserDialogProps) {
-  const isEdit = !!user;
+}: Omit<OrgUserDialogProps, "open">) {
   const create = useCreateOrgUser(platformSlug, organisationId);
-  const update = useUpdateOrgUser(platformSlug, organisationId);
-  const pending = create.isPending || update.isPending;
+  const pending = create.isPending;
 
-  const [metadata, setMetadata] = useState<Record<string, string>>(user?.metadata ?? {});
-  const [clearPassword, setClearPassword] = useState(false);
+  const [metadata, setMetadata] = useState<Record<string, string>>({});
 
-  const form = useForm(
-    orgUserFormSchema,
-    user
-      ? {
-          firstName: user.firstName,
-          lastName: user.lastName ?? "",
-          username: user.username ?? "",
-          email: user.email ?? "",
-          phone: user.phone ?? "",
-          enabled: user.enabled,
-          // The user response carries role names only; map them back to ids
-          // via the org's current role list.
-          roleIds: roles.filter((r) => user.roles.includes(r.name)).map((r) => r.id),
-          password: "",
-        }
-      : EMPTY_VALUES,
-  );
+  const form = useForm(orgUserFormSchema, EMPTY_VALUES);
 
   const close = () => onOpenChange(false);
 
   const submit = async () => {
     const data = form.values;
-    if (isEdit && user) {
-      await update.mutateAsync({
-        userId: user.id,
-        body: {
-          firstName: data.firstName,
-          lastName: data.lastName,
-          username: data.username.trim() || undefined,
-          email: data.email.trim() || undefined,
-          phone: data.phone.trim() || undefined,
-          enabled: data.enabled,
-          roleIds: data.roleIds,
-          // Blank password = no change; clearPassword sends "" to remove auth.
-          password: clearPassword ? "" : data.password.trim() || undefined,
-          metadata,
-        },
-      });
-    } else {
-      await create.mutateAsync({
-        firstName: data.firstName,
-        lastName: data.lastName,
-        username: data.username.trim() || undefined,
-        email: data.email.trim() || undefined,
-        phone: data.phone.trim() || undefined,
-        roleIds: data.roleIds,
-        password: data.password.trim() || undefined,
-        metadata,
-      });
-    }
+    await create.mutateAsync({
+      firstName: data.firstName,
+      lastName: data.lastName,
+      username: data.username.trim() || undefined,
+      email: data.email.trim() || undefined,
+      phone: data.phone.trim() || undefined,
+      roleIds: data.roleIds,
+      // Omitted without a password: the account is created as a placeholder
+      // with no usable credential, and an admin configures it afterwards.
+      password: data.password.trim() || undefined,
+      metadata,
+    });
     close();
   };
 
   return (
     <DialogContent className="sm:max-w-lg">
       <DialogHeader>
-        <DialogTitle>{isEdit ? "Edit organisation user" : "Create organisation user"}</DialogTitle>
+        <DialogTitle>Create organisation user</DialogTitle>
         <DialogDescription>
-          {isEdit
-            ? "Update profile, roles, password or user-field values."
-            : "Without a password the user can sign up themselves later, but cannot log in yet."}
+          Without a password the account is created as a placeholder: it cannot sign in until an
+          administrator gives it a password or a one-time-code login method.
         </DialogDescription>
       </DialogHeader>
       <form id="org-user-form" onSubmit={form.handleSubmit(() => submit())} className="space-y-4">
@@ -226,52 +182,20 @@ function OrgUserDialogInner({
           />
         </FormField>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <FormField
-            label={isEdit ? "New password (optional)" : "Password (optional)"}
-            htmlFor="ou-password"
-            error={form.errors.password}
-            hint={isEdit ? "Leave blank to keep the current password." : "Omit to create the user without login."}
-          >
-            <Input
-              id="ou-password"
-              type="password"
-              autoComplete="new-password"
-              value={form.values.password}
-              onChange={(e) => form.setValue("password", e.target.value)}
-            />
-          </FormField>
-          {isEdit ? (
-            <div className="flex h-full items-end pb-1">
-              <label className="flex items-center gap-2 text-sm">
-                <Checkbox
-                  checked={clearPassword}
-                  onCheckedChange={(checked) => setClearPassword(!!checked)}
-                  disabled={!user?.authTypes?.length}
-                />
-                Remove password (can&apos;t log in)
-              </label>
-            </div>
-          ) : null}
-        </div>
-
-        {isEdit ? (
-          <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
-            <div>
-              <Label htmlFor="ou-enabled" className="text-sm font-medium">
-                Account enabled
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                Disabled users can&apos;t log in; existing sessions stop working immediately.
-              </p>
-            </div>
-            <Switch
-              id="ou-enabled"
-              checked={form.values.enabled}
-              onCheckedChange={(checked) => form.setValue("enabled", checked)}
-            />
-          </div>
-        ) : null}
+        <FormField
+          label="Password (optional)"
+          htmlFor="ou-password"
+          error={form.errors.password}
+          hint="Omit to create the user without login, then configure them from the Settings dialog."
+        >
+          <Input
+            id="ou-password"
+            type="password"
+            autoComplete="new-password"
+            value={form.values.password}
+            onChange={(e) => form.setValue("password", e.target.value)}
+          />
+        </FormField>
 
         {fields.length > 0 ? (
           <div className="space-y-4 rounded-lg border p-3">
@@ -297,7 +221,7 @@ function OrgUserDialogInner({
       <DialogFooter>
         <Button type="submit" form="org-user-form" disabled={pending} className="gap-2">
           {pending ? <Loader2 className="animate-spin" /> : null}
-          {isEdit ? "Save changes" : "Create user"}
+          Create user
         </Button>
       </DialogFooter>
     </DialogContent>

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Trash2, UserPlus, Users } from "lucide-react";
+import { Settings, Trash2, UserPlus, Users } from "lucide-react";
 import { OrgUserDialog } from "@/components/organisations/org-user-dialog";
+import { OrgUserSettingsDialog } from "@/components/organisations/org-user-settings-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { InitialsAvatar } from "@/components/shared/initials-avatar";
@@ -196,10 +197,11 @@ export function OrgUsersTab({ platformSlug, organisationId, useEmailAsUsername }
                         <Button
                           variant="ghost"
                           size="icon"
-                          aria-label={`Edit ${fullName(user)}`}
+                          aria-label={`Settings for ${fullName(user)}`}
+                          title="User settings"
                           onClick={() => setEditing(user)}
                         >
-                          <Pencil />
+                          <Settings />
                         </Button>
                         <Button
                           variant="ghost"
@@ -242,16 +244,21 @@ export function OrgUsersTab({ platformSlug, organisationId, useEmailAsUsername }
         fields={fields.data ?? []}
         useEmailAsUsername={useEmailAsUsername}
       />
-      <OrgUserDialog
-        platformSlug={platformSlug}
-        organisationId={organisationId}
-        open={!!editing}
-        onOpenChange={(open) => !open && setEditing(null)}
-        roles={roles.data ?? []}
-        fields={fields.data ?? []}
-        useEmailAsUsername={useEmailAsUsername}
-        user={editing ?? undefined}
-      />
+      {editing ? (
+        <OrgUserSettingsDialog
+          platformSlug={platformSlug}
+          organisationId={organisationId}
+          open
+          onOpenChange={(open) => {
+            if (!open) setEditing(null);
+          }}
+          roles={roles.data ?? []}
+          fields={fields.data ?? []}
+          useEmailAsUsername={useEmailAsUsername}
+          user={editing}
+          onUserChange={setEditing}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={!!deleting}

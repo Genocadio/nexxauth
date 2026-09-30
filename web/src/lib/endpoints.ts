@@ -32,6 +32,27 @@ export const endpoints = {
       `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/users`,
     user: (organisationId: number, userId: number) =>
       `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/users/${userId}`,
+    // -- per-user settings (what the Settings dialog drives) ----------------
+    userVerifications: (organisationId: number, userId: number) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/users/${userId}/verifications`,
+    userPasswordReset: (organisationId: number, userId: number) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/users/${userId}/password-reset`,
+    userEmailVerified: (organisationId: number, userId: number, emailId: number) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/users/${userId}/emails/${emailId}/verified`,
+    userPhoneVerified: (organisationId: number, userId: number, phoneId: number) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/users/${userId}/phones/${phoneId}/verified`,
+    userEmails: (organisationId: number, userId: number) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/users/${userId}/emails`,
+    userEmail: (organisationId: number, userId: number, emailId: number) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/users/${userId}/emails/${emailId}`,
+    userEmailPrimary: (organisationId: number, userId: number, emailId: number) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/users/${userId}/emails/${emailId}/primary`,
+    userPhones: (organisationId: number, userId: number) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/users/${userId}/phones`,
+    userPhone: (organisationId: number, userId: number, phoneId: number) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/users/${userId}/phones/${phoneId}`,
+    userPhonePrimary: (organisationId: number, userId: number, phoneId: number) =>
+      `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/users/${userId}/phones/${phoneId}/primary`,
     roles: (organisationId: number) =>
       `${API_BASE_URL}/${platformSlug}/organisations/${organisationId}/roles`,
     role: (organisationId: number, roleId: number) =>

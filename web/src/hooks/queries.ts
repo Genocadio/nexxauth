@@ -76,6 +76,20 @@ export function useOrgUsers(organisationId: number) {
   });
 }
 
+/**
+ * One user in full. The list endpoint does not carry the address collections,
+ * so anything that edits addresses (the Settings dialog) reads the user here
+ * rather than from the row it was opened from.
+ */
+export function useOrgUser(organisationId: number, userId: number | null) {
+  const platformSlug = usePlatformSlug();
+  return useQuery({
+    queryKey: queryKeys.orgUser(organisationId, userId ?? 0),
+    queryFn: () => organisationsApi.getUser(platformSlug!, organisationId, userId!),
+    enabled: !!platformSlug && !!organisationId && !!userId,
+  });
+}
+
 export function useOrgRoles(organisationId: number) {
   const platformSlug = usePlatformSlug();
   return useQuery({

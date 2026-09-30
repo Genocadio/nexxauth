@@ -3,7 +3,17 @@
  * com.nexxserve.nexxauth.dto.response. Keep in sync when the backend changes.
  */
 
-import type { AuthType, ClientType, Permission, Role, SlugType, UserFieldType } from "@/types/enums";
+import type {
+  AuthType,
+  ClientType,
+  Permission,
+  Role,
+  SlugType,
+  UserFieldType,
+  UserLoginMethod,
+  VerificationChannel,
+  VerificationDelivery,
+} from "@/types/enums";
 
 /** ISO-8601 timestamp, as serialized by the backend. */
 export type IsoDate = string;
@@ -116,8 +126,12 @@ export interface OrganisationUserResponse {
   phones?: OrganisationUserPhoneResponse[];
   requireEmailVerificationAtNextLogin?: boolean;
   requirePhoneVerificationAtNextLogin?: boolean;
-  /** The user's enabled auth methods (only PASSWORD exists today). Empty when
-   * the user has no auth configured and cannot log in. */
+  /** Which credential this user may sign in with. Chosen per user; separate
+   * from `authTypes`, which reports what is actually usable right now. */
+  loginMethod: UserLoginMethod;
+  /** The credentials this user can actually use right now, derived rather
+   * than stored. Empty when the user has no usable credential — a placeholder
+   * created without a password cannot sign in until one is configured. */
   authTypes: AuthType[];
   /** The names of the roles the user holds — never ids, never permissions. */
   roles: string[];
@@ -132,6 +146,22 @@ export interface OrgAuthResponse {
   tokenType: string;
   expiresInSeconds: number;
   user: OrganisationUserResponse;
+}
+
+/**
+ * Acknowledgement that a verification value was sent. Carries no secret: the
+ * code or link itself only ever reaches the user, through the notification
+ * service. `accessToken` is the action token the *user's* app uses to complete
+ * a password reset without re-sending their identifier.
+ */
+export interface VerificationRequestResponse {
+  purpose: "EMAIL_VERIFICATION" | "PHONE_VERIFICATION" | "PASSWORD_RESET" | "LOGIN_OTP";
+  channel: VerificationChannel;
+  delivery: VerificationDelivery;
+  identifier: string;
+  expiresInSeconds: number;
+  accessToken: string;
+  tokenType: string;
 }
 
 export interface OrganisationAuthConfigResponse {

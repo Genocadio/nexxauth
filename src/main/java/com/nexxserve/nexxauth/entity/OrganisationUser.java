@@ -68,6 +68,14 @@ public class OrganisationUser extends BaseEntity {
     @Column(name = "password_changed_at")
     private java.time.Instant passwordChangedAt;
 
+    /** Which credentials this user may sign in with. Chosen per user by an
+     * administrator; independent of {@link #authType}, which only records the
+     * method stamped when the password was set. Never null; the default
+     * accepts either credential so existing accounts are unaffected. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "login_method", length = 30, nullable = false)
+    private UserLoginMethod loginMethod = UserLoginMethod.PASSWORD_OR_OTP;
+
     /** True while the password is temporary (set by a platform user or forced
      * via the admin API): the user must change it at next login, which is
      * surfaced as the CHANGE_PASSWORD action and gates the session (fixed

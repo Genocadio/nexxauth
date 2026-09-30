@@ -5,7 +5,16 @@
  * "unchanged", which is the PATCH semantics every partial update relies on.
  */
 
-import type { AuthType, ClientType, Permission, Role, UserFieldType } from "@/types/enums";
+import type {
+  AuthType,
+  ClientType,
+  Permission,
+  Role,
+  UserFieldType,
+  UserLoginMethod,
+  VerificationChannel,
+  VerificationDelivery,
+} from "@/types/enums";
 
 // ---------------------------------------------------------------------------
 // Platform auth
@@ -143,6 +152,11 @@ export interface CreateOrganisationUserRequest {
   roleIds?: number[];
   /** Omit to create the user without auth (cannot log in until set). */
   password?: string;
+  /** Forces the user to change this password at their next sign-in. */
+  temporaryPassword?: boolean;
+  /** Which credential the user may sign in with. Omitted without a password
+   * leaves the user a placeholder with no usable credential. */
+  loginMethod?: UserLoginMethod;
   metadata?: Record<string, string>;
 }
 
@@ -158,9 +172,52 @@ export interface UpdateOrganisationUserRequest {
   enabled?: boolean;
   /** Replaces the whole role set; [] clears all roles. */
   roleIds?: number[];
-  /** Resets the password; "" clears auth and disables login. */
+  /** Resets the password. */
   password?: string;
+  /** Force a change of the password just set, at the user's next sign-in. */
+  temporaryPassword?: boolean;
+  /** Which credential the user may sign in with. Omitted keeps the current
+   * method; set with an empty password to move a user to one-time codes
+   * instead of locking them out. */
+  loginMethod?: UserLoginMethod;
+  /** Challenge for the email to be proven at the user's next password login. */
+  requireEmailVerificationAtNextLogin?: boolean;
+  /** Challenge for the phone to be proven at the user's next password login. */
+  requirePhoneVerificationAtNextLogin?: boolean;
   metadata?: Record<string, string>;
+}
+
+/** Deliver a verification code or link to one of a user's own addresses. */
+export interface SendUserVerificationRequest {
+  channel: VerificationChannel;
+  /** Required for EMAIL, ignored otherwise. */
+  emailId?: number;
+  /** Required for SMS, ignored otherwise. */
+  phoneId?: number;
+  delivery?: VerificationDelivery;
+}
+
+/** Sends the user a reset so they choose their own password. */
+export interface SendPasswordResetRequest {
+  emailId?: number;
+  phoneId?: number;
+  delivery?: VerificationDelivery;
+}
+
+/** Manual override of an address's verified state; no proof of ownership. */
+export interface SetAddressVerifiedRequest {
+  verified: boolean;
+}
+
+export interface AddUserEmailRequest {
+  email: string;
+  /** Make this the primary address; defaults to false server-side. */
+  isPrimary?: boolean;
+}
+
+export interface AddUserPhoneRequest {
+  phone: string;
+  isPrimary?: boolean;
 }
 
 // ---------------------------------------------------------------------------

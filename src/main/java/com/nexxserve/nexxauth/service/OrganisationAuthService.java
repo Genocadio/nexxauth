@@ -6,6 +6,7 @@ import com.nexxserve.nexxauth.dto.request.OrgRegisterRequest;
 import com.nexxserve.nexxauth.dto.response.LoginChallenge;
 import com.nexxserve.nexxauth.dto.response.OrgAuthResponse;
 import com.nexxserve.nexxauth.entity.AuthType;
+import com.nexxserve.nexxauth.entity.UserLoginMethod;
 import com.nexxserve.nexxauth.entity.LogCategory;
 import com.nexxserve.nexxauth.entity.LogLevel;
 import com.nexxserve.nexxauth.entity.OrgIdentifierType;
@@ -157,6 +158,9 @@ public class OrganisationAuthService {
             throw new BadRequestException("Password is required for the PASSWORD auth method");
         } else if (authConfigService.configOf(organisation).getAuthType() == AuthType.OTP) {
             user.setAuthType(AuthType.OTP);
+            // The per-user method gates every login, so it has to agree with the
+            // org-level auth type or a passwordless registrant could never get in.
+            user.setLoginMethod(UserLoginMethod.OTP);
         }
         OrganisationUser saved = userRepository.save(user);
         applyRegisterMetadata(request, saved);
@@ -439,6 +443,12 @@ public class OrganisationAuthService {
                     identifier, organisation.getSlug(), organisation.getId(), "disabled");
             throw new InvalidCredentialsException();
         }
+        if (!allowsOtpLogin(user)) {
+            audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY, AuthAuditService.ORG_LOGIN_FAILURE,
+                    identifier, organisation.getSlug(), organisation.getId(), "otp_not_allowed");
+            accountLockout.recordFailure(organisation.getId(), identifier);
+            throw new InvalidCredentialsException();
+        }
         if (token.getPurpose() == com.nexxserve.nexxauth.entity.VerificationPurpose.EMAIL_VERIFICATION) {
             var emailItem = user.getEmails().stream().filter(e -> e.getEmail().equalsIgnoreCase(identifier)).findFirst();
             if (emailItem.isPresent()) {
@@ -463,6 +473,17 @@ public class OrganisationAuthService {
                 organisation.getSlug(), organisation.getId(), "verify");
         enforceRoleRestrictions(client, user);
         return issueTokens(user, client, ipAddress, userAgent, hostname);
+    }
+
+    /** Per-user gate for password sign-in; a user set to OTP-only has no
+     * password path even if a hash is somehow still stored. */
+    private boolean allowsPasswordLogin(OrganisationUser user) {
+        return user.getLoginMethod() == null || user.getLoginMethod().allowsPassword();
+    }
+
+    /** Per-user gate for one-time-code sign-in. */
+    private boolean allowsOtpLogin(OrganisationUser user) {
+        return user.getLoginMethod() == null || user.getLoginMethod().allowsOtp();
     }
 
     private VerificationChannel channelForIdentifier(
@@ -526,7 +547,12 @@ public class OrganisationAuthService {
         boolean passwordMatches = hash != null
                 ? passwordEncoder.matches(request.password(), hash)
                 : authTiming.equalsUnknown(request.password());
-        if (user.getAuthType() != AuthType.PASSWORD || !user.isEnabled() || !passwordMatches) {
+        // Three independent reasons a password login can fail: the org has
+        // password auth off, this user is only allowed to sign in with a code,
+        // or the account is disabled. The credential check runs first so the
+        // timing burn happens regardless of which one applies.
+        if (user.getAuthType() != AuthType.PASSWORD || !user.isEnabled() || !passwordMatches
+                || !allowsPasswordLogin(user)) {
             audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY, AuthAuditService.ORG_LOGIN_FAILURE, identifier,
                     organisation.getSlug(), organisation.getId(), null);
             accountLockout.recordFailure(organisation.getId(), identifier);

@@ -1,6 +1,7 @@
 package com.nexxserve.nexxauth.dto.response;
 
 import com.nexxserve.nexxauth.entity.AuthType;
+import com.nexxserve.nexxauth.entity.UserLoginMethod;
 
 import java.time.Instant;
 import java.util.List;
@@ -17,6 +18,10 @@ public record OrganisationUserResponse(
         String phone,
         boolean enabled,
         boolean temporaryPassword,
+        /** Which credentials this user may sign in with. PASSWORD/OTP/
+         * PASSWORD_OR_OTP; this is the administrator's per-user choice and is
+         * independent of {@link #authTypes}. */
+        UserLoginMethod loginMethod,
         /** True if primary email is verified. */
         boolean emailVerified,
         /** True if primary phone is verified. */
@@ -31,9 +36,10 @@ public record OrganisationUserResponse(
         /** True while the user's next password login must verify their phone
          * before completing (admin-set). Cleared automatically once verified. */
         boolean requirePhoneVerificationAtNextLogin,
-        /** The user's enabled auth methods (PASSWORD and OTP exist today; the
-         * list is the extension point for future modes such as SSO). Empty when
-         * the user has no auth configured and cannot log in. */
+        /** The credentials this user can actually use right now, derived from
+         * {@link #loginMethod} and what is stored: PASSWORD only when a hash
+         * exists, OTP only when the user has a reachable address. Empty means
+         * the user is locked out (for example no password and no address yet). */
         List<AuthType> authTypes,
         /** The names of the roles the user holds — never ids, and never
          * permissions (permissions are an internal concept, resolved

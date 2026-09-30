@@ -23,7 +23,27 @@ export const AUTH_TYPE_META: Record<AuthType, { label: string; description: stri
   VERIFY: { label: "Verify", description: "Submit verification code to complete sign-in or multi-factor authentication" },
 };
 
+/**
+ * How one organisation user signs in, chosen per user by an administrator.
+ * Distinct from {@link AuthType}: that is the organisation-wide method, this is
+ * the account's own. PASSWORD and OTP are the opt-in restrictions, so
+ * PASSWORD_OR_OTP is the default and keeps an existing account working.
+ */
+export type UserLoginMethod = "PASSWORD" | "OTP" | "PASSWORD_OR_OTP";
+
+export const USER_LOGIN_METHOD_META: Record<UserLoginMethod, { label: string; description: string }> = {
+  PASSWORD: { label: "Password", description: "Sign in with a password only — a one-time code is refused" },
+  OTP: { label: "One-time code", description: "Sign in with a one-time code only — the password is not accepted" },
+  PASSWORD_OR_OTP: { label: "Password or one-time code", description: "Accept either credential" },
+};
+
 export type UserFieldType = "STRING" | "NUMBER" | "BOOLEAN" | "DATE" | "EMAIL" | "LINK";
+
+/** Where a verification value is sent: the address kind it maps to. */
+export type VerificationChannel = "EMAIL" | "SMS";
+
+/** How a verification value is delivered: a typed code, or a link to open. */
+export type VerificationDelivery = "OTP" | "LINK";
 
 export const USER_FIELD_TYPE_META: Record<UserFieldType, { label: string; description: string }> = {
   STRING: { label: "Text", description: "Trimmed text (case-insensitive matching)" },

@@ -23,9 +23,30 @@ public interface OrganisationUserMapper {
     @Mapping(target = "phoneVerified", expression = "java(user.isPhoneVerified())")
     @Mapping(target = "emails", expression = "java(mapEmails(user))")
     @Mapping(target = "phones", expression = "java(mapPhones(user))")
-    @Mapping(target = "authTypes", expression = "java(user.getAuthType() == null ? List.of() : List.of(user.getAuthType()))")
+    @Mapping(target = "authTypes", expression = "java(mapAuthTypes(user))")
     @Mapping(target = "roles", expression = "java(user.getRoles().stream().map(com.nexxserve.nexxauth.entity.OrganisationRole::getName).sorted().toList())")
     OrganisationUserResponse toResponse(OrganisationUser user, Map<String, String> metadata);
+
+    /**
+     * What the user can sign in with right now. Derived rather than read from
+     * {@code authType} so the list never advertises a credential that is not
+     * usable: a password only counts when a hash is stored, and OTP only counts
+     * when the user's method allows it and there is an address to deliver to.
+     * A placeholder created without a password (method PASSWORD, no hash)
+     * therefore reports nothing, which is what locks it out.
+     */
+    default List<com.nexxserve.nexxauth.entity.AuthType> mapAuthTypes(OrganisationUser user) {
+        var method = user.getLoginMethod();
+        if (method == null) return List.of();
+        var types = new java.util.ArrayList<com.nexxserve.nexxauth.entity.AuthType>(2);
+        if (method.allowsPassword() && user.getPasswordHash() != null) {
+            types.add(com.nexxserve.nexxauth.entity.AuthType.PASSWORD);
+        }
+        if (method.allowsOtp() && (user.getPrimaryEmail() != null || user.getPrimaryPhone() != null)) {
+            types.add(com.nexxserve.nexxauth.entity.AuthType.OTP);
+        }
+        return types;
+    }
 
     default List<OrganisationUserEmailResponse> mapEmails(OrganisationUser user) {
         if (user.getEmails() == null) return List.of();
@@ -57,5 +78,10 @@ public interface OrganisationUserMapper {
     @Mapping(target = "roles", ignore = true)
     @Mapping(target = "emails", ignore = true)
     @Mapping(target = "phones", ignore = true)
+    // loginMethod is resolved by OrganisationUserService#create, which depends on
+    // whether a password was supplied. Mapping the nullable request field here
+    // would overwrite the entity's non-null default with null and violate the
+    // NOT NULL column.
+    @Mapping(target = "loginMethod", ignore = true)
     OrganisationUser toEntity(CreateOrganisationUserRequest request);
 }

@@ -157,7 +157,45 @@ public class OrganisationVerificationService {
 
         String identifier = normalize(channel, request.identifier());
         OrganisationUser user = findUser(organisation, identifier, purpose);
+        return issue(organisation, user, purpose, channel, delivery, identifier, request.identifierType());
+    }
 
+    /**
+     * Admin-triggered send for a known user and a specific address they own.
+     *
+     * <p>Unlike {@link #request}, the caller already resolved the user, so the
+     * code is always bound to them (the public path deliberately leaves the
+     * token owner null for LOGIN_OTP to avoid confirming who holds an address).
+     * The address must already be one of the user's own, which the caller is
+     * responsible for checking — this method sends to whatever it is handed.
+     */
+    @Transactional
+    public VerificationRequestResponse requestForUser(Organisation organisation, OrganisationUser user,
+                                                      VerificationPurpose purpose, VerificationChannel channel,
+                                                      String address, VerificationDelivery delivery) {
+        requireFeature(organisation, purpose);
+        requireNotifier();
+        validatePurposeVsChannel(purpose, channel);
+        VerificationDelivery effective = delivery != null
+                ? delivery
+                : authConfigService.configOf(organisation).getVerificationMode();
+        if (effective == null
+                || (purpose == VerificationPurpose.LOGIN_OTP && effective != VerificationDelivery.OTP)) {
+            effective = VerificationDelivery.OTP;
+        }
+        return issue(organisation, user, purpose, channel, effective, normalize(channel, address), null);
+    }
+
+    /**
+     * Creates, stores and delivers one verification for {@code identifier},
+     * superseding any active token for the same (org, purpose, channel,
+     * address). The action token returned tells the client what the address
+     * must do next (enter a code, follow a link).
+     */
+    private VerificationRequestResponse issue(Organisation organisation, OrganisationUser user,
+                                              VerificationPurpose purpose, VerificationChannel channel,
+                                              VerificationDelivery delivery, String identifier,
+                                              com.nexxserve.nexxauth.entity.OrgIdentifierType identifierType) {
         Instant now = Instant.now();
         tokenRepository.findFirstByOrganisationIdAndPurposeAndChannelAndIdentifierAndConsumedAtIsNullOrderByCreatedAtDesc(
                         organisation.getId(), purpose, channel, identifier)
@@ -188,7 +226,7 @@ public class OrganisationVerificationService {
                 ? List.of(com.nexxserve.nexxauth.entity.OrgUserAction.CHANGE_PASSWORD)
                 : List.of(com.nexxserve.nexxauth.entity.OrgUserAction.OTP_NEEDED);
         String actionToken = orgJwtService.generateActionToken(
-                organisation, identifier, request.identifierType(), user != null ? user.getId() : null, actions, purpose.name(), ttl);
+                organisation, identifier, identifierType, user != null ? user.getId() : null, actions, purpose.name(), ttl);
 
         return new VerificationRequestResponse(purpose, channel, delivery, identifier,
                 ttl.toSeconds(), actionToken, "Bearer");

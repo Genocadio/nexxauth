@@ -23,9 +23,12 @@ import type {
   OrganisationSessionSettingsResponse,
   OrganisationUserFieldResponse,
   OrganisationUserResponse,
+  VerificationRequestResponse,
   PlatformUserResponse,
 } from "@/types/api";
 import type {
+  AddUserEmailRequest,
+  AddUserPhoneRequest,
   AddPlatformUserRequest,
   CreateOrganisationClientLinkRequest,
   CreateOrganisationClientRequest,
@@ -33,6 +36,8 @@ import type {
   CreateOrganisationRoleRequest,
   CreateOrganisationUserFieldRequest,
   CreateOrganisationUserRequest,
+  SendPasswordResetRequest,
+  SendUserVerificationRequest,
   UpdateOrganisationAuthConfigRequest,
   UpdateOrganisationClientLinkRequest,
   UpdateOrganisationClientRequest,
@@ -166,6 +171,105 @@ export function useDeleteOrgUser(platformSlug: string, organisationId: number) {
     mutationFn: (userId) => organisationsApi.deleteUser(platformSlug, organisationId, userId),
     invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgUsers(organisationId) })],
     successMessage: "User deleted",
+  });
+}
+
+// -- per-user settings ------------------------------------------------------
+// Every one of these changes who can sign in, so each invalidates the user
+// list: the row's login method, verified badges and auth types all move.
+
+export function useSendOrgUserVerification(platformSlug: string, organisationId: number) {
+  return useApiMutation<
+    VerificationRequestResponse,
+    { userId: number; body: SendUserVerificationRequest }
+  >({
+    mutationFn: ({ userId, body }) =>
+      organisationsApi.sendUserVerification(platformSlug, organisationId, userId, body),
+    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgUsers(organisationId) })],
+    successMessage: "Verification sent to the user",
+  });
+}
+
+export function useSendOrgUserPasswordReset(platformSlug: string, organisationId: number) {
+  return useApiMutation<VerificationRequestResponse, { userId: number; body?: SendPasswordResetRequest }>({
+    mutationFn: ({ userId, body }) =>
+      organisationsApi.sendUserPasswordReset(platformSlug, organisationId, userId, body),
+    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgUsers(organisationId) })],
+    // Deliberately says the user chooses it: the administrator never sees or
+    // sets the new password.
+    successMessage: "Password reset sent — the user chooses their new password",
+  });
+}
+
+/** Manual override of a verified state. Audited as a security event, so the
+ * toast is explicit that ownership was not proven. */
+export function useSetOrgUserEmailVerified(platformSlug: string, organisationId: number) {
+  return useApiMutation<OrganisationUserResponse, { userId: number; emailId: number; verified: boolean }>({
+    mutationFn: ({ userId, emailId, verified }) =>
+      organisationsApi.setEmailVerified(platformSlug, organisationId, userId, emailId, { verified }),
+    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgUsers(organisationId) })],
+    onSuccess: (_data, v) => toast.success(v.verified ? "Email marked verified" : "Email marked unverified"),
+  });
+}
+
+export function useSetOrgUserPhoneVerified(platformSlug: string, organisationId: number) {
+  return useApiMutation<OrganisationUserResponse, { userId: number; phoneId: number; verified: boolean }>({
+    mutationFn: ({ userId, phoneId, verified }) =>
+      organisationsApi.setPhoneVerified(platformSlug, organisationId, userId, phoneId, { verified }),
+    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgUsers(organisationId) })],
+    onSuccess: (_data, v) => toast.success(v.verified ? "Phone marked verified" : "Phone marked unverified"),
+  });
+}
+
+export function useAddOrgUserEmail(platformSlug: string, organisationId: number) {
+  return useApiMutation<OrganisationUserResponse, { userId: number; body: AddUserEmailRequest }>({
+    mutationFn: ({ userId, body }) => organisationsApi.addEmail(platformSlug, organisationId, userId, body),
+    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgUsers(organisationId) })],
+    successMessage: "Email added",
+  });
+}
+
+export function useDeleteOrgUserEmail(platformSlug: string, organisationId: number) {
+  return useApiMutation<OrganisationUserResponse, { userId: number; emailId: number }>({
+    mutationFn: ({ userId, emailId }) =>
+      organisationsApi.deleteEmail(platformSlug, organisationId, userId, emailId),
+    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgUsers(organisationId) })],
+    successMessage: "Email removed",
+  });
+}
+
+export function useSetOrgUserPrimaryEmail(platformSlug: string, organisationId: number) {
+  return useApiMutation<OrganisationUserResponse, { userId: number; emailId: number }>({
+    mutationFn: ({ userId, emailId }) =>
+      organisationsApi.setPrimaryEmail(platformSlug, organisationId, userId, emailId),
+    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgUsers(organisationId) })],
+    successMessage: "Primary email updated",
+  });
+}
+
+export function useAddOrgUserPhone(platformSlug: string, organisationId: number) {
+  return useApiMutation<OrganisationUserResponse, { userId: number; body: AddUserPhoneRequest }>({
+    mutationFn: ({ userId, body }) => organisationsApi.addPhone(platformSlug, organisationId, userId, body),
+    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgUsers(organisationId) })],
+    successMessage: "Phone added",
+  });
+}
+
+export function useDeleteOrgUserPhone(platformSlug: string, organisationId: number) {
+  return useApiMutation<OrganisationUserResponse, { userId: number; phoneId: number }>({
+    mutationFn: ({ userId, phoneId }) =>
+      organisationsApi.deletePhone(platformSlug, organisationId, userId, phoneId),
+    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgUsers(organisationId) })],
+    successMessage: "Phone removed",
+  });
+}
+
+export function useSetOrgUserPrimaryPhone(platformSlug: string, organisationId: number) {
+  return useApiMutation<OrganisationUserResponse, { userId: number; phoneId: number }>({
+    mutationFn: ({ userId, phoneId }) =>
+      organisationsApi.setPrimaryPhone(platformSlug, organisationId, userId, phoneId),
+    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgUsers(organisationId) })],
+    successMessage: "Primary phone updated",
   });
 }
 

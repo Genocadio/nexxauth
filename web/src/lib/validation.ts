@@ -134,6 +134,30 @@ export const orgUserFormSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// Organisation user settings (per-tab forms in the Settings dialog)
+// ---------------------------------------------------------------------------
+
+/** Adding a second email address to a user. */
+export const addUserEmailSchema = z.object({ email: z.email("Enter a valid email").max(255) });
+
+/** Adding a phone number to a user. */
+export const addUserPhoneSchema = z.object({
+  phone: z.string().trim().min(1, "Phone is required").max(30, "At most 30 characters"),
+});
+
+/** Profile tab: names, username and the org's own user-field values. */
+export const orgUserProfileSchema = z.object({
+  firstName: requiredName(100, "First name"),
+  lastName: optionalName(100),
+  username: z.union([z.string().trim().max(100), z.literal("")]),
+});
+
+/** Security tab: setting a password directly. */
+export const orgUserPasswordSchema = z.object({
+  password: z.string().min(1, "Enter a password").max(72, "At most 72 characters"),
+});
+
+// ---------------------------------------------------------------------------
 // Organisation roles
 // ---------------------------------------------------------------------------
 

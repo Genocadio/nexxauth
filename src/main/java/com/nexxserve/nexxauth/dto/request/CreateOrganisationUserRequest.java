@@ -1,5 +1,6 @@
 package com.nexxserve.nexxauth.dto.request;
 
+import com.nexxserve.nexxauth.entity.UserLoginMethod;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -11,7 +12,8 @@ import java.util.Set;
  * Create an organisation user. Username and email are optional identifiers,
  * unique per organisation; when the organisation has {@code useEmailAsUsername}
  * enabled, email is required. A user created without a {@code password} has no
- * auth configured and cannot log in (per the org auth config rules).
+ * password credential — pair that with {@code loginMethod} of OTP so they can
+ * still sign in with a one-time code.
  */
 public record CreateOrganisationUserRequest(
 
@@ -34,6 +36,11 @@ public record CreateOrganisationUserRequest(
         String phone,
 
         Set<Long> roleIds,
+
+        /** Which credentials this user may sign in with. Defaults to PASSWORD;
+         * set OTP (or PASSWORD_OR_OTP) for a user created without a password so
+         * they can still sign in with a one-time code. */
+        UserLoginMethod loginMethod,
 
         /** Optional initial password. When set, the user gets the org's default
          * auth type (PASSWORD) and can log in; when omitted, the user has no

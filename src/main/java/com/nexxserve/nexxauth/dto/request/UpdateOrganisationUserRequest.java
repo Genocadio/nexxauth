@@ -1,5 +1,6 @@
 package com.nexxserve.nexxauth.dto.request;
 
+import com.nexxserve.nexxauth.entity.UserLoginMethod;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Size;
 
@@ -11,7 +12,8 @@ import java.util.Set;
  * {@code username}/{@code email} may be passed as empty strings to clear them;
  * {@code roleIds} replaces the whole role set (empty clears all roles);
  * {@code password} resets the password subject to the org's password rules
- * (empty string clears auth and disables login).
+ * (empty string clears the password hash; pair it with {@code loginMethod} of
+ * OTP to keep the user able to sign in with a one-time code).
  */
 public record UpdateOrganisationUserRequest(
 
@@ -33,6 +35,11 @@ public record UpdateOrganisationUserRequest(
         String phone,
 
         Boolean enabled,
+
+        /** Which credentials this user may sign in with. OTP keeps the user able
+         * to log in after their password is removed; PASSWORD_OR_OTP accepts
+         * either. Omit to keep the current method. */
+        UserLoginMethod loginMethod,
 
         Set<Long> roleIds,
 

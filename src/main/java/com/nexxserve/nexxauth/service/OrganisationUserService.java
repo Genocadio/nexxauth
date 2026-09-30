@@ -27,8 +27,14 @@ import com.nexxserve.nexxauth.util.Phones;
 import com.nexxserve.nexxauth.util.Usernames;
 import com.nexxserve.nexxauth.dto.request.AddUserEmailRequest;
 import com.nexxserve.nexxauth.dto.request.AddUserPhoneRequest;
+import com.nexxserve.nexxauth.dto.request.SendPasswordResetRequest;
+import com.nexxserve.nexxauth.dto.request.SendUserVerificationRequest;
+import com.nexxserve.nexxauth.dto.response.VerificationRequestResponse;
 import com.nexxserve.nexxauth.entity.OrganisationUserEmail;
 import com.nexxserve.nexxauth.entity.OrganisationUserPhone;
+import com.nexxserve.nexxauth.entity.UserLoginMethod;
+import com.nexxserve.nexxauth.entity.VerificationChannel;
+import com.nexxserve.nexxauth.entity.VerificationPurpose;
 import com.nexxserve.nexxauth.repository.OrganisationUserEmailRepository;
 import com.nexxserve.nexxauth.repository.OrganisationUserPhoneRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -60,6 +66,7 @@ public class OrganisationUserService {
     private final OrganisationAuthConfigService authConfigService;
     private final OrganisationRefreshTokenService refreshTokenService;
     private final OrganisationUserFieldService userFieldService;
+    private final OrganisationVerificationService verificationService;
     private final PasswordEncoder passwordEncoder;
     private final AuthAuditService audit;
 
@@ -72,6 +79,7 @@ public class OrganisationUserService {
                                    OrganisationAuthConfigService authConfigService,
                                    OrganisationRefreshTokenService refreshTokenService,
                                    OrganisationUserFieldService userFieldService,
+                                   OrganisationVerificationService verificationService,
                                    PasswordEncoder passwordEncoder, AuthAuditService audit) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
@@ -83,6 +91,7 @@ public class OrganisationUserService {
         this.authConfigService = authConfigService;
         this.refreshTokenService = refreshTokenService;
         this.userFieldService = userFieldService;
+        this.verificationService = verificationService;
         this.passwordEncoder = passwordEncoder;
         this.audit = audit;
     }
@@ -151,6 +160,17 @@ public class OrganisationUserService {
         }
         if (request.roleIds() != null) {
             user.setRoles(resolveRoles(organisation, request.roleIds()));
+        }
+        // A user created with no password is a placeholder: it has never been
+        // given a way in, so it stays inert (PASSWORD with no hash means no
+        // usable credential) until an admin configures it. This is deliberately
+        // different from *removing* the password of a live user, which switches
+        // them to OTP so they can still sign in.
+        boolean hasPassword = request.password() != null && !request.password().isBlank();
+        if (request.loginMethod() != null) {
+            user.setLoginMethod(request.loginMethod());
+        } else if (!hasPassword) {
+            user.setLoginMethod(UserLoginMethod.PASSWORD);
         }
         OrganisationUser saved = userRepository.save(user);
         if (request.metadata() != null) {
@@ -229,15 +249,42 @@ public class OrganisationUserService {
         if (request.roleIds() != null) {
             user.setRoles(resolveRoles(organisation, request.roleIds()));
         }
+        UserLoginMethod previousLoginMethod = user.getLoginMethod();
+        if (request.loginMethod() != null) {
+            user.setLoginMethod(request.loginMethod());
+        }
         if (request.password() != null) {
             if (request.password().isBlank()) {
                 authConfigService.clearAuth(user);
+                // Clearing the password used to strand the user with no method at
+                // all. Default to OTP so "remove password" means "sign in with a
+                // code"; an explicit loginMethod in the same request still wins
+                // because it was applied above.
+                if (request.loginMethod() == null) {
+                    user.setLoginMethod(UserLoginMethod.OTP);
+                }
             } else {
                 authConfigService.setPassword(user, request.password());
             }
             refreshTokenService.revokeAllForUser(user.getId());
             audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY, AuthAuditService.ORG_USER_PASSWORD_RESET,
                     identifierOf(user), organisation.getSlug(), organisation.getId(), null);
+        }
+        if (previousLoginMethod != null && previousLoginMethod != user.getLoginMethod()) {
+            // Changing what a user may sign in with must not leave an existing
+            // session valid under the old rules.
+            refreshTokenService.revokeAllForUser(user.getId());
+            audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY,
+                    AuthAuditService.ORG_USER_LOGIN_METHOD_CHANGED,
+                    identifierOf(user), organisation.getSlug(), organisation.getId(),
+                    previousLoginMethod.name() + " -> " + user.getLoginMethod().name());
+        }
+        if (user.getLoginMethod() != null && !user.getLoginMethod().allowsPassword()
+                && user.getPasswordHash() != null) {
+            // OTP-only with a stored password would let the password keep working
+            // wherever a stale request is replayed; drop it so the stored
+            // credential matches what the account is allowed to use.
+            authConfigService.clearAuth(user);
         }
         if (request.temporaryPassword() != null) {
             user.setTemporaryPassword(request.temporaryPassword());
@@ -458,6 +505,139 @@ public class OrganisationUserService {
         audit.logPersisted(LogLevel.INFO, LogCategory.USER_MANAGEMENT, AuthAuditService.ORG_USER_UPDATED,
                 identifierOf(saved), organisation.getSlug(), organisation.getId(), "set primary phone " + target.getPhone());
         return userMapper.toResponse(saved, userFieldService.readMetadata(saved.getId()));
+    }
+
+    // ---------------------------------------------------------------------
+    // Administrator-triggered verification
+    // ---------------------------------------------------------------------
+
+    /**
+     * Sends a verification code/link to one of the user's own addresses so they
+     * can prove they own it. Resolves the target from {@code emailId} /
+     * {@code phoneId}, falling back to the primary address for the channel; an
+     * id that is not on this user is a 404 rather than a silent fallback.
+     */
+    @Transactional
+    public VerificationRequestResponse sendVerification(String platformSlug, Long organisationId, Long userId,
+                                                        OrgActor requester, SendUserVerificationRequest request) {
+        Organisation organisation = resolveForUser(platformSlug, organisationId, userId, requester);
+        OrganisationUser user = findUser(organisation, userId);
+        VerificationChannel channel = request.channel();
+        String address = resolveAddress(user, channel, request.emailId(), request.phoneId());
+        // The purpose has to follow the channel: an SMS delivery is a phone
+        // verification, and the service rejects a purpose/channel mismatch.
+        VerificationPurpose purpose = channel == VerificationChannel.SMS
+                ? VerificationPurpose.PHONE_VERIFICATION
+                : VerificationPurpose.EMAIL_VERIFICATION;
+
+        VerificationRequestResponse response = verificationService.requestForUser(
+                organisation, user, purpose, channel, address, request.delivery());
+        audit.logPersisted(LogLevel.INFO, LogCategory.USER_MANAGEMENT, AuthAuditService.ORG_USER_VERIFICATION_SENT,
+                identifierOf(user), organisation.getSlug(), organisation.getId(),
+                channel.name() + " " + address);
+        return response;
+    }
+
+    /**
+     * Sends a password reset so the user chooses their own password. The
+     * organisation must have password resets enabled; the code is bound to this
+     * user, so it cannot be completed by whoever intercepted the mail.
+     */
+    @Transactional
+    public VerificationRequestResponse sendPasswordReset(String platformSlug, Long organisationId, Long userId,
+                                                        OrgActor requester, SendPasswordResetRequest request) {
+        Organisation organisation = resolveForUser(platformSlug, organisationId, userId, requester);
+        OrganisationUser user = findUser(organisation, userId);
+        if (!user.isEnabled()) {
+            throw new BadRequestException("Cannot send a password reset to a disabled account");
+        }
+        VerificationChannel channel = request.emailId() != null || request.phoneId() == null
+                ? VerificationChannel.EMAIL
+                : VerificationChannel.SMS;
+        String address = resolveAddress(user, channel, request.emailId(), request.phoneId());
+
+        VerificationRequestResponse response = verificationService.requestForUser(
+                organisation, user, VerificationPurpose.PASSWORD_RESET, channel, address, request.delivery());
+        audit.logPersisted(LogLevel.INFO, LogCategory.USER_MANAGEMENT, AuthAuditService.ORG_USER_PASSWORD_RESET_SENT,
+                identifierOf(user), organisation.getSlug(), organisation.getId(),
+                channel.name() + " " + address);
+        return response;
+    }
+
+    /**
+     * Overrides an address's verified state without proof of ownership. Used by
+     * support to unblock a user whose delivery failed; it is a SECURITY-level
+     * audit event because it lets an administrator vouch for an address the user
+     * has not proven.
+     */
+    @Transactional
+    public OrganisationUserResponse setAddressVerified(String platformSlug, Long organisationId, Long userId,
+                                                      Long addressId, boolean email, boolean verified,
+                                                      OrgActor requester) {
+        Organisation organisation = resolveForUser(platformSlug, organisationId, userId, requester);
+        OrganisationUser user = findUser(organisation, userId);
+        String address;
+        if (email) {
+            OrganisationUserEmail target = user.getEmails().stream()
+                    .filter(e -> e.getId() != null && e.getId().equals(addressId))
+                    .findFirst()
+                    .orElseThrow(() -> ResourceNotFoundException.of("Organisation user email", addressId));
+            target.setVerifiedAt(verified ? java.time.Instant.now() : null);
+            address = target.getEmail();
+        } else {
+            OrganisationUserPhone target = user.getPhones().stream()
+                    .filter(p -> p.getId() != null && p.getId().equals(addressId))
+                    .findFirst()
+                    .orElseThrow(() -> ResourceNotFoundException.of("Organisation user phone", addressId));
+            target.setVerifiedAt(verified ? java.time.Instant.now() : null);
+            address = target.getPhone();
+        }
+        // A forced "verify at next login" is satisfied once the address is proven,
+        // so clear it rather than challenging the user for a no-op.
+        if (verified) {
+            if (email) {
+                user.setRequireEmailVerificationAtNextLogin(false);
+            } else {
+                user.setRequirePhoneVerificationAtNextLogin(false);
+            }
+        }
+        user.bumpDataHash();
+        OrganisationUser saved = userRepository.save(user);
+        audit.logPersisted(verified ? LogLevel.WARN : LogLevel.INFO, LogCategory.SECURITY,
+                verified ? AuthAuditService.ORG_USER_ADDRESS_VERIFIED : AuthAuditService.ORG_USER_ADDRESS_UNVERIFIED,
+                identifierOf(saved), organisation.getSlug(), organisation.getId(),
+                (email ? "email " : "phone ") + address + " manual override");
+        return userMapper.toResponse(saved, userFieldService.readMetadata(saved.getId()));
+    }
+
+    /**
+     * The address to deliver to: the requested one when it belongs to the user,
+     * otherwise their primary address for the channel. A supplied id that is not
+     * on this user is rejected so a caller cannot think they targeted one address
+     * while another receives the code.
+     */
+    private String resolveAddress(OrganisationUser user, VerificationChannel channel,
+                                  Long emailId, Long phoneId) {
+        if (emailId != null) {
+            return user.getEmails().stream()
+                    .filter(e -> e.getId() != null && e.getId().equals(emailId))
+                    .findFirst()
+                    .orElseThrow(() -> ResourceNotFoundException.of("Organisation user email", emailId))
+                    .getEmail();
+        }
+        if (phoneId != null) {
+            return user.getPhones().stream()
+                    .filter(p -> p.getId() != null && p.getId().equals(phoneId))
+                    .findFirst()
+                    .orElseThrow(() -> ResourceNotFoundException.of("Organisation user phone", phoneId))
+                    .getPhone();
+        }
+        String primary = channel == VerificationChannel.SMS ? user.getPrimaryPhone() : user.getPrimaryEmail();
+        if (primary == null || primary.isBlank()) {
+            throw new BadRequestException("The user has no " + channel.name().toLowerCase()
+                    + " address to send to — add one first");
+        }
+        return primary;
     }
 
     private Organisation resolveForUser(String platformSlug, Long organisationId, Long userId, OrgActor requester) {

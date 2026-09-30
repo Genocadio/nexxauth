@@ -86,6 +86,14 @@ public class AuthAuditService {
     public static final String ORG_USER_DISABLED = "ORG_USER_DISABLED";
     public static final String ORG_USER_PASSWORD_RESET = "ORG_USER_PASSWORD_RESET";
     public static final String ORG_USER_ROLES_CHANGED = "ORG_USER_ROLES_CHANGED";
+    public static final String ORG_USER_LOGIN_METHOD_CHANGED = "ORG_USER_LOGIN_METHOD_CHANGED";
+    /** An administrator triggered a verification send for one of the user's addresses. */
+    public static final String ORG_USER_VERIFICATION_SENT = "ORG_USER_VERIFICATION_SENT";
+    /** An administrator triggered a password reset send so the user picks their own password. */
+    public static final String ORG_USER_PASSWORD_RESET_SENT = "ORG_USER_PASSWORD_RESET_SENT";
+    /** An administrator changed an address's verified state by hand, bypassing proof of ownership. */
+    public static final String ORG_USER_ADDRESS_VERIFIED = "ORG_USER_ADDRESS_VERIFIED";
+    public static final String ORG_USER_ADDRESS_UNVERIFIED = "ORG_USER_ADDRESS_UNVERIFIED";
 
     /** Organisation management events. */
     public static final String ORG_CREATED = "ORG_CREATED";

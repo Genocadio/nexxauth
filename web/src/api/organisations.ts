@@ -10,14 +10,20 @@ import type {
   OrganisationSessionSettingsResponse,
   OrganisationUserFieldResponse,
   OrganisationUserResponse,
+  VerificationRequestResponse,
 } from "@/types/api";
 import type {
+  AddUserEmailRequest,
+  AddUserPhoneRequest,
   CreateOrganisationClientLinkRequest,
   CreateOrganisationClientRequest,
   CreateOrganisationRequest,
   CreateOrganisationRoleRequest,
   CreateOrganisationUserFieldRequest,
   CreateOrganisationUserRequest,
+  SendPasswordResetRequest,
+  SendUserVerificationRequest,
+  SetAddressVerifiedRequest,
   UpdateOrganisationAuthConfigRequest,
   UpdateOrganisationClientLinkRequest,
   UpdateOrganisationClientRequest,
@@ -49,6 +55,8 @@ export const organisationsApi = {
   // -- users ---------------------------------------------------------------
   users: (platformSlug: string, organisationId: number) =>
     get<OrganisationUserResponse[]>(endpoints.organisations(platformSlug).users(organisationId), "platform"),
+  getUser: (platformSlug: string, organisationId: number, userId: number) =>
+    get<OrganisationUserResponse>(endpoints.organisations(platformSlug).user(organisationId, userId), "platform"),
   createUser: (platformSlug: string, organisationId: number, body: CreateOrganisationUserRequest) =>
     post<OrganisationUserResponse>(
       endpoints.organisations(platformSlug).users(organisationId),
@@ -68,6 +76,92 @@ export const organisationsApi = {
     ),
   deleteUser: (platformSlug: string, organisationId: number, userId: number) =>
     del<void>(endpoints.organisations(platformSlug).user(organisationId, userId), "platform"),
+
+  // -- per-user settings ---------------------------------------------------
+  /** Sends a code or link to one of the user's own addresses so they can
+   * prove ownership now, rather than waiting for their next sign-in. */
+  sendUserVerification: (
+    platformSlug: string,
+    organisationId: number,
+    userId: number,
+    body: SendUserVerificationRequest,
+  ) =>
+    post<VerificationRequestResponse>(
+      endpoints.organisations(platformSlug).userVerifications(organisationId, userId),
+      body,
+      "platform",
+    ),
+  /** Starts a reset the user completes themselves, so they pick their own
+   * password. The administrator never sees or sets it. */
+  sendUserPasswordReset: (
+    platformSlug: string,
+    organisationId: number,
+    userId: number,
+    body: SendPasswordResetRequest = {},
+  ) =>
+    post<VerificationRequestResponse>(
+      endpoints.organisations(platformSlug).userPasswordReset(organisationId, userId),
+      body,
+      "platform",
+    ),
+  setEmailVerified: (
+    platformSlug: string,
+    organisationId: number,
+    userId: number,
+    emailId: number,
+    body: SetAddressVerifiedRequest,
+  ) =>
+    patch<OrganisationUserResponse>(
+      endpoints.organisations(platformSlug).userEmailVerified(organisationId, userId, emailId),
+      body,
+      "platform",
+    ),
+  setPhoneVerified: (
+    platformSlug: string,
+    organisationId: number,
+    userId: number,
+    phoneId: number,
+    body: SetAddressVerifiedRequest,
+  ) =>
+    patch<OrganisationUserResponse>(
+      endpoints.organisations(platformSlug).userPhoneVerified(organisationId, userId, phoneId),
+      body,
+      "platform",
+    ),
+  addEmail: (platformSlug: string, organisationId: number, userId: number, body: AddUserEmailRequest) =>
+    post<OrganisationUserResponse>(
+      endpoints.organisations(platformSlug).userEmails(organisationId, userId),
+      body,
+      "platform",
+    ),
+  deleteEmail: (platformSlug: string, organisationId: number, userId: number, emailId: number) =>
+    del<OrganisationUserResponse>(
+      endpoints.organisations(platformSlug).userEmail(organisationId, userId, emailId),
+      "platform",
+    ),
+  setPrimaryEmail: (platformSlug: string, organisationId: number, userId: number, emailId: number) =>
+    put<OrganisationUserResponse>(
+      endpoints.organisations(platformSlug).userEmailPrimary(organisationId, userId, emailId),
+      undefined,
+      "platform",
+    ),
+  addPhone: (platformSlug: string, organisationId: number, userId: number, body: AddUserPhoneRequest) =>
+    post<OrganisationUserResponse>(
+      endpoints.organisations(platformSlug).userPhones(organisationId, userId),
+      body,
+      "platform",
+    ),
+  deletePhone: (platformSlug: string, organisationId: number, userId: number, phoneId: number) =>
+    del<OrganisationUserResponse>(
+      endpoints.organisations(platformSlug).userPhone(organisationId, userId, phoneId),
+      "platform",
+    ),
+  setPrimaryPhone: (platformSlug: string, organisationId: number, userId: number, phoneId: number) =>
+    put<OrganisationUserResponse>(
+      endpoints.organisations(platformSlug).userPhonePrimary(organisationId, userId, phoneId),
+      undefined,
+      "platform",
+    ),
 
   // -- roles ---------------------------------------------------------------
   roles: (platformSlug: string, organisationId: number) =>

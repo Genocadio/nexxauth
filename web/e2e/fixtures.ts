@@ -117,8 +117,8 @@ export async function seedOrgUser(
   platform: PlatformSetup,
   organisationId: number,
   roleId: number,
-  options: { username?: string; firstName?: string; lastName?: string } = {},
-): Promise<{ id: number; username: string }> {
+  options: { username?: string; firstName?: string; lastName?: string; email?: string } = {},
+): Promise<{ id: number; username: string; email: string | null }> {
   const api = await request.newContext();
   try {
     const username = options.username ?? uniqueSlug("user");
@@ -131,12 +131,13 @@ export async function seedOrgUser(
         firstName: options.firstName ?? "Test",
         lastName: options.lastName ?? "User",
         username,
+        ...(options.email ? { email: options.email } : {}),
         password: "pw-secret-1",
         roleIds: [roleId],
         metadata: { "employee-id": "EMP-SEED" },
       },
     );
-    return { id: user.id, username: user.username ?? username };
+    return { id: user.id, username: user.username ?? username, email: user.email ?? null };
   } finally {
     await api.dispose();
   }

@@ -4,9 +4,13 @@ import com.nexxserve.nexxauth.dto.request.AddUserEmailRequest;
 import com.nexxserve.nexxauth.dto.request.AddUserPhoneRequest;
 import com.nexxserve.nexxauth.dto.request.ChangePasswordRequest;
 import com.nexxserve.nexxauth.dto.request.CreateOrganisationUserRequest;
+import com.nexxserve.nexxauth.dto.request.SendPasswordResetRequest;
+import com.nexxserve.nexxauth.dto.request.SendUserVerificationRequest;
+import com.nexxserve.nexxauth.dto.request.SetAddressVerifiedRequest;
 import com.nexxserve.nexxauth.dto.request.UpdateOrganisationUserRequest;
 import com.nexxserve.nexxauth.dto.request.UpdateOwnProfileRequest;
 import com.nexxserve.nexxauth.dto.response.OrganisationUserResponse;
+import com.nexxserve.nexxauth.dto.response.VerificationRequestResponse;
 import com.nexxserve.nexxauth.security.OrgActor;
 import com.nexxserve.nexxauth.security.OrgUserPrincipal;
 import com.nexxserve.nexxauth.service.OrganisationUserService;
@@ -244,5 +248,56 @@ public class OrganisationUserController {
                                                     @PathVariable Long phoneId,
                                                     @AuthenticationPrincipal OrgActor requester) {
         return userService.setPrimaryPhone(slug, organisationId, userId, phoneId, requester);
+    }
+
+    /** Administrator-triggered verification send for one of the user's own
+     * addresses, so an unverified email or phone can be proven now instead of
+     * waiting for the user's next sign-in. */
+    @PostMapping("/{userId}/verifications")
+    @PreAuthorize("hasRole('SUPER_USER') or hasAuthority('PERM_ORGANISATION_USER_UPDATE')")
+    public VerificationRequestResponse sendVerification(@PathVariable String slug,
+                                                        @PathVariable Long organisationId,
+                                                        @PathVariable Long userId,
+                                                        @AuthenticationPrincipal OrgActor requester,
+                                                        @Valid @RequestBody SendUserVerificationRequest request) {
+        return userService.sendVerification(slug, organisationId, userId, requester, request);
+    }
+
+    /** Sends the user a password reset so they choose their own password. */
+    @PostMapping("/{userId}/password-reset")
+    @PreAuthorize("hasRole('SUPER_USER') or hasAuthority('PERM_ORGANISATION_USER_UPDATE')")
+    public VerificationRequestResponse sendPasswordReset(@PathVariable String slug,
+                                                        @PathVariable Long organisationId,
+                                                        @PathVariable Long userId,
+                                                        @AuthenticationPrincipal OrgActor requester,
+                                                        @Valid @RequestBody(required = false) SendPasswordResetRequest request) {
+        return userService.sendPasswordReset(slug, organisationId, userId, requester,
+                request != null ? request : new SendPasswordResetRequest(null, null, null));
+    }
+
+    /** Manual override of an email's verified state (no proof of ownership). */
+    @PatchMapping("/{userId}/emails/{emailId}/verified")
+    @PreAuthorize("hasRole('SUPER_USER') or hasAuthority('PERM_ORGANISATION_USER_UPDATE')")
+    public OrganisationUserResponse setEmailVerified(@PathVariable String slug,
+                                                    @PathVariable Long organisationId,
+                                                    @PathVariable Long userId,
+                                                    @PathVariable Long emailId,
+                                                    @AuthenticationPrincipal OrgActor requester,
+                                                    @Valid @RequestBody SetAddressVerifiedRequest request) {
+        return userService.setAddressVerified(slug, organisationId, userId, emailId, true,
+                Boolean.TRUE.equals(request.verified()), requester);
+    }
+
+    /** Manual override of a phone's verified state (no proof of ownership). */
+    @PatchMapping("/{userId}/phones/{phoneId}/verified")
+    @PreAuthorize("hasRole('SUPER_USER') or hasAuthority('PERM_ORGANISATION_USER_UPDATE')")
+    public OrganisationUserResponse setPhoneVerified(@PathVariable String slug,
+                                                    @PathVariable Long organisationId,
+                                                    @PathVariable Long userId,
+                                                    @PathVariable Long phoneId,
+                                                    @AuthenticationPrincipal OrgActor requester,
+                                                    @Valid @RequestBody SetAddressVerifiedRequest request) {
+        return userService.setAddressVerified(slug, organisationId, userId, phoneId, false,
+                Boolean.TRUE.equals(request.verified()), requester);
     }
 }

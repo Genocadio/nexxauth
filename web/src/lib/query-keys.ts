@@ -10,6 +10,8 @@ export const queryKeys = {
   organisations: ["organisations"] as const,
   organisation: (organisationId: number) => ["organisation", organisationId] as const,
   orgUsers: (organisationId: number) => [...queryKeys.organisation(organisationId), "users"] as const,
+  orgUser: (organisationId: number, userId: number) =>
+    [...queryKeys.orgUsers(organisationId), userId] as const,
   orgRoles: (organisationId: number) => [...queryKeys.organisation(organisationId), "roles"] as const,
   orgAuthConfig: (organisationId: number) => [...queryKeys.organisation(organisationId), "auth-config"] as const,
   orgNotificationTemplates: (organisationId: number) =>
