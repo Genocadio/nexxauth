@@ -590,6 +590,10 @@ public class OrganisationAuthService {
     public OrgAuthResponse refresh(String platformSlug, String rawRefreshToken,
                                     String ipAddress, String userAgent, String hostname) {
         OrganisationUser resolved = refreshTokenService.resolveSubject(rawRefreshToken);
+        Organisation refreshOrg = resolved.getOrganisation();
+        if (!refreshOrg.getPlatform().getSlug().equals(platformSlug)) {
+            throw ResourceNotFoundException.of("Organisation", refreshOrg.getId());
+        }
         if (orgUserActions.hasPendingGatingAction(resolved))
             throw new RefreshTokenException("Pending action required");
         OrganisationClient client = refreshTokenService.clientOf(rawRefreshToken);
@@ -607,11 +611,16 @@ public class OrganisationAuthService {
 
     @Transactional
     public void logout(String platformSlug, String rawRefreshToken) {
-        refreshTokenService.findSubjectForAudit(rawRefreshToken).ifPresent(user ->
-                audit.logPersisted(LogLevel.INFO, LogCategory.AUTH, AuthAuditService.ORG_LOGOUT,
-                        identifierOf(user),
-                        user.getOrganisation().getSlug(),
-                        user.getOrganisation().getId(), null));
+        refreshTokenService.findSubjectForAudit(rawRefreshToken).ifPresent(user -> {
+            Organisation logoutOrg = user.getOrganisation();
+            if (!logoutOrg.getPlatform().getSlug().equals(platformSlug)) {
+                throw ResourceNotFoundException.of("Organisation", logoutOrg.getId());
+            }
+            audit.logPersisted(LogLevel.INFO, LogCategory.AUTH, AuthAuditService.ORG_LOGOUT,
+                    identifierOf(user),
+                    logoutOrg.getSlug(),
+                    logoutOrg.getId(), null);
+        });
         refreshTokenService.revoke(rawRefreshToken);
     }
 

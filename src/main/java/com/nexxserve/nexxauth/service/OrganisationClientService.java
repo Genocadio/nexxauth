@@ -17,10 +17,13 @@ import com.nexxserve.nexxauth.exception.ResourceNotFoundException;
 import com.nexxserve.nexxauth.mapper.OrganisationClientMapper;
 import com.nexxserve.nexxauth.repository.OrganisationClientLinkRepository;
 import com.nexxserve.nexxauth.repository.OrganisationClientRepository;
+import com.nexxserve.nexxauth.security.ClientCache;
 import com.nexxserve.nexxauth.security.ClientTokens;
 import com.nexxserve.nexxauth.security.OrgActor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
@@ -48,6 +51,7 @@ public class OrganisationClientService {
     private final OrganisationAccess organisationAccess;
     private final ObjectMapper objectMapper;
     private final AuthAuditService audit;
+    private final ClientCache clientCache;
 
     public OrganisationClientService(OrganisationClientRepository clientRepository,
                                      OrganisationClientLinkRepository linkRepository,
@@ -55,7 +59,8 @@ public class OrganisationClientService {
                                      PlatformAccess platformAccess,
                                      OrganisationAccess organisationAccess,
                                      ObjectMapper objectMapper,
-                                     AuthAuditService audit) {
+                                     AuthAuditService audit,
+                                     ClientCache clientCache) {
         this.clientRepository = clientRepository;
         this.linkRepository = linkRepository;
         this.clientMapper = clientMapper;
@@ -63,6 +68,25 @@ public class OrganisationClientService {
         this.organisationAccess = organisationAccess;
         this.objectMapper = objectMapper;
         this.audit = audit;
+        this.clientCache = clientCache;
+    }
+
+    /** Drops the cached {@code X-Client-Id → client} entry once the current
+     * transaction commits, so a disabled/rotated/deleted client stops
+     * authenticating immediately instead of lingering for the cache TTL.
+     * Deferring to after-commit avoids a concurrent read re-caching the
+     * pre-commit (stale) row. */
+    private void invalidateClientCacheAfterCommit(String clientKey) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    clientCache.invalidate(clientKey);
+                }
+            });
+        } else {
+            clientCache.invalidate(clientKey);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -179,6 +203,7 @@ public class OrganisationClientService {
             client.setRoleRestrictionMode(request.roleRestrictionMode());
         }
         OrganisationClient saved = clientRepository.save(client);
+        invalidateClientCacheAfterCommit(client.getClientKey());
         audit.logPersisted(LogLevel.INFO, LogCategory.CONFIG, AuthAuditService.ORG_CLIENT_UPDATED, null,
                 organisation.getSlug(), organisation.getId(), saved.getName());
         return toResponse(saved, newToken);
@@ -191,6 +216,7 @@ public class OrganisationClientService {
         audit.logPersisted(LogLevel.INFO, LogCategory.CONFIG, AuthAuditService.ORG_CLIENT_DELETED, null,
                 organisation.getSlug(), organisation.getId(), client.getName());
         clientRepository.delete(client);
+        invalidateClientCacheAfterCommit(client.getClientKey());
     }
 
     @Transactional
@@ -204,6 +230,7 @@ public class OrganisationClientService {
         String token = ClientTokens.generate();
         client.setTokenHash(ClientTokens.hash(token));
         OrganisationClient saved = clientRepository.save(client);
+        invalidateClientCacheAfterCommit(client.getClientKey());
         audit.logPersisted(LogLevel.INFO, LogCategory.SECURITY, AuthAuditService.ORG_CLIENT_TOKEN_ROTATED, null,
                 organisation.getSlug(), organisation.getId(), client.getName());
         return toResponse(saved, token);

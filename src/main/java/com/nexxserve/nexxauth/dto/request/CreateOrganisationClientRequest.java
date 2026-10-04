@@ -2,6 +2,8 @@ package com.nexxserve.nexxauth.dto.request;
 
 import com.nexxserve.nexxauth.entity.ClientType;
 import com.nexxserve.nexxauth.entity.RoleRestrictionMode;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -38,6 +40,11 @@ public record CreateOrganisationClientRequest(
 
         Long refreshTokenTtlSeconds,
 
+        /** Concurrent-session limit for this client. Must be >= 1: a limit of 0
+         * (or negative) is rejected here so it can never reach the eviction loop,
+         * where it would otherwise throw on every login. Null = org default. */
+        @Min(value = 1, message = "maxSessionsPerUser must be at least 1")
+        @Max(value = 1000, message = "maxSessionsPerUser must be at most 1000")
         Integer maxSessionsPerUser,
 
         // --- per-client login/register restrictions ---

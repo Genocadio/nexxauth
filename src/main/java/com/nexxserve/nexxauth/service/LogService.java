@@ -18,6 +18,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -87,6 +89,14 @@ public class LogService {
     // Writing
     // ------------------------------------------------------------------
 
+    /** Persists one log/audit row and broadcasts it to the live console.
+     *
+     * <p>Runs in its own transaction ({@link Propagation#REQUIRES_NEW}) on
+     * purpose: security audit rows are written immediately before the request
+     * throws (failed logins, detected token reuse, disabled accounts). With
+     * {@code REQUIRED} the row would join the caller's transaction and be rolled
+     * back with it, erasing the audit trail precisely when it matters most. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public LogEntry logEvent(LogLevel level, LogCategory category, String eventType,
                              String message, Long platformId, Long organisationId,
                              String actor, String detail, String clientKey, String domainOverride) {

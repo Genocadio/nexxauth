@@ -93,7 +93,7 @@ public class OrganisationSessionController {
             @PathVariable String sessionId,
             @AuthenticationPrincipal OrgActor requester) {
         Organisation organisation = resolve(slug, organisationId, requester);
-        String revoked = sessionService.revokeSession(organisation.getId(), sessionId, null);
+        String revoked = sessionService.revokeSession(organisation.getId(), sessionId);
         audit.logPersisted(LogLevel.INFO, LogCategory.SECURITY, AuthAuditService.ORG_SESSION_REVOKED,
                 requester.isPlatformUser() ? "platform" : "org_user",
                 organisation.getSlug(), organisation.getId(), "sessionId=" + revoked);

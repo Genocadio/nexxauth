@@ -1,7 +1,9 @@
 package com.nexxserve.nexxauth.repository;
 
 import com.nexxserve.nexxauth.entity.OrganisationRefreshToken;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,6 +14,10 @@ import java.util.Optional;
 
 public interface OrganisationRefreshTokenRepository extends JpaRepository<OrganisationRefreshToken, Long> {
 
+    /** Row-locked lookup so concurrent refreshes of the same token serialise:
+     *  exactly one caller observes {@code revokedAt = null} and rotates, the
+     *  other waits, then sees the revoked token and trips reuse detection. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<OrganisationRefreshToken> findByTokenHash(String tokenHash);
 
     /** Live sessions of a user (not revoked, not evicted, not expired), oldest first. */
@@ -114,6 +120,17 @@ public interface OrganisationRefreshTokenRepository extends JpaRepository<Organi
             update OrganisationRefreshToken rt set rt.revokedAt = :now
             where rt.sessionId = :sessionId and rt.revokedAt is null""")
     void revokeBySessionId(@Param("sessionId") String sessionId, @Param("now") Instant now);
+
+    /** Revoke all tokens for a session, scoped to one organisation. */
+    @Modifying
+    @Query("""
+            update OrganisationRefreshToken rt set rt.revokedAt = :now
+            where rt.sessionId = :sessionId
+              and rt.organisationUser.organisation.id = :organisationId
+              and rt.revokedAt is null""")
+    void revokeBySessionIdAndOrganisationId(@Param("sessionId") String sessionId,
+                                            @Param("organisationId") Long organisationId,
+                                            @Param("now") Instant now);
 
     /** Revoke all tokens for a session that belong to a specific user. */
     @Modifying

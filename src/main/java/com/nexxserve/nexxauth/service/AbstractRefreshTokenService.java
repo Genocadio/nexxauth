@@ -44,8 +44,18 @@ public abstract class AbstractRefreshTokenService<S, T> {
     /** Issues a refresh token with an explicit lifetime (per-org settings). */
     @Transactional
     public String issue(S subject, Duration ttl) {
+        return persist(subject, ttl, null);
+    }
+
+    /** Creates and stores a new refresh token, optionally inheriting the session
+     * context of {@code parent} (the token being rotated). */
+    private String persist(S subject, Duration ttl, T parent) {
         String rawToken = RefreshTokens.generateRaw();
-        save(createToken(subject, RefreshTokens.hash(rawToken), Instant.now().plus(ttl)));
+        T token = createToken(subject, RefreshTokens.hash(rawToken), Instant.now().plus(ttl));
+        if (parent != null) {
+            inheritContext(parent, token);
+        }
+        save(token);
         return rawToken;
     }
 
@@ -87,7 +97,7 @@ public abstract class AbstractRefreshTokenService<S, T> {
             throw new RefreshTokenException("User account is disabled");
         }
         markRevoked(current);
-        return new Rotation<>(subject, issue(subject, ttl.apply(subject)));
+        return new Rotation<>(subject, persist(subject, ttl.apply(subject), current));
     }
 
     /** A rotated refresh token together with the subject it belongs to. */
@@ -120,8 +130,9 @@ public abstract class AbstractRefreshTokenService<S, T> {
      * side effects: unlike {@link #findUsable} it does not treat a presented
      * revoked token as theft, and unlike {@link #resolveSubject} it tolerates
      * unknown/expired tokens. Call before {@link #revoke} - a revoked token
-     * no longer resolves here. */
-    @Transactional(readOnly = true)
+     * no longer resolves here. Not read-only: the underlying token lookup takes a
+     * pessimistic row lock, which a read-only transaction would not honour. */
+    @Transactional
     public java.util.Optional<S> findSubjectForAudit(String rawToken) {
         return findByTokenHash(RefreshTokens.hash(rawToken))
                 .filter(token -> !isRevoked(token) && !isExpired(token))
@@ -184,6 +195,13 @@ public abstract class AbstractRefreshTokenService<S, T> {
     protected abstract boolean isExpired(T token);
 
     protected abstract void markRevoked(T token);
+
+    /** Copies session-scoped metadata (client key, IP, user agent, session id,
+     * hostname) from the token being rotated onto its replacement, so a session
+     * stays trackable - and revocable - across rotations. Default: no-op; token
+     * types with no session context have nothing to inherit. */
+    protected void inheritContext(T from, T to) {
+    }
 
     protected abstract void revokeAllForSubject(Long subjectId, Instant now);
 

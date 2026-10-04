@@ -17,9 +17,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 /**
  * Manages sessions for organisation users. A "session" is a group of refresh
@@ -116,17 +120,19 @@ public class OrganisationSessionService {
      * that was revoked, or throw if not found.
      */
     @Transactional
-    public String revokeSession(Long organisationId, String sessionId, Long operatorUserId) {
+    public String revokeSession(Long organisationId, String sessionId) {
         // Verify the session belongs to this organisation
         List<OrganisationRefreshToken> tokens = refreshTokenRepository.findBySessionId(sessionId);
         boolean belongsToOrg = tokens.stream()
                 .anyMatch(t -> t.getOrganisationUser().getOrganisation().getId().equals(organisationId));
-        if (!belongsToOrg || tokens.isEmpty()) {
+        if (!belongsToOrg) {
             throw ResourceNotFoundException.of("Session", sessionId);
         }
 
         Instant now = Instant.now();
-        refreshTokenRepository.revokeBySessionId(sessionId, now);
+        // Org-scoped update: a (theoretical) session-id collision must not revoke
+        // another organisation's tokens.
+        refreshTokenRepository.revokeBySessionIdAndOrganisationId(sessionId, organisationId, now);
         return sessionId;
     }
 
@@ -173,14 +179,18 @@ public class OrganisationSessionService {
         Instant now = Instant.now();
         List<OrganisationRefreshToken> active =
                 refreshTokenRepository.findActiveByUserIdOrderByExpiresAtAsc(userId, now);
-        int count = 0;
+        // One bulk update per distinct session, and the returned count is the
+        // number of sessions revoked (not the number of tokens).
+        Set<String> sessionIds = new LinkedHashSet<>();
         for (OrganisationRefreshToken token : active) {
             if (token.getSessionId() != null) {
-                refreshTokenRepository.revokeBySessionId(token.getSessionId(), now);
-                count++;
+                sessionIds.add(token.getSessionId());
             }
         }
-        return count;
+        for (String sid : sessionIds) {
+            refreshTokenRepository.revokeBySessionIdAndUserId(sid, userId, now);
+        }
+        return sessionIds.size();
     }
 
     // -------------------------------------------------------------------------
@@ -214,7 +224,8 @@ public class OrganisationSessionService {
                     .orElse(primary.getCreatedAt());
 
             Instant latestActivity = sessionTokens.stream()
-                    .map(t -> t.getRevokedAt() != null ? t.getRevokedAt() : t.getCreatedAt())
+                    .flatMap(t -> Stream.of(t.getCreatedAt(), t.getRevokedAt(), t.getEvictedAt()))
+                    .filter(Objects::nonNull)
                     .max(Instant::compareTo)
                     .orElse(primary.getCreatedAt());
 

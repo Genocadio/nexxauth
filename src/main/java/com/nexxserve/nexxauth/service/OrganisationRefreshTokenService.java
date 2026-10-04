@@ -73,12 +73,15 @@ public class OrganisationRefreshTokenService
         // context (loaded via findWithRolesById during login/register), so
         // merge() is a no-op — just returns the existing instance.
         entityManager.lock(user, LockModeType.PESSIMISTIC_WRITE);
-        int max = sessionSettingsService.maxSessionsPerUser(organisation, client);
+        // The session limit is a positive count. Clamp defensively so a bad
+        // stored value can never make the eviction loop index past the list,
+        // which would surface as a 500 on every login through that client.
+        int max = Math.max(1, sessionSettingsService.maxSessionsPerUser(organisation, client));
         List<OrganisationRefreshToken> active =
                 refreshTokenRepository.findActiveByUserIdOrderByExpiresAtAsc(userId, Instant.now());
         // +1: a new session is about to be issued after this call.
-        int excess = active.size() - max + 1;
-        for (int i = 0; i < excess; i++) {
+        int excess = Math.max(0, active.size() - max + 1);
+        for (int i = 0; i < excess && i < active.size(); i++) {
             active.get(i).setEvictedAt(Instant.now());
         }
     }
@@ -126,7 +129,7 @@ public class OrganisationRefreshTokenService
      * Look up the session id of an existing token (for carrying forward on
      * rotation). Returns null for legacy tokens.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public String sessionIdOf(String rawToken) {
         return refreshTokenRepository.findByTokenHash(RefreshTokens.hash(rawToken))
                 .map(OrganisationRefreshToken::getSessionId)
@@ -134,7 +137,7 @@ public class OrganisationRefreshTokenService
     }
 
     /** Returns the client that originally issued this token, or null. */
-    @Transactional(readOnly = true)
+    @Transactional
     public OrganisationClient clientOf(String rawToken) {
         return refreshTokenRepository.findByTokenHash(RefreshTokens.hash(rawToken))
                 .map(t -> t.getClientKey())
@@ -195,6 +198,19 @@ public class OrganisationRefreshTokenService
     @Override
     protected void markRevoked(OrganisationRefreshToken token) {
         token.setRevokedAt(Instant.now());
+    }
+
+    /** A rotated organisation token inherits the full session context of its
+     * parent, so the session stays visible in the admin session list, remains
+     * revocable by session id, keeps its per-client TTL overrides and still
+     * dedups a same-IP re-login onto the existing session. */
+    @Override
+    protected void inheritContext(OrganisationRefreshToken from, OrganisationRefreshToken to) {
+        to.setSessionId(from.getSessionId());
+        to.setClientKey(from.getClientKey());
+        to.setIpAddress(from.getIpAddress());
+        to.setUserAgent(from.getUserAgent());
+        to.setHostname(from.getHostname());
     }
 
     @Override

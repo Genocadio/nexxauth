@@ -138,7 +138,10 @@ public class OrgKeyService {
             return (RSAPublicKey) java.security.KeyFactory.getInstance("RSA")
                     .generatePublic(new java.security.spec.X509EncodedKeySpec(der));
         } catch (Exception e) {
-            throw new IllegalStateException("Stored organisation public key is corrupt", e);
+            // JwtException (not IllegalStateException) so the JWT auth filter's
+            // JwtException catch turns corrupt key material into a logged 401
+            // instead of an unhandled 500 escaping the servlet filter.
+            throw new io.jsonwebtoken.JwtException("Stored organisation public key is corrupt", e);
         }
     }
 
@@ -148,7 +151,7 @@ public class OrgKeyService {
             return (RSAPrivateKey) java.security.KeyFactory.getInstance("RSA")
                     .generatePrivate(new java.security.spec.PKCS8EncodedKeySpec(der));
         } catch (Exception e) {
-            throw new IllegalStateException("Stored organisation private key is corrupt", e);
+            throw new io.jsonwebtoken.JwtException("Stored organisation private key is corrupt", e);
         }
     }
 

@@ -167,10 +167,22 @@ public class ClientTokenFilter extends OncePerRequestFilter {
         return own == null || !origin.equals(own);
     }
 
-    private static String ownOrigin(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-Host");
-        String host = forwarded != null && !forwarded.isBlank() ? forwarded
-                : request.getServerName();
+    /**
+     * Resolves this server's own origin from the container's parsed view of the
+     * request ({@link HttpServletRequest#getServerName()}, {@link
+     * HttpServletRequest#getScheme()}, {@link HttpServletRequest#getServerPort()}).
+     *
+     * <p>Deliberately does <em>not</em> read the raw {@code X-Forwarded-Host}
+     * header. A proxy that appends to it (nginx's default
+     * {@code $proxy_add_x_forwarded_host}) yields a comma-joined value such as
+     * {@code "evil.example, auth.nexxserve.dev"}, which can never equal a real
+     * {@code Origin} header and would therefore reject every legitimate
+     * same-origin browser request with a 403. Using the framework's parsed view
+     * keeps this comparison consistent with how the rest of the application
+     * (CORS, redirect and URL construction) already resolves the request URL.
+     */
+    static String ownOrigin(HttpServletRequest request) {
+        String host = request.getServerName();
         if (host == null || host.isBlank()) {
             return null;
         }
