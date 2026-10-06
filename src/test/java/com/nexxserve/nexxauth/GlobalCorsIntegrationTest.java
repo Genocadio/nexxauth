@@ -7,6 +7,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -75,6 +76,50 @@ class GlobalCorsIntegrationTest {
                         .header("X-Client-Id", "1")
                         .header("Origin", "https://app.example.com")
                         .header("Access-Control-Request-Method", "POST"))
+                .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
+    }
+
+    // --- Actual (non-preflight) requests -----------------------------------
+    //
+    // Regression cover for a production incident: only preflights were asserted
+    // above, so the actual-request path through the filter chain was untested.
+    // In production every request carrying an Origin was rejected with
+    // 403 "Invalid CORS request" while preflights were accepted, which is only
+    // distinguishable by exercising a real request.
+
+    @Test
+    void allowsFrontendOriginOnActualRequest() throws Exception {
+        mockMvc.perform(get("/auth/refresh")
+                        .header("Origin", "https://app.example.com"))
+                .andExpect(header().string("Access-Control-Allow-Origin", "https://app.example.com"));
+    }
+
+    @Test
+    void allowsBackendOriginOnActualRequest() throws Exception {
+        mockMvc.perform(get("/auth/refresh")
+                        .header("Origin", "https://api.example.com"))
+                .andExpect(header().string("Access-Control-Allow-Origin", "https://api.example.com"));
+    }
+
+    @Test
+    void echoesHeadersOnActualRequest() throws Exception {
+        // The response must be usable cross-origin: status and headers are what
+        // matter here, so assert headers only and ignore the (401/405) status.
+        mockMvc.perform(get("/auth/refresh")
+                        .header("Origin", "https://app.example.com"))
+                .andExpect(header().string("Access-Control-Expose-Headers", "X-Request-Id"));
+    }
+
+    @Test
+    void unknownOriginOnActualRequestGetsNoAllowOriginHeader() throws Exception {
+        mockMvc.perform(get("/auth/refresh")
+                        .header("Origin", "https://evil.example.com"))
+                .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
+    }
+
+    @Test
+    void noOriginHeaderIsNotACorsRequest() throws Exception {
+        mockMvc.perform(get("/auth/refresh"))
                 .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
     }
 }
