@@ -46,11 +46,13 @@ import {
   useUpdateOrgNotificationTemplates,
   useUpdateOrgSessionSettings,
 } from "@/hooks/mutations";
+import type { OrganisationUserResponse } from "@/types/api";
 import {
   useOrganisation,
   useOrgAuthConfig,
   useOrgNotificationTemplates,
   useOrgSessionSettings,
+  useOrgUsers,
 } from "@/hooks/queries";
 import { useForm } from "@/hooks/use-form";
 import { authConfigSchema, sessionSettingsSchema } from "@/lib/validation";
@@ -195,6 +197,75 @@ interface VerificationFeaturesCardProps extends OrgSettingsTabProps {
   onNavigateToNotifications: () => void;
 }
 
+type PendingVerificationFlag =
+  | "emailVerificationEnabled"
+  | "phoneVerificationEnabled"
+  | "twoFactorEnabled";
+
+const EXISTING_ACCOUNT_IMPACT: Record<PendingVerificationFlag, string> = {
+  emailVerificationEnabled:
+    "Email Verification becomes a standing requirement, so every existing account that has an email address is asked to verify it. Accounts without one are not prompted, and existing password logins keep working.",
+  phoneVerificationEnabled:
+    "Phone Verification becomes a standing requirement, so every existing account that has a phone number is asked to verify it. Accounts without one are not prompted, and existing password logins keep working.",
+  twoFactorEnabled:
+    "Two-factor is enforced on the next login of every existing account that has an email address or phone number, where the code is sent. An account with neither cannot sign in at all until one is added.",
+};
+
+const FLAG_LABELS: Record<PendingVerificationFlag, string> = {
+  emailVerificationEnabled: "Email Verification",
+  phoneVerificationEnabled: "Phone Verification",
+  twoFactorEnabled: "Two-Factor Authentication",
+};
+
+/** How a flag change lands on the accounts that already exist.
+ * `affected` are prompted or challenged; `blocked` cannot sign in at all. */
+type FlagImpact = { affected: number; blocked: number };
+
+function impactOf(
+  flag: PendingVerificationFlag,
+  accounts: OrganisationUserResponse[],
+): FlagImpact {
+  if (flag === "twoFactorEnabled") {
+    // Backend challenges every account that has an address to send the code to
+    // (OrganisationAuthService#firstPendingLoginObligation); an account with
+    // neither email nor phone is rejected outright.
+    const blocked = accounts.filter((u) => !u.email && !u.phone).length;
+    return { affected: accounts.length - blocked, blocked };
+  }
+  const hasAddress = flag === "emailVerificationEnabled" ? "email" : "phone";
+  const verified = flag === "emailVerificationEnabled" ? "emailVerified" : "phoneVerified";
+  return {
+    affected: accounts.filter((u) => u[hasAddress] && !u[verified]).length,
+    blocked: 0,
+  };
+}
+
+function affectedSummary(
+  flag: PendingVerificationFlag,
+  { affected, blocked }: FlagImpact,
+  total: number,
+): string {
+  const accountLabel = total === 1 ? "account" : "accounts";
+  if (flag === "twoFactorEnabled") {
+    const parts = [
+      `${affected} of ${total} existing ${accountLabel} will be asked for a second factor on their next login.`,
+    ];
+    if (blocked > 0) {
+      parts.push(
+        `${blocked} ${blocked === 1 ? "has" : "have"} neither an email address nor a phone number and cannot sign in at all.`,
+      );
+    }
+    return parts.join(" ");
+  }
+  const address = flag === "emailVerificationEnabled" ? "email address" : "phone number";
+  if (affected === 0) {
+    return `No existing ${accountLabel} has an unverified ${address}, so nobody is asked to verify.`;
+  }
+  return `${affected} of ${total} existing ${accountLabel} ${
+    affected === 1 ? "has" : "have"
+  } an unverified ${address} and will be required to verify one.`;
+}
+
 function VerificationFeaturesCard({
   platformSlug,
   organisationId,
@@ -202,6 +273,8 @@ function VerificationFeaturesCard({
 }: VerificationFeaturesCardProps) {
   const config = useOrgAuthConfig(organisationId);
   const update = useUpdateOrgAuthConfig(platformSlug, organisationId);
+  const users = useOrgUsers(organisationId);
+  const [pendingFlag, setPendingFlag] = useState<PendingVerificationFlag | null>(null);
 
   if (config.isLoading) return <TableSkeleton rows={4} columns={2} />;
   if (config.isError || !config.data)
@@ -210,8 +283,32 @@ function VerificationFeaturesCard({
   const data = config.data;
   const locked = !data.verificationServiceAvailable;
 
+  const existingAccounts = users.data ?? [];
+  const accountsKnown = users.isSuccess;
+  const noExistingAccounts = accountsKnown && existingAccounts.length === 0;
+  const impact = pendingFlag ? impactOf(pendingFlag, existingAccounts) : null;
+
   const toggleFlag = (key: string, value: unknown) => {
+    // Fail closed: only skip the confirmation when the account list has
+    // actually loaded and is empty. While it is loading (or failed) the
+    // dialog must still appear — silently applying the change because
+    // `users.data` is undefined was the previous behaviour.
+    if (value === true && key in EXISTING_ACCOUNT_IMPACT && !noExistingAccounts) {
+      setPendingFlag(key as PendingVerificationFlag);
+      return;
+    }
     update.mutateAsync({ [key]: value }).catch(() => undefined);
+  };
+
+  const confirmPendingFlag = async () => {
+    if (!pendingFlag) return;
+    const key = pendingFlag;
+    setPendingFlag(null);
+    try {
+      await update.mutateAsync({ [key]: true });
+    } catch {
+      return;
+    }
   };
 
   const hasActiveNotifications =
@@ -417,6 +514,50 @@ function VerificationFeaturesCard({
           </div>
         )}
       </CardContent>
+
+      {pendingFlag ? (
+        <Dialog open onOpenChange={(open) => !open && setPendingFlag(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Enable {FLAG_LABELS[pendingFlag]}?</DialogTitle>
+              <DialogDescription className="space-y-2">
+                {accountsKnown ? (
+                  <>
+                    <span className="block">
+                      This organisation already has {existingAccounts.length}{" "}
+                      {existingAccounts.length === 1 ? "account" : "accounts"}.
+                    </span>
+                    {impact ? (
+                      <span className="block">{affectedSummary(pendingFlag, impact, existingAccounts.length)}</span>
+                    ) : null}
+                  </>
+                ) : (
+                  <span className="block">
+                    {users.isFetching
+                      ? "Loading the existing account list…"
+                      : "The existing account list could not be loaded, so the impact on current accounts cannot be shown."}
+                  </span>
+                )}
+                <span className="block">{EXISTING_ACCOUNT_IMPACT[pendingFlag]}</span>
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPendingFlag(null)} disabled={update.isPending}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => void confirmPendingFlag()}
+                disabled={update.isPending || users.isFetching}
+                className="gap-2"
+              >
+                {update.isPending ? <Loader2 className="animate-spin" /> : null}
+                Enable for existing accounts
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </Card>
   );
 }
