@@ -65,7 +65,7 @@ public class ClientTokenFilter extends OncePerRequestFilter {
     // verification + password-reset paths are public org auth flows too
     // (no-auth clients only reach org auth endpoints).
     private static final Pattern ORG_AUTH_PATH =
-            Pattern.compile("^/(?!api/)[^/]+/auth/(login|register|refresh|logout|challenges/verify|"
+            Pattern.compile("^/(?!api/)[^/]+/auth/(login|register|refresh|logout|delete-account|challenges/verify|"
                     + "verifications/(request|verify|complete)|password-reset/confirm)$");
     private static final List<SimpleGrantedAuthority> CLIENT_AUTHORITIES = clientAuthorities();
 

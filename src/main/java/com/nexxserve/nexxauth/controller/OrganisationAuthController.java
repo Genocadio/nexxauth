@@ -2,6 +2,7 @@ package com.nexxserve.nexxauth.controller;
 
 import com.nexxserve.nexxauth.dto.request.ChallengeVerifyRequest;
 import com.nexxserve.nexxauth.dto.request.LogoutRequest;
+import com.nexxserve.nexxauth.dto.request.OrgDeleteAccountRequest;
 import com.nexxserve.nexxauth.dto.request.OrgLoginRequest;
 import com.nexxserve.nexxauth.dto.request.OrgRegisterRequest;
 import com.nexxserve.nexxauth.dto.request.RefreshTokenRequest;
@@ -89,6 +90,19 @@ public class OrganisationAuthController {
                                        @Valid @RequestBody LogoutRequest request) {
         authService.logout(slug, request.refreshToken());
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/delete-account")
+    public ResponseEntity<java.util.Map<String, Object>> deleteAccount(
+            @PathVariable String slug,
+            @RequestHeader(value = CLIENT_ID_HEADER, required = false) String clientId,
+            @Valid @RequestBody OrgDeleteAccountRequest request,
+            HttpServletRequest httpRequest) {
+        authService.deleteAccount(slug, request, clientId, resolveIp(httpRequest), httpRequest.getHeader("User-Agent"));
+        return ResponseEntity.ok(java.util.Map.of(
+                "success", true,
+                "message", "Account successfully deleted. Your data will be permanently removed in 30 days."
+        ));
     }
 
     private String resolveIp(HttpServletRequest request) {

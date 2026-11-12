@@ -117,6 +117,15 @@ public class OrganisationUserController {
         return userService.update(slug, organisationId, userId, requester, request);
     }
 
+    @DeleteMapping("/me")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public ResponseEntity<Void> deleteOwnAccount(@PathVariable String slug,
+                                                 @PathVariable Long organisationId,
+                                                 @AuthenticationPrincipal OrgActor requester) {
+        userService.deleteOwnAccount(slug, organisationId, requester);
+        return ResponseEntity.noContent().build();
+    }
+
     @DeleteMapping("/{userId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('SUPER_USER') or hasAuthority('PERM_ORGANISATION_USER_DELETE')")

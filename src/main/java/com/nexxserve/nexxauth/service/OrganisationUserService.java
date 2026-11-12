@@ -105,6 +105,7 @@ public class OrganisationUserService {
         Map<Long, Map<String, String>> metadata = userFieldService
                 .readMetadataByUserIds(users.stream().map(OrganisationUser::getId).toList());
         return users.stream()
+                .filter(u -> !u.isDeleted())
                 .map(user -> userMapper.toResponse(user, metadata.getOrDefault(user.getId(), Map.of())))
                 .toList();
     }
@@ -324,9 +325,37 @@ public class OrganisationUserService {
     public void delete(String platformSlug, Long organisationId, Long userId, OrgActor requester) {
         Organisation organisation = resolve(platformSlug, organisationId, requester, true, Permission.ORGANISATION_USER_DELETE);
         OrganisationUser user = findUser(organisation, userId);
+        user.markDeleted();
+        userRepository.save(user);
+        refreshTokenService.revokeAllForUser(user.getId());
         audit.logPersisted(LogLevel.INFO, LogCategory.USER_MANAGEMENT, AuthAuditService.ORG_USER_DELETED,
-                identifierOf(user), organisation.getSlug(), organisation.getId(), null);
-        userRepository.delete(user);
+                identifierOf(user), organisation.getSlug(), organisation.getId(), "soft_deleted");
+    }
+
+    /** Self-service account deletion (any org user can delete their own account). */
+    @Transactional
+    public void deleteOwnAccount(String platformSlug, Long organisationId, OrgActor requester) {
+        OrganisationUser user = ownUser(platformSlug, organisationId, requester);
+        if (user.isDeleted()) {
+            throw new BadRequestException("Account is already deleted");
+        }
+        user.markDeleted();
+        userRepository.save(user);
+        refreshTokenService.revokeAllForUser(user.getId());
+        audit.logPersisted(LogLevel.INFO, LogCategory.USER_MANAGEMENT, AuthAuditService.ORG_USER_DELETED,
+                identifierOf(user), user.getOrganisation().getSlug(), user.getOrganisation().getId(), "self_service_soft_delete");
+    }
+
+    /** Nightly maintenance: permanently purge accounts that have been soft-deleted for > 30 days. */
+    @Transactional
+    public int purgeExpiredSoftDeletedUsers(java.time.Instant cutoff) {
+        List<OrganisationUser> expired = userRepository.findAllByDeletedAtBefore(cutoff);
+        for (OrganisationUser user : expired) {
+            audit.logPersisted(LogLevel.INFO, LogCategory.USER_MANAGEMENT, AuthAuditService.ORG_USER_DELETED,
+                    identifierOf(user), user.getOrganisation().getSlug(), user.getOrganisation().getId(), "30_day_purge");
+            userRepository.delete(user);
+        }
+        return expired.size();
     }
 
     /** Self-service password change (any org user, regardless of permissions).
@@ -707,6 +736,7 @@ public class OrganisationUserService {
 
     private OrganisationUser findUser(Organisation organisation, Long userId) {
         return userRepository.findByIdAndOrganisationId(userId, organisation.getId())
+                .filter(u -> !u.isDeleted())
                 .orElseThrow(() -> ResourceNotFoundException.of("Organisation user", userId));
     }
 

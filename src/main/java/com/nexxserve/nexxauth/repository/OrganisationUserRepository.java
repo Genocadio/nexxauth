@@ -58,4 +58,6 @@ public interface OrganisationUserRepository extends JpaRepository<OrganisationUs
                                            @Param("phone") String phone);
 
     long countByOrganisationId(Long organisationId);
+
+    List<OrganisationUser> findAllByDeletedAtBefore(java.time.Instant cutoff);
 }

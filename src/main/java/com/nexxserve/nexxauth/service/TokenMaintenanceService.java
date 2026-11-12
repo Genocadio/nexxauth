@@ -24,25 +24,30 @@ public class TokenMaintenanceService {
     private final RefreshTokenService refreshTokenService;
     private final OrganisationRefreshTokenService organisationRefreshTokenService;
     private final OrganisationVerificationTokenRepository verificationTokenRepository;
+    private final OrganisationUserService organisationUserService;
 
     public TokenMaintenanceService(RefreshTokenService refreshTokenService,
                                    OrganisationRefreshTokenService organisationRefreshTokenService,
-                                   OrganisationVerificationTokenRepository verificationTokenRepository) {
+                                   OrganisationVerificationTokenRepository verificationTokenRepository,
+                                   OrganisationUserService organisationUserService) {
         this.refreshTokenService = refreshTokenService;
         this.organisationRefreshTokenService = organisationRefreshTokenService;
         this.verificationTokenRepository = verificationTokenRepository;
+        this.organisationUserService = organisationUserService;
     }
 
     /** Expired/revoked/evicted refresh tokens and expired verification
-     * values are purged daily at 03:00. */
+     * values are purged daily at 03:00. Soft-deleted accounts older than
+     * 30 days are permanently purged. */
     @Scheduled(cron = "0 0 3 * * *")
     public void cleanupExpiredTokens() {
         try {
             refreshTokenService.cleanupExpired();
             organisationRefreshTokenService.cleanupExpired();
             verificationTokenRepository.deleteExpired(java.time.Instant.now());
+            organisationUserService.purgeExpiredSoftDeletedUsers(java.time.Instant.now().minus(30, java.time.temporal.ChronoUnit.DAYS));
         } catch (RuntimeException e) {
-            log.warn("Token cleanup failed (will retry tomorrow)", e);
+            log.warn("Maintenance cleanup failed (will retry tomorrow)", e);
         }
     }
 }

@@ -87,6 +87,11 @@ public class OrganisationUser extends BaseEntity {
     @Column(name = "enabled", nullable = false)
     private boolean enabled = true;
 
+    /** When the account was soft-deleted. Soft-deleted accounts cannot log in,
+     * and are permanently purged after 30 days. */
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "organisation_user_roles",
             joinColumns = @JoinColumn(name = "organisation_user_id"),
@@ -123,6 +128,16 @@ public class OrganisationUser extends BaseEntity {
      * this — the hash represents user *data*, not credentials. */
     public void bumpDataHash() {
         this.dataHash = UUID.randomUUID().toString();
+    }
+
+    public boolean isDeleted() {
+        return deletedAt != null;
+    }
+
+    public void markDeleted() {
+        this.deletedAt = Instant.now();
+        this.enabled = false;
+        bumpDataHash();
     }
 
     public String getPrimaryEmail() {

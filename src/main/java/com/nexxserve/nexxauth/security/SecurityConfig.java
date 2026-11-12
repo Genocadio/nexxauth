@@ -55,7 +55,7 @@ public class SecurityConfig {
                         // Organisation auth (org-level, separate from platform auth).
                         // Platforms live at their own clean root origin: /{slug}/auth/*
                         .requestMatchers("/*/auth/login", "/*/auth/register",
-                                "/*/auth/refresh", "/*/auth/logout").permitAll()
+                                "/*/auth/refresh", "/*/auth/logout", "/*/auth/delete-account").permitAll()
                         // Login challenges (2FA / verify-at-next-login) are
                         // started by the server after a password check and
                         // completed on a public endpoint.

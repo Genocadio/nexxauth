@@ -1,6 +1,7 @@
 package com.nexxserve.nexxauth.service;
 
 import com.nexxserve.nexxauth.dto.request.ChallengeVerifyRequest;
+import com.nexxserve.nexxauth.dto.request.OrgDeleteAccountRequest;
 import com.nexxserve.nexxauth.dto.request.OrgLoginRequest;
 import com.nexxserve.nexxauth.dto.request.OrgRegisterRequest;
 import com.nexxserve.nexxauth.dto.response.LoginChallenge;
@@ -21,6 +22,7 @@ import com.nexxserve.nexxauth.entity.Platform;
 import com.nexxserve.nexxauth.entity.VerificationChannel;
 import com.nexxserve.nexxauth.entity.VerificationDelivery;
 import com.nexxserve.nexxauth.entity.VerificationPurpose;
+import com.nexxserve.nexxauth.exception.AccountDeletedException;
 import com.nexxserve.nexxauth.exception.BadRequestException;
 import com.nexxserve.nexxauth.exception.ConflictException;
 import com.nexxserve.nexxauth.exception.InvalidCredentialsException;
@@ -293,6 +295,9 @@ public class OrganisationAuthService {
                                                 String clientId, String ipAddress, String userAgent, String hostname) {
         var resolved = verificationService.resolveLoginChallenge(request.challengeToken(), request.code());
         OrganisationUser user = resolved.user();
+        if (user.isDeleted()) {
+            throw new AccountDeletedException("This account has been deleted");
+        }
         Organisation organisation = user.getOrganisation();
         if (!organisation.getPlatform().getSlug().equals(platformSlug)) {
             throw ResourceNotFoundException.of("Organisation", organisation.getId());
@@ -438,6 +443,11 @@ public class OrganisationAuthService {
                         return new InvalidCredentialsException();
                     });
         }
+        if (user.isDeleted()) {
+            audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY, AuthAuditService.ORG_LOGIN_FAILURE,
+                    identifier, organisation.getSlug(), organisation.getId(), "account_deleted");
+            throw new AccountDeletedException("This account has been deleted");
+        }
         if (!user.isEnabled()) {
             audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY, AuthAuditService.ORG_LOGIN_FAILURE,
                     identifier, organisation.getSlug(), organisation.getId(), "disabled");
@@ -543,6 +553,13 @@ public class OrganisationAuthService {
                     authTiming.equalsUnknown(request.password());
                     return new InvalidCredentialsException();
                 });
+        if (user.isDeleted()) {
+            audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY, AuthAuditService.ORG_LOGIN_FAILURE, identifier,
+                    organisation.getSlug(), organisation.getId(), "account_deleted");
+            accountLockout.recordFailure(organisation.getId(), identifier);
+            authTiming.equalsUnknown(request.password());
+            throw new AccountDeletedException("This account has been deleted");
+        }
         String hash = user.getPasswordHash();
         boolean passwordMatches = hash != null
                 ? passwordEncoder.matches(request.password(), hash)
@@ -819,5 +836,63 @@ public class OrganisationAuthService {
 
     private void applyRegisterMetadata(OrgRegisterRequest request, OrganisationUser saved) {
         if (request.metadata() != null) userFieldService.setMetadata(saved, request.metadata());
+    }
+
+    /** Direct account deletion via credentials (identifier + password or verification code). */
+    @Transactional
+    public void deleteAccount(String platformSlug, OrgDeleteAccountRequest request, String clientId,
+                              String ipAddress, String userAgent) {
+        OrganisationClient client = resolveClient(clientId);
+        enforceClientRestrictions(client, "delete-account");
+        Organisation organisation = resolveOrganisation(platformSlug, client, request.organisationId());
+
+        String identifier = request.identifier().trim();
+        OrganisationUser user = findByIdentifier(organisation, identifier, request.identifierType())
+                .or(() -> userFieldService.findUserByLoginField(organisation, identifier))
+                .orElseThrow(() -> {
+                    audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY, AuthAuditService.ORG_LOGIN_FAILURE,
+                            identifier, organisation.getSlug(), organisation.getId(), "delete_account_user_not_found");
+                    return new InvalidCredentialsException();
+                });
+
+        if (user.isDeleted()) {
+            throw new AccountDeletedException("This account has already been deleted");
+        }
+
+        boolean verified = false;
+        if (request.password() != null && !request.password().isBlank()) {
+            String hash = user.getPasswordHash();
+            if (hash != null && passwordEncoder.matches(request.password(), hash)) {
+                verified = true;
+            }
+        } else if (request.resolvedVerificationCode() != null) {
+            String code = request.resolvedVerificationCode();
+            VerificationChannel channel = channelForIdentifier(request.identifierType(), identifier);
+            String normalized = normalizedIdentifier(channel, identifier);
+            var tokenOpt = verificationTokenRepository.findActive(organisation.getId(),
+                    VerificationPurpose.LOGIN_OTP, channel, normalized, Instant.now());
+            if (tokenOpt.isPresent()) {
+                var token = tokenOpt.get();
+                if (java.security.MessageDigest.isEqual(
+                        hashHex(code).getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                        token.getTokenHash().getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
+                    token.setConsumedAt(Instant.now());
+                    verified = true;
+                }
+            }
+        }
+
+        if (!verified) {
+            accountLockout.recordFailure(organisation.getId(), identifier);
+            audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY, AuthAuditService.ORG_LOGIN_FAILURE,
+                    identifier, organisation.getSlug(), organisation.getId(), "delete_account_invalid_credentials");
+            throw new InvalidCredentialsException();
+        }
+
+        user.markDeleted();
+        userRepository.save(user);
+        refreshTokenService.revokeAllForUser(user.getId());
+        audit.logPersisted(LogLevel.INFO, LogCategory.USER_MANAGEMENT, AuthAuditService.ORG_USER_DELETED,
+                identifierOf(user), organisation.getSlug(), organisation.getId(), "direct_credentials_delete");
     }
 }

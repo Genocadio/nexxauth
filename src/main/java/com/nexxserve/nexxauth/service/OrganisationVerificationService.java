@@ -157,6 +157,9 @@ public class OrganisationVerificationService {
 
         String identifier = normalize(channel, request.identifier());
         OrganisationUser user = findUser(organisation, identifier, purpose);
+        if (user != null && user.isDeleted() && (purpose == VerificationPurpose.LOGIN_OTP || purpose == VerificationPurpose.TWO_FACTOR)) {
+            throw new com.nexxserve.nexxauth.exception.AccountDeletedException("This account has been deleted");
+        }
         return issue(organisation, user, purpose, channel, delivery, identifier, request.identifierType());
     }
 
