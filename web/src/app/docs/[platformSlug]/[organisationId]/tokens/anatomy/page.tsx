@@ -39,9 +39,11 @@ export default function AnatomyPage() {
   "iss": "nexxauth",             // Issuer
   "iat": 1704067200,             // Issued at (Unix timestamp)
   "exp": 1704068100,             // Expires at (Unix timestamp)
-  "kid": "key-1",               // Key ID for verification
   "roles": ["User", "Admin"],   // Role names (NOT permissions)
   "dataHash": "uuid",           // Changes on every user data mutation
+  "emailVerified": true,         // Primary email verification status
+  "phoneVerified": false,        // Primary phone verification status
+  "actions": [],                 // Pending advisory actions (e.g. ["VERIFY_EMAIL"])
   "orgId": ${docs.organisation.id}                  // Organisation ID
 }`}
             language="json"
@@ -136,6 +138,28 @@ export default function AnatomyPage() {
               </div>
               <p className="text-sm text-muted-foreground">
                 Organisation ID. The user belongs to this organisation.
+              </p>
+            </div>
+
+            <div className="border rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-1">
+                <code className="text-sm font-mono">emailVerified / phoneVerified</code>
+                <span className="text-xs text-muted-foreground">— boolean</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Whether the user&apos;s primary email address or phone number has been verified.
+                Allows downstream services to gate sensitive actions while keeping general sign-in optional.
+              </p>
+            </div>
+
+            <div className="border rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-1">
+                <code className="text-sm font-mono">actions</code>
+                <span className="text-xs text-muted-foreground">— string[]</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Pending user actions at issue time (e.g. <code>VERIFY_EMAIL</code>, <code>VERIFY_PHONE</code>, <code>UPDATE_PROFILE</code>).
+                When verification is optional, the user receives a full RS256 access token + refresh token with the advisory action included.
               </p>
             </div>
           </div>

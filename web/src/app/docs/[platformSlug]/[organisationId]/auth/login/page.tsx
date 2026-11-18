@@ -69,9 +69,9 @@ export default function LoginPage() {
         response={JSON.stringify(
           {
             accessToken: "eyJhbGciOiJSUzI1NiIs...",
-            refreshToken: "dGhpcyBpcyBhIHJlZnJl...",
+            refreshToken: docs.auth.twoFactorEnabled ? null : "dGhpcyBpcyBhIHJlZnJl...",
             tokenType: "Bearer",
-            expiresInSeconds: docs.sessions.accessTokenTtlSeconds,
+            expiresInSeconds: docs.auth.twoFactorEnabled ? 300 : docs.sessions.accessTokenTtlSeconds,
             user: {
               id: 1,
               firstName: "John",
@@ -80,11 +80,18 @@ export default function LoginPage() {
               email: "john@example.com",
               phone: null,
               enabled: true,
+              emailVerified: false,
+              phoneVerified: false,
               authTypes: ["PASSWORD"],
               roles: ["User"],
               createdAt: "2024-01-01T00:00:00Z",
               metadata: {},
             },
+            actions: [
+              ...(docs.auth.twoFactorEnabled ? ["OTP_NEEDED"] : []),
+              ...(docs.auth.emailVerificationEnabled ? ["VERIFY_EMAIL"] : []),
+              ...(docs.auth.phoneVerificationEnabled ? ["VERIFY_PHONE"] : []),
+            ],
           },
           null,
           2

@@ -311,7 +311,10 @@ export function useDeleteOrgRole(platformSlug: string, organisationId: number) {
 export function useUpdateOrgAuthConfig(platformSlug: string, organisationId: number) {
   return useApiMutation<OrganisationAuthConfigResponse, UpdateOrganisationAuthConfigRequest>({
     mutationFn: (body) => organisationsApi.updateAuthConfig(platformSlug, organisationId, body),
-    invalidate: [(qc) => qc.invalidateQueries({ queryKey: queryKeys.orgAuthConfig(organisationId) })],
+    invalidate: [
+      (qc) => qc.invalidateQueries({ queryKey: queryKeys.orgAuthConfig(organisationId) }),
+      (qc) => qc.invalidateQueries({ queryKey: queryKeys.orgUsers(organisationId) }),
+    ],
     successMessage: "Authentication settings saved",
   });
 }

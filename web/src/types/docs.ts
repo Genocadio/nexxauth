@@ -1,4 +1,4 @@
-import type { AuthType, ClientType, Permission, UserFieldType } from "@/types/enums";
+import type { AuthType, ClientType, Permission, UserFieldType, VerificationDelivery } from "@/types/enums";
 
 export interface DocumentationContext {
   organisation: {
@@ -20,6 +20,14 @@ export interface DocumentationContext {
     passwordEnabled: boolean;
     passwordMinLength: number;
     passwordMaxLength: number;
+    emailVerificationEnabled?: boolean;
+    phoneVerificationEnabled?: boolean;
+    requireEmailVerificationOnRegister?: boolean;
+    requirePhoneVerificationOnRegister?: boolean;
+    passwordResetEnabled?: boolean;
+    otpLoginEnabled?: boolean;
+    twoFactorEnabled?: boolean;
+    verificationMode?: VerificationDelivery;
   };
   sessions: {
     accessTokenTtlSeconds: number;

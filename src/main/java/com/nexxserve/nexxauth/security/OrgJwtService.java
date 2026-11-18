@@ -36,6 +36,8 @@ public class OrgJwtService {
     public static final String CLAIM_ORG_SLUG = "orgSlug";
     public static final String CLAIM_ROLES = "roles";
     public static final String CLAIM_DATA_HASH = "dataHash";
+    public static final String CLAIM_EMAIL_VERIFIED = "emailVerified";
+    public static final String CLAIM_PHONE_VERIFIED = "phoneVerified";
     public static final String CLAIM_ACTIONS = "actions";
     public static final String CLAIM_IDENTIFIER = "identifier";
     public static final String CLAIM_IDENTIFIER_TYPE = "identifierType";
@@ -112,6 +114,12 @@ public class OrgJwtService {
 
     public String generateAccessToken(OrganisationUser user, OrganisationSigningKey signingKey,
                                       Duration accessTokenTtl) {
+        return generateAccessToken(user, signingKey, accessTokenTtl, java.util.List.of());
+    }
+
+    public String generateAccessToken(OrganisationUser user, OrganisationSigningKey signingKey,
+                                      Duration accessTokenTtl,
+                                      List<com.nexxserve.nexxauth.entity.OrgUserAction> actions) {
         Instant now = Instant.now();
         RSAPrivateKey privateKey = orgKeyService.privateKeyOf(signingKey);
         return Jwts.builder()
@@ -121,6 +129,9 @@ public class OrgJwtService {
                 .claim(CLAIM_ORG_SLUG, user.getOrganisation().getSlug())
                 .claim(CLAIM_ROLES, user.getRoles().stream().map(role -> role.getName()).toList())
                 .claim(CLAIM_DATA_HASH, user.getDataHash())
+                .claim(CLAIM_EMAIL_VERIFIED, user.isEmailVerified())
+                .claim(CLAIM_PHONE_VERIFIED, user.isPhoneVerified())
+                .claim(CLAIM_ACTIONS, actions != null ? actions.stream().map(Enum::name).toList() : java.util.List.of())
                 .claim(CLAIM_TYPE, TYPE_ORG_ACCESS)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plus(accessTokenTtl)))

@@ -39,11 +39,14 @@ public class OrgJwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     /** While a gating action (CHANGE_PASSWORD) is pending the user may only
-     * reach the action endpoints; every other org endpoint stays closed. The
-     * negative lookahead keeps a slug literally named "api" from matching
-     * /api/... paths (org endpoints live at /{slug}/organisations/...). */
-    private static final Pattern ACTION_ENDPOINTS =
+     * reach the change-password endpoint; for VERIFY_EMAIL / VERIFY_PHONE
+     * action tokens (when not blocked by temporaryPassword), the user may also
+     * read /users/me or manage their own emails/phones before verifying. */
+    private static final Pattern CHANGE_PASSWORD_ENDPOINT =
             Pattern.compile("^/(?!api/)[^/]+/organisations/\\d+/users/me/change-password$");
+
+    private static final Pattern SELF_SERVICE_ACTION_ENDPOINTS =
+            Pattern.compile("^/(?!api/)[^/]+/organisations/\\d+/users/me(/change-password|/emails(/\\d+(/primary)?)?|/phones(/\\d+(/primary)?)?)?$");
 
     /** Pre-compiled: does this path target an org-scoped endpoint? */
     private static final Pattern ORG_SCOPED_PATH =
@@ -71,9 +74,14 @@ public class OrgJwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     /** True when the request targets an endpoint that stays reachable while a
-     * gating action is pending (e.g. completing the change-password action). */
+     * gating action is pending (e.g. completing the change-password action or
+     * managing own address before verification). */
     private boolean isActionEndpoint(HttpServletRequest request) {
-        return ACTION_ENDPOINTS.matcher(request.getRequestURI()).matches();
+        return SELF_SERVICE_ACTION_ENDPOINTS.matcher(request.getRequestURI()).matches();
+    }
+
+    private boolean isChangePasswordEndpoint(HttpServletRequest request) {
+        return CHANGE_PASSWORD_ENDPOINT.matcher(request.getRequestURI()).matches();
     }
 
     @Override
@@ -100,9 +108,13 @@ public class OrgJwtAuthenticationFilter extends OncePerRequestFilter {
                 Long userId = Long.valueOf(claims.getSubject());
                 organisationUserRepository.findWithRolesById(userId)
                         .filter(OrganisationUser::isEnabled)
-                        // A pending gating action (temporary password -> change
-                        // password) restricts access to the action endpoints.
-                        .filter(user -> (!user.isTemporaryPassword() && !actionToken) || isActionEndpoint(request))
+                        // A pending temporary password restricts access strictly to
+                        // /users/me/change-password; other action tokens (e.g.
+                        // VERIFY_EMAIL / VERIFY_PHONE) may also reach /users/me and
+                        // own email/phone endpoints.
+                        .filter(user -> user.isTemporaryPassword()
+                                ? isChangePasswordEndpoint(request)
+                                : (!actionToken || isActionEndpoint(request)))
                         .ifPresent(user -> {
                             Set<Permission> permissions = user.getRoles().stream()
                                     .flatMap(role -> role.getPermissions().stream())

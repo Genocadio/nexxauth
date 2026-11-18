@@ -258,6 +258,8 @@ export interface UpdateOrganisationAuthConfigRequest {
   verificationMode?: "OTP" | "LINK";
   requireEmailVerificationOnRegister?: boolean;
   requirePhoneVerificationOnRegister?: boolean;
+  enforceEmailVerificationForExistingUsers?: boolean;
+  enforcePhoneVerificationForExistingUsers?: boolean;
 }
 
 export interface UpdateOrganisationTemplatesRequest {

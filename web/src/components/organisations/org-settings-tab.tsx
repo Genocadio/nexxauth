@@ -34,6 +34,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -204,9 +205,9 @@ type PendingVerificationFlag =
 
 const EXISTING_ACCOUNT_IMPACT: Record<PendingVerificationFlag, string> = {
   emailVerificationEnabled:
-    "Email Verification becomes a standing requirement, so every existing account that has an email address is asked to verify it. Accounts without one are not prompted, and existing password logins keep working.",
+    "When optional (default), unverified accounts still receive a normal session (access + refresh token) alongside the VERIFY_EMAIL action. When mandatory is enforced, accounts receive a short-lived action token until their email is verified.",
   phoneVerificationEnabled:
-    "Phone Verification becomes a standing requirement, so every existing account that has a phone number is asked to verify it. Accounts without one are not prompted, and existing password logins keep working.",
+    "When optional (default), unverified accounts still receive a normal session (access + refresh token) alongside the VERIFY_PHONE action. When mandatory is enforced, accounts receive a short-lived action token until their phone number is verified.",
   twoFactorEnabled:
     "Two-factor is enforced on the next login of every existing account that has an email address or phone number, where the code is sent. An account with neither cannot sign in at all until one is added.",
 };
@@ -244,6 +245,7 @@ function affectedSummary(
   flag: PendingVerificationFlag,
   { affected, blocked }: FlagImpact,
   total: number,
+  enforceExisting = false,
 ): string {
   const accountLabel = total === 1 ? "account" : "accounts";
   if (flag === "twoFactorEnabled") {
@@ -258,12 +260,18 @@ function affectedSummary(
     return parts.join(" ");
   }
   const address = flag === "emailVerificationEnabled" ? "email address" : "phone number";
+  const actionName = flag === "emailVerificationEnabled" ? "VERIFY_EMAIL" : "VERIFY_PHONE";
   if (affected === 0) {
     return `No existing ${accountLabel} has an unverified ${address}, so nobody is asked to verify.`;
   }
+  if (enforceExisting) {
+    return `${affected} of ${total} existing ${accountLabel} ${
+      affected === 1 ? "has" : "have"
+    } an unverified ${address} and will be required to verify it on their next login (short action token, no refresh token until verified).`;
+  }
   return `${affected} of ${total} existing ${accountLabel} ${
     affected === 1 ? "has" : "have"
-  } an unverified ${address} and will be required to verify one.`;
+  } an unverified ${address}. Verification remains optional for them: they keep signing in normally (full access + refresh token) with the ${actionName} action returned.`;
 }
 
 function VerificationFeaturesCard({
@@ -275,6 +283,8 @@ function VerificationFeaturesCard({
   const update = useUpdateOrgAuthConfig(platformSlug, organisationId);
   const users = useOrgUsers(organisationId);
   const [pendingFlag, setPendingFlag] = useState<PendingVerificationFlag | null>(null);
+  const [enforceExisting, setEnforceExisting] = useState(false);
+  const [enforceNew, setEnforceNew] = useState(false);
 
   if (config.isLoading) return <TableSkeleton rows={4} columns={2} />;
   if (config.isError || !config.data)
@@ -287,13 +297,64 @@ function VerificationFeaturesCard({
   const accountsKnown = users.isSuccess;
   const noExistingAccounts = accountsKnown && existingAccounts.length === 0;
   const impact = pendingFlag ? impactOf(pendingFlag, existingAccounts) : null;
+  const unverifiedEmailNeedingEnforcement = existingAccounts.filter(
+    (u) => u.email && !u.emailVerified && !u.requireEmailVerificationAtNextLogin,
+  ).length;
+  const unverifiedPhoneNeedingEnforcement = existingAccounts.filter(
+    (u) => u.phone && !u.phoneVerified && !u.requirePhoneVerificationAtNextLogin,
+  ).length;
 
   const toggleFlag = (key: string, value: unknown) => {
+    if (key === "requireEmailVerificationOnRegister" && value === true && !data.emailVerificationEnabled) {
+      if (!noExistingAccounts) {
+        setEnforceExisting(false);
+        setEnforceNew(true);
+        setPendingFlag("emailVerificationEnabled");
+        return;
+      }
+      update
+        .mutateAsync({ emailVerificationEnabled: true, requireEmailVerificationOnRegister: true })
+        .catch(() => undefined);
+      return;
+    }
+    if (key === "requirePhoneVerificationOnRegister" && value === true && !data.phoneVerificationEnabled) {
+      if (!noExistingAccounts) {
+        setEnforceExisting(false);
+        setEnforceNew(true);
+        setPendingFlag("phoneVerificationEnabled");
+        return;
+      }
+      update
+        .mutateAsync({ phoneVerificationEnabled: true, requirePhoneVerificationOnRegister: true })
+        .catch(() => undefined);
+      return;
+    }
+    if (key === "emailVerificationEnabled" && value === false && data.requireEmailVerificationOnRegister) {
+      update
+        .mutateAsync({ emailVerificationEnabled: false, requireEmailVerificationOnRegister: false })
+        .catch(() => undefined);
+      return;
+    }
+    if (key === "phoneVerificationEnabled" && value === false && data.requirePhoneVerificationOnRegister) {
+      update
+        .mutateAsync({ phoneVerificationEnabled: false, requirePhoneVerificationOnRegister: false })
+        .catch(() => undefined);
+      return;
+    }
+
     // Fail closed: only skip the confirmation when the account list has
     // actually loaded and is empty. While it is loading (or failed) the
     // dialog must still appear — silently applying the change because
     // `users.data` is undefined was the previous behaviour.
     if (value === true && key in EXISTING_ACCOUNT_IMPACT && !noExistingAccounts) {
+      setEnforceExisting(false);
+      setEnforceNew(
+        key === "emailVerificationEnabled"
+          ? data.requireEmailVerificationOnRegister
+          : key === "phoneVerificationEnabled"
+            ? data.requirePhoneVerificationOnRegister
+            : false,
+      );
       setPendingFlag(key as PendingVerificationFlag);
       return;
     }
@@ -303,9 +364,30 @@ function VerificationFeaturesCard({
   const confirmPendingFlag = async () => {
     if (!pendingFlag) return;
     const key = pendingFlag;
+    const shouldEnforceExisting = enforceExisting;
+    const shouldEnforceNew = enforceNew;
     setPendingFlag(null);
+    setEnforceExisting(false);
     try {
-      await update.mutateAsync({ [key]: true });
+      if (key === "emailVerificationEnabled") {
+        await update.mutateAsync({
+          emailVerificationEnabled: true,
+          ...(shouldEnforceExisting ? { enforceEmailVerificationForExistingUsers: true } : {}),
+          ...(shouldEnforceNew !== data.requireEmailVerificationOnRegister
+            ? { requireEmailVerificationOnRegister: shouldEnforceNew }
+            : {}),
+        });
+      } else if (key === "phoneVerificationEnabled") {
+        await update.mutateAsync({
+          phoneVerificationEnabled: true,
+          ...(shouldEnforceExisting ? { enforcePhoneVerificationForExistingUsers: true } : {}),
+          ...(shouldEnforceNew !== data.requirePhoneVerificationOnRegister
+            ? { requirePhoneVerificationOnRegister: shouldEnforceNew }
+            : {}),
+        });
+      } else {
+        await update.mutateAsync({ [key]: true });
+      }
     } catch {
       return;
     }
@@ -358,13 +440,39 @@ function VerificationFeaturesCard({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Email Verification */}
           <div className="flex items-start justify-between gap-4 rounded-lg border p-3">
-            <div className="space-y-1">
-              <Label className="text-sm font-medium flex items-center gap-1.5">
-                <Mail className="h-3.5 w-3.5 text-muted-foreground" /> Email Verification
-              </Label>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <Label className="text-sm font-medium flex items-center gap-1.5">
+                  <Mail className="h-3.5 w-3.5 text-muted-foreground" /> Email Verification
+                </Label>
+                {data.emailVerificationEnabled ? (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                    {data.requireEmailVerificationOnRegister ? "Mandatory on Register" : "Optional"}
+                  </Badge>
+                ) : null}
+              </div>
               <p className="text-xs text-muted-foreground">
-                Allows users to verify their email address via OTP or link.
+                Allows users to verify their email address via OTP or link. When optional, unverified accounts receive normal tokens with <code className="font-mono text-[11px]">VERIFY_EMAIL</code>.
               </p>
+              {data.emailVerificationEnabled && unverifiedEmailNeedingEnforcement > 0 ? (
+                <div className="pt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={locked || update.isPending}
+                    className="h-7 text-xs"
+                    onClick={() => {
+                      setEnforceExisting(true);
+                      setEnforceNew(data.requireEmailVerificationOnRegister);
+                      setPendingFlag("emailVerificationEnabled");
+                    }}
+                  >
+                    Require for {unverifiedEmailNeedingEnforcement} unverified existing{" "}
+                    {unverifiedEmailNeedingEnforcement === 1 ? "account" : "accounts"}
+                  </Button>
+                </div>
+              ) : null}
             </div>
             <Switch
               checked={data.emailVerificationEnabled}
@@ -376,9 +484,9 @@ function VerificationFeaturesCard({
           {/* Require Email on Register */}
           <div className="flex items-start justify-between gap-4 rounded-lg border p-3">
             <div className="space-y-1">
-              <Label className="text-sm font-medium">Verify Email on Register</Label>
+              <Label className="text-sm font-medium">Verify Email on Register (Mandatory)</Label>
               <p className="text-xs text-muted-foreground">
-                Requires newly registered users to verify email before accessing the platform.
+                Requires newly registered users to verify email before receiving full tokens (issues a short-lived action token until verified).
               </p>
             </div>
             <Switch
@@ -390,13 +498,39 @@ function VerificationFeaturesCard({
 
           {/* Phone Verification */}
           <div className="flex items-start justify-between gap-4 rounded-lg border p-3">
-            <div className="space-y-1">
-              <Label className="text-sm font-medium flex items-center gap-1.5">
-                <Smartphone className="h-3.5 w-3.5 text-muted-foreground" /> Phone Verification
-              </Label>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <Label className="text-sm font-medium flex items-center gap-1.5">
+                  <Smartphone className="h-3.5 w-3.5 text-muted-foreground" /> Phone Verification
+                </Label>
+                {data.phoneVerificationEnabled ? (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                    {data.requirePhoneVerificationOnRegister ? "Mandatory on Register" : "Optional"}
+                  </Badge>
+                ) : null}
+              </div>
               <p className="text-xs text-muted-foreground">
-                Allows users to verify their mobile phone number via SMS OTP.
+                Allows users to verify their mobile phone number via SMS OTP. When optional, unverified accounts receive normal tokens with <code className="font-mono text-[11px]">VERIFY_PHONE</code>.
               </p>
+              {data.phoneVerificationEnabled && unverifiedPhoneNeedingEnforcement > 0 ? (
+                <div className="pt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={locked || update.isPending}
+                    className="h-7 text-xs"
+                    onClick={() => {
+                      setEnforceExisting(true);
+                      setEnforceNew(data.requirePhoneVerificationOnRegister);
+                      setPendingFlag("phoneVerificationEnabled");
+                    }}
+                  >
+                    Require for {unverifiedPhoneNeedingEnforcement} unverified existing{" "}
+                    {unverifiedPhoneNeedingEnforcement === 1 ? "account" : "accounts"}
+                  </Button>
+                </div>
+              ) : null}
             </div>
             <Switch
               checked={data.phoneVerificationEnabled}
@@ -408,9 +542,9 @@ function VerificationFeaturesCard({
           {/* Require Phone on Register */}
           <div className="flex items-start justify-between gap-4 rounded-lg border p-3">
             <div className="space-y-1">
-              <Label className="text-sm font-medium">Verify Phone on Register</Label>
+              <Label className="text-sm font-medium">Verify Phone on Register (Mandatory)</Label>
               <p className="text-xs text-muted-foreground">
-                Requires newly registered users to verify phone number via SMS code.
+                Requires newly registered users to verify phone number before receiving full tokens (issues a short-lived action token until verified).
               </p>
             </div>
             <Switch
@@ -528,7 +662,9 @@ function VerificationFeaturesCard({
                       {existingAccounts.length === 1 ? "account" : "accounts"}.
                     </span>
                     {impact ? (
-                      <span className="block">{affectedSummary(pendingFlag, impact, existingAccounts.length)}</span>
+                      <span className="block">
+                        {affectedSummary(pendingFlag, impact, existingAccounts.length, enforceExisting)}
+                      </span>
                     ) : null}
                   </>
                 ) : (
@@ -541,18 +677,77 @@ function VerificationFeaturesCard({
                 <span className="block">{EXISTING_ACCOUNT_IMPACT[pendingFlag]}</span>
               </DialogDescription>
             </DialogHeader>
+
+            {pendingFlag !== "twoFactorEnabled" ? (
+              <div className="space-y-3 rounded-lg border bg-muted/30 p-3 text-sm">
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <Checkbox
+                    id="enforce-existing-verification"
+                    checked={enforceExisting}
+                    onCheckedChange={(checked) => setEnforceExisting(!!checked)}
+                    className="mt-0.5"
+                  />
+                  <div className="space-y-0.5">
+                    <span className="font-medium leading-none">
+                      Require verification for existing unverified accounts
+                    </span>
+                    <p className="text-xs text-muted-foreground">
+                      When unchecked (optional), existing accounts receive a normal access + refresh token with the{" "}
+                      <code className="font-mono">
+                        {pendingFlag === "emailVerificationEnabled" ? "VERIFY_EMAIL" : "VERIFY_PHONE"}
+                      </code>{" "}
+                      action. When checked (mandatory), they receive a short-lived action token until verified.
+                    </p>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-2.5 cursor-pointer border-t pt-2.5">
+                  <Checkbox
+                    id="enforce-new-verification"
+                    checked={enforceNew}
+                    onCheckedChange={(checked) => setEnforceNew(!!checked)}
+                    className="mt-0.5"
+                  />
+                  <div className="space-y-0.5">
+                    <span className="font-medium leading-none">
+                      Require verification for new registrations
+                    </span>
+                    <p className="text-xs text-muted-foreground">
+                      When unchecked (optional), new accounts receive a normal access + refresh token with the{" "}
+                      <code className="font-mono">
+                        {pendingFlag === "emailVerificationEnabled" ? "VERIFY_EMAIL" : "VERIFY_PHONE"}
+                      </code>{" "}
+                      action. When checked (mandatory), new registrations receive a short-lived action token until verified.
+                    </p>
+                  </div>
+                </label>
+              </div>
+            ) : null}
+
             <DialogFooter>
               <Button variant="outline" onClick={() => setPendingFlag(null)} disabled={update.isPending}>
                 Cancel
               </Button>
               <Button
-                variant="destructive"
+                variant={
+                  pendingFlag === "twoFactorEnabled" || enforceExisting || enforceNew
+                    ? "destructive"
+                    : "default"
+                }
                 onClick={() => void confirmPendingFlag()}
                 disabled={update.isPending || users.isFetching}
                 className="gap-2"
               >
                 {update.isPending ? <Loader2 className="animate-spin" /> : null}
-                Enable for existing accounts
+                {pendingFlag === "twoFactorEnabled"
+                  ? "Enable for existing accounts"
+                  : enforceExisting && enforceNew
+                    ? "Enable & require for all accounts"
+                    : enforceExisting
+                      ? "Enable & require for existing accounts"
+                      : enforceNew
+                        ? "Enable & require on register"
+                        : "Enable (optional)"}
               </Button>
             </DialogFooter>
           </DialogContent>

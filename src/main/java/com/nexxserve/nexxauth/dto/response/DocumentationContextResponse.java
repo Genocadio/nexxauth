@@ -4,6 +4,7 @@ import com.nexxserve.nexxauth.entity.AuthType;
 import com.nexxserve.nexxauth.entity.ClientType;
 import com.nexxserve.nexxauth.entity.Permission;
 import com.nexxserve.nexxauth.entity.UserFieldType;
+import com.nexxserve.nexxauth.entity.VerificationDelivery;
 
 import java.util.List;
 import java.util.Set;
@@ -44,7 +45,15 @@ public record DocumentationContextResponse(
             AuthType authType,
             boolean passwordEnabled,
             int passwordMinLength,
-            int passwordMaxLength
+            int passwordMaxLength,
+            boolean emailVerificationEnabled,
+            boolean phoneVerificationEnabled,
+            boolean requireEmailVerificationOnRegister,
+            boolean requirePhoneVerificationOnRegister,
+            boolean passwordResetEnabled,
+            boolean otpLoginEnabled,
+            boolean twoFactorEnabled,
+            VerificationDelivery verificationMode
     ) {
     }
 

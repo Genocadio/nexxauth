@@ -57,21 +57,14 @@ public class OrgUserActions {
 
     /** True when a gating action is pending: the login issues a short-lived
      * access token without a refresh token and all endpoints but the action
-     * endpoints stay closed. CHANGE_PASSWORD, plus a register-required
-     * verification (VERIFY_EMAIL / VERIFY_PHONE) when the org demands it on
-     * registration, are the gating actions today. */
+     * endpoints stay closed. CHANGE_PASSWORD, plus a mandatory verification
+     * (VERIFY_EMAIL / VERIFY_PHONE) stamped on the user (at registration when
+     * the org demands it, or enforced for existing accounts/by an admin), are
+     * the gating actions today. */
     public boolean hasPendingGatingAction(OrganisationUser user) {
-        if (user.isTemporaryPassword()
+        return user.isTemporaryPassword()
                 || (user.isRequireEmailVerificationAtNextLogin() && user.getPrimaryEmail() != null && user.getEmailVerifiedAt() == null)
-                || (user.isRequirePhoneVerificationAtNextLogin() && user.getPrimaryPhone() != null && user.getPhoneVerifiedAt() == null)) {
-            return true;
-        }
-        OrganisationAuthConfig config = authConfigService.configOf(user.getOrganisation());
-        boolean unverifiedRequiredEmail = config.isRequireEmailVerificationOnRegister()
-                && user.getPrimaryEmail() != null && user.getEmailVerifiedAt() == null;
-        boolean unverifiedRequiredPhone = config.isRequirePhoneVerificationOnRegister()
-                && user.getPrimaryPhone() != null && user.getPhoneVerifiedAt() == null;
-        return unverifiedRequiredEmail || unverifiedRequiredPhone;
+                || (user.isRequirePhoneVerificationAtNextLogin() && user.getPrimaryPhone() != null && user.getPhoneVerifiedAt() == null);
     }
 
     /** True when at least one required organisation user field has no value. */

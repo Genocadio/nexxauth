@@ -9,6 +9,7 @@ import com.nexxserve.nexxauth.entity.OrganisationUser;
 import com.nexxserve.nexxauth.exception.BadRequestException;
 import com.nexxserve.nexxauth.repository.OrganisationAuthConfigRepository;
 import com.nexxserve.nexxauth.repository.OrganisationPasswordHistoryRepository;
+import com.nexxserve.nexxauth.repository.OrganisationUserRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -33,17 +34,23 @@ public class OrganisationAuthConfigService {
 
     private final OrganisationAuthConfigRepository configRepository;
     private final OrganisationPasswordHistoryRepository historyRepository;
+    private final OrganisationUserRepository userRepository;
+    private final OrganisationRefreshTokenService refreshTokenService;
     private final EntityManager entityManager;
     private final PasswordEncoder passwordEncoder;
     private final NexxbotifyClient nexxbotifyClient;
 
     public OrganisationAuthConfigService(OrganisationAuthConfigRepository configRepository,
                                          OrganisationPasswordHistoryRepository historyRepository,
+                                         OrganisationUserRepository userRepository,
+                                         OrganisationRefreshTokenService refreshTokenService,
                                          EntityManager entityManager,
                                          PasswordEncoder passwordEncoder,
                                          NexxbotifyClient nexxbotifyClient) {
         this.configRepository = configRepository;
         this.historyRepository = historyRepository;
+        this.userRepository = userRepository;
+        this.refreshTokenService = refreshTokenService;
         this.entityManager = entityManager;
         this.passwordEncoder = passwordEncoder;
         this.nexxbotifyClient = nexxbotifyClient;
@@ -90,6 +97,11 @@ public class OrganisationAuthConfigService {
     public OrganisationAuthConfigResponse update(Organisation organisation,
                                                  UpdateOrganisationAuthConfigRequest request) {
         OrganisationAuthConfig config = configOf(organisation);
+        boolean wasEmailVerificationActive = config.isEmailVerificationEnabled()
+                || config.isRequireEmailVerificationOnRegister();
+        boolean wasPhoneVerificationActive = config.isPhoneVerificationEnabled()
+                || config.isRequirePhoneVerificationOnRegister();
+
         if (request.authType() != null) {
             config.setAuthType(request.authType());
         }
@@ -110,9 +122,15 @@ public class OrganisationAuthConfigService {
         }
         if (request.emailVerificationEnabled() != null) {
             config.setEmailVerificationEnabled(request.emailVerificationEnabled());
+            if (!request.emailVerificationEnabled() && request.requireEmailVerificationOnRegister() == null) {
+                config.setRequireEmailVerificationOnRegister(false);
+            }
         }
         if (request.phoneVerificationEnabled() != null) {
             config.setPhoneVerificationEnabled(request.phoneVerificationEnabled());
+            if (!request.phoneVerificationEnabled() && request.requirePhoneVerificationOnRegister() == null) {
+                config.setRequirePhoneVerificationOnRegister(false);
+            }
         }
         if (request.passwordResetEnabled() != null) {
             config.setPasswordResetEnabled(request.passwordResetEnabled());
@@ -128,12 +146,84 @@ public class OrganisationAuthConfigService {
         }
         if (request.requireEmailVerificationOnRegister() != null) {
             config.setRequireEmailVerificationOnRegister(request.requireEmailVerificationOnRegister());
+            if (request.requireEmailVerificationOnRegister()) {
+                config.setEmailVerificationEnabled(true);
+            }
         }
         if (request.requirePhoneVerificationOnRegister() != null) {
             config.setRequirePhoneVerificationOnRegister(request.requirePhoneVerificationOnRegister());
+            if (request.requirePhoneVerificationOnRegister()) {
+                config.setPhoneVerificationEnabled(true);
+            }
         }
         validateConfig(config);
-        return toResponse(configRepository.save(config));
+        OrganisationAuthConfig saved = configRepository.save(config);
+
+        boolean isEmailVerificationActive = saved.isEmailVerificationEnabled()
+                || saved.isRequireEmailVerificationOnRegister();
+        boolean isPhoneVerificationActive = saved.isPhoneVerificationEnabled()
+                || saved.isRequirePhoneVerificationOnRegister();
+
+        boolean enforceEmail = Boolean.TRUE.equals(request.enforceEmailVerificationForExistingUsers());
+        boolean enforcePhone = Boolean.TRUE.equals(request.enforcePhoneVerificationForExistingUsers());
+        if (enforceEmail || enforcePhone) {
+            enforceExistingUserVerification(organisation, enforceEmail, enforcePhone);
+        }
+
+        boolean clearEmail = wasEmailVerificationActive && !isEmailVerificationActive;
+        boolean clearPhone = wasPhoneVerificationActive && !isPhoneVerificationActive;
+        if (clearEmail || clearPhone) {
+            clearExistingUserVerificationObligations(organisation, clearEmail, clearPhone);
+        }
+
+        return toResponse(saved);
+    }
+
+    private void enforceExistingUserVerification(Organisation organisation, boolean enforceEmail, boolean enforcePhone) {
+        List<OrganisationUser> users = userRepository.findByOrganisationIdOrderByCreatedAtAsc(organisation.getId());
+        for (OrganisationUser user : users) {
+            if (user.isDeleted()) {
+                continue;
+            }
+            boolean changed = false;
+            if (enforceEmail && user.getPrimaryEmail() != null && !user.isEmailVerified()
+                    && !user.isRequireEmailVerificationAtNextLogin()) {
+                user.setRequireEmailVerificationAtNextLogin(true);
+                changed = true;
+            }
+            if (enforcePhone && user.getPrimaryPhone() != null && !user.isPhoneVerified()
+                    && !user.isRequirePhoneVerificationAtNextLogin()) {
+                user.setRequirePhoneVerificationAtNextLogin(true);
+                changed = true;
+            }
+            if (changed) {
+                user.bumpDataHash();
+                userRepository.save(user);
+                refreshTokenService.revokeAllForUser(user.getId());
+            }
+        }
+    }
+
+    private void clearExistingUserVerificationObligations(Organisation organisation, boolean clearEmail, boolean clearPhone) {
+        List<OrganisationUser> users = userRepository.findByOrganisationIdOrderByCreatedAtAsc(organisation.getId());
+        for (OrganisationUser user : users) {
+            if (user.isDeleted()) {
+                continue;
+            }
+            boolean changed = false;
+            if (clearEmail && user.isRequireEmailVerificationAtNextLogin()) {
+                user.setRequireEmailVerificationAtNextLogin(false);
+                changed = true;
+            }
+            if (clearPhone && user.isRequirePhoneVerificationAtNextLogin()) {
+                user.setRequirePhoneVerificationAtNextLogin(false);
+                changed = true;
+            }
+            if (changed) {
+                user.bumpDataHash();
+                userRepository.save(user);
+            }
+        }
     }
 
     /**

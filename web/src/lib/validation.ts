@@ -198,6 +198,8 @@ export const authConfigSchema = z
     verificationMode: z.enum(["OTP", "LINK"]).optional(),
     requireEmailVerificationOnRegister: z.boolean().optional(),
     requirePhoneVerificationOnRegister: z.boolean().optional(),
+    enforceEmailVerificationForExistingUsers: z.boolean().optional(),
+    enforcePhoneVerificationForExistingUsers: z.boolean().optional(),
   })
   .refine((v) => v.passwordMinLength <= v.passwordMaxLength, {
     message: "Minimum length cannot exceed maximum length",

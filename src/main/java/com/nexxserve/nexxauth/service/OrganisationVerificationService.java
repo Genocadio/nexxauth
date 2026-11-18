@@ -241,14 +241,14 @@ public class OrganisationVerificationService {
 
     /** Confirms a numeric OTP for {@code EMAIL_VERIFICATION} or
      * {@code PHONE_VERIFICATION}; successful verification stamps the address
-     * as verified on the owning user. */
+     * as verified on the owning user and returns the verified user. */
     @Transactional
-    public void verifyOtp(String platformSlug, VerificationVerifyRequest request, String clientId) {
-        verifyOtp(platformSlug, request, clientId, null);
+    public OrganisationUser verifyOtp(String platformSlug, VerificationVerifyRequest request, String clientId) {
+        return verifyOtp(platformSlug, request, clientId, null);
     }
 
     @Transactional
-    public void verifyOtp(String platformSlug, VerificationVerifyRequest request, String clientId, String authHeader) {
+    public OrganisationUser verifyOtp(String platformSlug, VerificationVerifyRequest request, String clientId, String authHeader) {
         VerificationPurpose purpose = request.purpose();
         if (purpose != VerificationPurpose.EMAIL_VERIFICATION
                 && purpose != VerificationPurpose.PHONE_VERIFICATION) {
@@ -305,6 +305,7 @@ public class OrganisationVerificationService {
         audit.logPersisted(LogLevel.INFO, LogCategory.AUTH, AuthAuditService.ORG_IDENTIFIER_VERIFIED,
                 identifier, organisation.getSlug(), organisation.getId(),
                 purpose.name() + " " + channel.name());
+        return user;
     }
 
     /** Confirms a magic link for {@code EMAIL_VERIFICATION} / {@code PHONE_VERIFICATION}. */
@@ -722,6 +723,9 @@ public class OrganisationVerificationService {
             } else {
                 user.getEmails().stream().filter(com.nexxserve.nexxauth.entity.OrganisationUserEmail::isPrimary).findFirst().ifPresent(e -> e.setVerifiedAt(now));
             }
+            if (user.isEmailVerified()) {
+                user.setRequireEmailVerificationAtNextLogin(false);
+            }
         } else if (purpose == VerificationPurpose.PHONE_VERIFICATION) {
             if (identifier != null) {
                 user.getPhones().stream()
@@ -730,6 +734,9 @@ public class OrganisationVerificationService {
                         .ifPresentOrElse(p -> p.setVerifiedAt(now), () -> user.addPhone(identifier, true, now));
             } else {
                 user.getPhones().stream().filter(com.nexxserve.nexxauth.entity.OrganisationUserPhone::isPrimary).findFirst().ifPresent(p -> p.setVerifiedAt(now));
+            }
+            if (user.isPhoneVerified()) {
+                user.setRequirePhoneVerificationAtNextLogin(false);
             }
         }
         user.bumpDataHash();

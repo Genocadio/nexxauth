@@ -83,9 +83,15 @@ export default function RegisterPage() {
         response={JSON.stringify(
           {
             accessToken: "eyJhbGciOiJSUzI1NiIs...",
-            refreshToken: "dGhpcyBpcyBhIHJlZnJl...",
+            refreshToken:
+              docs.auth.requireEmailVerificationOnRegister || docs.auth.requirePhoneVerificationOnRegister
+                ? null
+                : "dGhpcyBpcyBhIHJlZnJl...",
             tokenType: "Bearer",
-            expiresInSeconds: docs.sessions.accessTokenTtlSeconds,
+            expiresInSeconds:
+              docs.auth.requireEmailVerificationOnRegister || docs.auth.requirePhoneVerificationOnRegister
+                ? 300
+                : docs.sessions.accessTokenTtlSeconds,
             user: {
               id: 1,
               firstName: "John",
@@ -94,6 +100,8 @@ export default function RegisterPage() {
               email: docs.identifiers.emailRequired ? "john@example.com" : null,
               phone: docs.identifiers.phoneRequired ? "+1234567890" : null,
               enabled: true,
+              emailVerified: false,
+              phoneVerified: false,
               authTypes: ["PASSWORD"],
               roles: docs.roles.filter((r) => r.isDefault).map((r) => r.name),
               createdAt: "2024-01-01T00:00:00Z",
@@ -103,6 +111,14 @@ export default function RegisterPage() {
                   )
                 : {},
             },
+            actions: [
+              ...(docs.auth.emailVerificationEnabled || docs.auth.requireEmailVerificationOnRegister
+                ? ["VERIFY_EMAIL"]
+                : []),
+              ...(docs.auth.phoneVerificationEnabled || docs.auth.requirePhoneVerificationOnRegister
+                ? ["VERIFY_PHONE"]
+                : []),
+            ],
           },
           null,
           2

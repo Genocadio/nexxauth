@@ -154,15 +154,22 @@ public class OrganisationAuthService {
         if (phone != null) {
             user.addPhone(phone, true, null);
         }
+        OrganisationAuthConfig config = authConfigService.configOf(organisation);
         if (request.password() != null && !request.password().isBlank()) {
             authConfigService.setPassword(user, request.password());
-        } else if (authConfigService.configOf(organisation).isPasswordEnabled()) {
+        } else if (config.isPasswordEnabled()) {
             throw new BadRequestException("Password is required for the PASSWORD auth method");
-        } else if (authConfigService.configOf(organisation).getAuthType() == AuthType.OTP) {
+        } else if (config.getAuthType() == AuthType.OTP) {
             user.setAuthType(AuthType.OTP);
             // The per-user method gates every login, so it has to agree with the
             // org-level auth type or a passwordless registrant could never get in.
             user.setLoginMethod(UserLoginMethod.OTP);
+        }
+        if (config.isRequireEmailVerificationOnRegister() && email != null) {
+            user.setRequireEmailVerificationAtNextLogin(true);
+        }
+        if (config.isRequirePhoneVerificationOnRegister() && phone != null) {
+            user.setRequirePhoneVerificationAtNextLogin(true);
         }
         OrganisationUser saved = userRepository.save(user);
         applyRegisterMetadata(request, saved);
@@ -779,6 +786,15 @@ public class OrganisationAuthService {
         return issueTokens(user, client, ipAddress, userAgent, null);
     }
 
+    @Transactional
+    public OrgAuthResponse issueTokensForVerifiedUser(OrganisationUser user, String clientId,
+                                                      String ipAddress, String userAgent, String hostname) {
+        OrganisationClient client = resolveClient(clientId);
+        OrganisationUser userWithRoles = userRepository.findWithRolesById(user.getId()).orElse(user);
+        enforceRoleRestrictions(client, userWithRoles);
+        return issueTokens(userWithRoles, client, ipAddress, userAgent, hostname);
+    }
+
     private OrgAuthResponse issueTokens(OrganisationUser user, OrganisationClient client,
                                          String ipAddress, String userAgent, String hostname) {
         Organisation organisation = user.getOrganisation();
@@ -828,9 +844,9 @@ public class OrganisationAuthService {
                                          String ipAddress, String userAgent, String sessionId, String hostname) {
         Organisation organisation = user.getOrganisation();
         OrganisationSigningKey signingKey = orgKeyService.activeKey(organisation);
-        String accessToken = orgJwtService.generateAccessToken(user, signingKey, accessTtl);
-        Map<String, String> metadata = userFieldService.readMetadata(user.getId());
         List<OrgUserAction> actions = orgUserActions.of(user);
+        String accessToken = orgJwtService.generateAccessToken(user, signingKey, accessTtl, actions);
+        Map<String, String> metadata = userFieldService.readMetadata(user.getId());
         return OrgAuthResponse.of(accessToken, refreshToken, accessTtl.toSeconds(), userMapper.toResponse(user, metadata), actions);
     }
 

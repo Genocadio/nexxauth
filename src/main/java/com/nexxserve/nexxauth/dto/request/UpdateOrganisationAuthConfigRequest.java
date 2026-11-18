@@ -65,6 +65,20 @@ public record UpdateOrganisationAuthConfigRequest(
 
         /** When true, new registrations can only reach full access after
          * verifying their phone (gating VERIFY_PHONE action until verified). */
-        Boolean requirePhoneVerificationOnRegister
+        Boolean requirePhoneVerificationOnRegister,
+
+        /** When true while enabling email verification, forces every existing
+         * user with an unverified primary email to verify it at their next
+         * login (sets requireEmailVerificationAtNextLogin = true and revokes
+         * their active sessions). When false or omitted, verification stays
+         * optional for existing accounts (normal tokens + VERIFY_EMAIL action). */
+        Boolean enforceEmailVerificationForExistingUsers,
+
+        /** When true while enabling phone verification, forces every existing
+         * user with an unverified primary phone to verify it at their next
+         * login (sets requirePhoneVerificationAtNextLogin = true and revokes
+         * their active sessions). When false or omitted, verification stays
+         * optional for existing accounts (normal tokens + VERIFY_PHONE action). */
+        Boolean enforcePhoneVerificationForExistingUsers
 ) {
 }

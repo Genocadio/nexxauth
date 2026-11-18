@@ -39,7 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class OrganisationLoginChallengeIntegrationTest {
 
-    private static final String[] SLUGS = {"c1", "c2", "c3", "c4", "c5", "c6"};
+    private static final String[] SLUGS = {"c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9"};
 
     @Autowired
     private MockMvc mockMvc;
@@ -337,6 +337,160 @@ class OrganisationLoginChallengeIntegrationTest {
                                 "channel", "EMAIL", "purpose", "EMAIL_VERIFICATION", "delivery", "OTP"))))
                 .andExpect(status().isOk());
         capturedCode();
+    }
+
+    @Test
+    void optionalEmailVerificationIssuesNormalSessionWithActionForExistingAndNewAccounts() throws Exception {
+        String platform = "/" + SLUGS[6];
+        String boss = registerPlatform("ch-opt-boss@nexx.io", SLUGS[6]);
+        long orgId = createOrganisation(boss, platform, "Optional Verify Org", "optverify-org");
+        String org = platform + "/organisations/" + orgId;
+        String orgAuth = platform + "/auth";
+        String clientKey = createClient(boss, org, "Test Client");
+
+        // Existing user created before emailVerificationEnabled is turned on
+        registerUser(orgAuth, clientKey, orgId, "existinguser", "existing@example.com", "passw0rd1");
+
+        // Enable email verification as optional (default: enforceEmailVerificationForExistingUsers = false)
+        enable(platform, orgId, boss, Map.of("emailVerificationEnabled", true));
+
+        // Existing user logs in: receives normal access + refresh token and VERIFY_EMAIL action
+        mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("organisationId", orgId, "identifier", "existinguser",
+                                "identifierType", "USERNAME", "password", "passw0rd1"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
+                .andExpect(jsonPath("$.actions[0]").value("VERIFY_EMAIL"));
+
+        // New user registers when requireEmailVerificationOnRegister is false: receives normal access + refresh token and VERIFY_EMAIL action
+        mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "organisationId", orgId, "username", "newuser",
+                                "email", "new@example.com", "password", "passw0rd1",
+                                "firstName", "N", "lastName", "U"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
+                .andExpect(jsonPath("$.actions[0]").value("VERIFY_EMAIL"));
+    }
+
+    @Test
+    void enforceEmailVerificationForExistingUsersRequiresShortActionTokenUntilVerified() throws Exception {
+        String platform = "/" + SLUGS[7];
+        String boss = registerPlatform("ch-enf-boss@nexx.io", SLUGS[7]);
+        long orgId = createOrganisation(boss, platform, "Enforce Verify Org", "enfverify-org");
+        String org = platform + "/organisations/" + orgId;
+        String orgAuth = platform + "/auth";
+        String clientKey = createClient(boss, org, "Test Client");
+
+        registerUser(orgAuth, clientKey, orgId, "enfuser", "enf@example.com", "passw0rd1");
+
+        // Enable email verification and enforce for existing unverified accounts
+        enable(platform, orgId, boss, Map.of(
+                "emailVerificationEnabled", true,
+                "enforceEmailVerificationForExistingUsers", true));
+
+        // Existing user logs in: receives short 5m action token, no refresh token, and VERIFY_EMAIL action
+        MvcResult login = mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("organisationId", orgId, "identifier", "enfuser",
+                                "identifierType", "USERNAME", "password", "passw0rd1"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(jsonPath("$.expiresInSeconds").value(300))
+                .andExpect(jsonPath("$.actions[0]").value("VERIFY_EMAIL"))
+                .andReturn();
+
+        String actionToken = objectMapper.readTree(login.getResponse().getContentAsString())
+                .get("accessToken").asText();
+        String code = capturedCode();
+
+        // Completing verification grants normal tokens
+        mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
+                        .header("Authorization", bearer(actionToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("mode", "VERIFY", "verificationCode", code))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
+                .andExpect(jsonPath("$.user.emailVerified").value(true))
+                .andExpect(jsonPath("$.actions").isEmpty());
+    }
+
+    @Test
+    void enablingRequireEmailVerificationOnRegisterDoesNotGateExistingAccountsAndVerifyWithActionTokenIssuesSession() throws Exception {
+        String platform = "/" + SLUGS[8];
+        String boss = registerPlatform("ch-regonly-boss@nexx.io", SLUGS[8]);
+        long orgId = createOrganisation(boss, platform, "RegOnly Org", "regonly-org");
+        String org = platform + "/organisations/" + orgId;
+        String orgAuth = platform + "/auth";
+        String clientKey = createClient(boss, org, "Test Client");
+
+        // 1. Existing user registers before requireEmailVerificationOnRegister is enabled
+        registerUser(orgAuth, clientKey, orgId, "olduser", "old@example.com", "passw0rd1");
+
+        // 2. Admin enables requireEmailVerificationOnRegister (without enforceEmailVerificationForExistingUsers)
+        enable(platform, orgId, boss, Map.of("requireEmailVerificationOnRegister", true));
+
+        // 3. Existing user logs in: STILL gets normal access + refresh token and VERIFY_EMAIL action (not gated!)
+        mockMvc.perform(post(orgAuth + "/login")
+                        .header("X-Client-Id", clientKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("organisationId", orgId, "identifier", "olduser",
+                                "identifierType", "USERNAME", "password", "passw0rd1"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
+                .andExpect(jsonPath("$.actions[0]").value("VERIFY_EMAIL"));
+
+        // 4. New user registers: IS gated (short actionToken, no refreshToken)
+        MvcResult newReg = mockMvc.perform(post(orgAuth + "/register")
+                        .header("X-Client-Id", clientKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "organisationId", orgId, "username", "gatednew",
+                                "email", "gatednew@example.com", "password", "passw0rd1",
+                                "firstName", "G", "lastName", "N"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(jsonPath("$.actions[0]").value("VERIFY_EMAIL"))
+                .andReturn();
+
+        String regActionToken = objectMapper.readTree(newReg.getResponse().getContentAsString())
+                .get("accessToken").asText();
+        String code = capturedCode();
+
+        // 4a. While gated by VERIFY_EMAIL, the action token can read /users/me to inspect profile/addresses,
+        // but cannot reach general org endpoints like /users
+        mockMvc.perform(get(org + "/users/me")
+                        .header("Authorization", bearer(regActionToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("gatednew@example.com"));
+        mockMvc.perform(get(org + "/users")
+                        .header("Authorization", bearer(regActionToken)))
+                .andExpect(status().isUnauthorized());
+
+        // 5. Verifying via /auth/verifications/verify with the action token in Authorization immediately returns full session tokens (200 OK)
+        mockMvc.perform(post(orgAuth + "/verifications/verify")
+                        .header("X-Client-Id", clientKey)
+                        .header("Authorization", bearer(regActionToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "organisationId", orgId, "purpose", "EMAIL_VERIFICATION", "code", code))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
+                .andExpect(jsonPath("$.user.emailVerified").value(true))
+                .andExpect(jsonPath("$.actions").isEmpty());
     }
 
     // --- helpers ---

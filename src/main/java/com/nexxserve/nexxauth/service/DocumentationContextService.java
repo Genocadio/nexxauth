@@ -94,9 +94,22 @@ public class DocumentationContextService {
                         org.isEmailRequired(), org.isUsernameRequired(), org.isPhoneRequired(),
                         org.isEmailCanLogin(), org.isUsernameCanLogin(), org.isPhoneCanLogin()),
                 authConfig != null
-                        ? new AuthConfig(authConfig.getAuthType(), authConfig.isPasswordEnabled(),
-                        authConfig.getPasswordMinLength(), authConfig.getPasswordMaxLength())
-                        : new AuthConfig(AuthType.PASSWORD, true, 8, 72),
+                        ? new AuthConfig(
+                        authConfig.getAuthType(),
+                        authConfig.isPasswordEnabled(),
+                        authConfig.getPasswordMinLength(),
+                        authConfig.getPasswordMaxLength(),
+                        authConfig.isEmailVerificationEnabled(),
+                        authConfig.isPhoneVerificationEnabled(),
+                        authConfig.isRequireEmailVerificationOnRegister(),
+                        authConfig.isRequirePhoneVerificationOnRegister(),
+                        authConfig.isPasswordResetEnabled(),
+                        authConfig.isOtpLoginEnabled(),
+                        authConfig.isTwoFactorEnabled(),
+                        authConfig.getVerificationMode())
+                        : new AuthConfig(AuthType.PASSWORD, true, 8, 72,
+                        false, false, false, false, false, false, false,
+                        com.nexxserve.nexxauth.entity.VerificationDelivery.OTP),
                 sessionSettings != null
                         ? new SessionConfig(sessionSettings.getAccessTokenTtlSeconds(),
                         sessionSettings.getRefreshTokenTtlSeconds(),
