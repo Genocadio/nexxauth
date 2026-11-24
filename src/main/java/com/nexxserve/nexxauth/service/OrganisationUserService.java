@@ -69,6 +69,7 @@ public class OrganisationUserService {
     private final OrganisationVerificationService verificationService;
     private final PasswordEncoder passwordEncoder;
     private final AuthAuditService audit;
+    private final AuthWebhookEmitter authWebhookEmitter;
 
     public OrganisationUserService(OrganisationUserRepository userRepository,
                                    OrganisationRoleRepository roleRepository,
@@ -80,7 +81,8 @@ public class OrganisationUserService {
                                    OrganisationRefreshTokenService refreshTokenService,
                                    OrganisationUserFieldService userFieldService,
                                    OrganisationVerificationService verificationService,
-                                   PasswordEncoder passwordEncoder, AuthAuditService audit) {
+                                   PasswordEncoder passwordEncoder, AuthAuditService audit,
+                                   AuthWebhookEmitter authWebhookEmitter) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.emailRepository = emailRepository;
@@ -94,6 +96,7 @@ public class OrganisationUserService {
         this.verificationService = verificationService;
         this.passwordEncoder = passwordEncoder;
         this.audit = audit;
+        this.authWebhookEmitter = authWebhookEmitter;
     }
 
     @Transactional(readOnly = true)
@@ -237,10 +240,12 @@ public class OrganisationUserService {
             }
         }
 
+        boolean notifySessionRevoked = false;
         if (request.enabled() != null && request.enabled() != user.isEnabled()) {
             user.setEnabled(request.enabled());
             if (!request.enabled()) {
                 refreshTokenService.revokeAllForUser(user.getId());
+                notifySessionRevoked = true;
             }
             audit.logPersisted(LogLevel.INFO, LogCategory.USER_MANAGEMENT,
                     request.enabled() ? AuthAuditService.ORG_USER_ENABLED : AuthAuditService.ORG_USER_DISABLED,
@@ -268,6 +273,7 @@ public class OrganisationUserService {
                 authConfigService.setPassword(user, request.password());
             }
             refreshTokenService.revokeAllForUser(user.getId());
+            notifySessionRevoked = true;
             audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY, AuthAuditService.ORG_USER_PASSWORD_RESET,
                     identifierOf(user), organisation.getSlug(), organisation.getId(), null);
         }
@@ -275,6 +281,7 @@ public class OrganisationUserService {
             // Changing what a user may sign in with must not leave an existing
             // session valid under the old rules.
             refreshTokenService.revokeAllForUser(user.getId());
+            notifySessionRevoked = true;
             audit.logPersisted(LogLevel.WARN, LogCategory.SECURITY,
                     AuthAuditService.ORG_USER_LOGIN_METHOD_CHANGED,
                     identifierOf(user), organisation.getSlug(), organisation.getId(),
@@ -291,18 +298,21 @@ public class OrganisationUserService {
             user.setTemporaryPassword(request.temporaryPassword());
             if (request.temporaryPassword()) {
                 refreshTokenService.revokeAllForUser(user.getId());
+                notifySessionRevoked = true;
             }
         }
         if (request.requireEmailVerificationAtNextLogin() != null) {
             user.setRequireEmailVerificationAtNextLogin(request.requireEmailVerificationAtNextLogin());
             if (request.requireEmailVerificationAtNextLogin()) {
                 refreshTokenService.revokeAllForUser(user.getId());
+                notifySessionRevoked = true;
             }
         }
         if (request.requirePhoneVerificationAtNextLogin() != null) {
             user.setRequirePhoneVerificationAtNextLogin(request.requirePhoneVerificationAtNextLogin());
             if (request.requirePhoneVerificationAtNextLogin()) {
                 refreshTokenService.revokeAllForUser(user.getId());
+                notifySessionRevoked = true;
             }
         }
         if (request.metadata() != null) {
@@ -318,6 +328,9 @@ public class OrganisationUserService {
         }
         audit.logPersisted(LogLevel.INFO, LogCategory.USER_MANAGEMENT, AuthAuditService.ORG_USER_UPDATED,
                 identifierOf(saved), organisation.getSlug(), organisation.getId(), null);
+        if (notifySessionRevoked || !previousRoleIds.equals(newRoleIds)) {
+            authWebhookEmitter.userSessionRevoked(saved, "USER_UPDATED");
+        }
         return userMapper.toResponse(saved, userFieldService.readMetadata(saved.getId()));
     }
 
@@ -328,6 +341,7 @@ public class OrganisationUserService {
         user.markDeleted();
         userRepository.save(user);
         refreshTokenService.revokeAllForUser(user.getId());
+        authWebhookEmitter.userSessionRevoked(user, "USER_DELETED");
         audit.logPersisted(LogLevel.INFO, LogCategory.USER_MANAGEMENT, AuthAuditService.ORG_USER_DELETED,
                 identifierOf(user), organisation.getSlug(), organisation.getId(), "soft_deleted");
     }
@@ -342,6 +356,7 @@ public class OrganisationUserService {
         user.markDeleted();
         userRepository.save(user);
         refreshTokenService.revokeAllForUser(user.getId());
+        authWebhookEmitter.userSessionRevoked(user, "USER_DELETED");
         audit.logPersisted(LogLevel.INFO, LogCategory.USER_MANAGEMENT, AuthAuditService.ORG_USER_DELETED,
                 identifierOf(user), user.getOrganisation().getSlug(), user.getOrganisation().getId(), "self_service_soft_delete");
     }
@@ -373,6 +388,7 @@ public class OrganisationUserService {
         userRepository.save(user);
         // Invalidate all other sessions so stolen tokens can't ride on the password change.
         refreshTokenService.revokeAllForUser(user.getId());
+        authWebhookEmitter.userSessionRevoked(user, "PASSWORD_CHANGED");
         audit.logPersisted(LogLevel.INFO, LogCategory.AUTH, AuthAuditService.ORG_PASSWORD_CHANGED,
                 identifierOf(user), user.getOrganisation().getSlug(), user.getOrganisation().getId(), null);
     }

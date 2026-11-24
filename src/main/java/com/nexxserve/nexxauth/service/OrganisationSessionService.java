@@ -38,13 +38,16 @@ public class OrganisationSessionService {
     private final OrganisationRefreshTokenRepository refreshTokenRepository;
     private final OrganisationUserRepository userRepository;
     private final OrganisationClientRepository clientRepository;
+    private final AuthWebhookEmitter authWebhookEmitter;
 
     public OrganisationSessionService(OrganisationRefreshTokenRepository refreshTokenRepository,
                                        OrganisationUserRepository userRepository,
-                                       OrganisationClientRepository clientRepository) {
+                                       OrganisationClientRepository clientRepository,
+                                       AuthWebhookEmitter authWebhookEmitter) {
         this.refreshTokenRepository = refreshTokenRepository;
         this.userRepository = userRepository;
         this.clientRepository = clientRepository;
+        this.authWebhookEmitter = authWebhookEmitter;
     }
 
     /**
@@ -133,6 +136,11 @@ public class OrganisationSessionService {
         // Org-scoped update: a (theoretical) session-id collision must not revoke
         // another organisation's tokens.
         refreshTokenRepository.revokeBySessionIdAndOrganisationId(sessionId, organisationId, now);
+        tokens.stream()
+                .map(OrganisationRefreshToken::getOrganisationUser)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .ifPresent(user -> authWebhookEmitter.userSessionRevoked(user, "SESSION_REVOKED"));
         return sessionId;
     }
 
@@ -172,7 +180,7 @@ public class OrganisationSessionService {
     @Transactional
     public int revokeAllUserSessions(Long organisationId, Long userId) {
         // Verify user belongs to this org
-        userRepository.findById(userId)
+        OrganisationUser user = userRepository.findById(userId)
                 .filter(u -> u.getOrganisation().getId().equals(organisationId))
                 .orElseThrow(() -> ResourceNotFoundException.of("OrganisationUser", userId));
 
@@ -189,6 +197,9 @@ public class OrganisationSessionService {
         }
         for (String sid : sessionIds) {
             refreshTokenRepository.revokeBySessionIdAndUserId(sid, userId, now);
+        }
+        if (!sessionIds.isEmpty()) {
+            authWebhookEmitter.userSessionRevoked(user, "ALL_SESSIONS_REVOKED");
         }
         return sessionIds.size();
     }

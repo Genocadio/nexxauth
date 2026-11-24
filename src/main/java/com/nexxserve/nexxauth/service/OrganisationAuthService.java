@@ -75,6 +75,7 @@ public class OrganisationAuthService {
     private final com.nexxserve.nexxauth.repository.OrganisationVerificationTokenRepository verificationTokenRepository;
     private final VerificationProperties verificationProperties;
     private final OrganisationVerificationService verificationService;
+    private final AuthWebhookEmitter authWebhookEmitter;
 
     public OrganisationAuthService(PlatformAccess platformAccess,
                                    OrganisationClientRepository clientRepository,
@@ -92,7 +93,8 @@ public class OrganisationAuthService {
                                    com.nexxserve.nexxauth.security.AccountLockoutService accountLockout,
                                    com.nexxserve.nexxauth.repository.OrganisationVerificationTokenRepository verificationTokenRepository,
                                    VerificationProperties verificationProperties,
-                                   OrganisationVerificationService verificationService) {
+                                   OrganisationVerificationService verificationService,
+                                   AuthWebhookEmitter authWebhookEmitter) {
         this.platformAccess = platformAccess;
         this.clientRepository = clientRepository;
         this.organisationRepository = organisationRepository;
@@ -115,6 +117,7 @@ public class OrganisationAuthService {
         this.verificationTokenRepository = verificationTokenRepository;
         this.verificationProperties = verificationProperties;
         this.verificationService = verificationService;
+        this.authWebhookEmitter = authWebhookEmitter;
     }
 
     @Transactional
@@ -644,6 +647,7 @@ public class OrganisationAuthService {
                     identifierOf(user),
                     logoutOrg.getSlug(),
                     logoutOrg.getId(), null);
+            authWebhookEmitter.userSessionRevoked(user, "LOGOUT");
         });
         refreshTokenService.revoke(rawRefreshToken);
     }
@@ -810,6 +814,9 @@ public class OrganisationAuthService {
             return OrgAuthResponse.of(actionToken, null, OrgJwtService.ACTION_TOKEN_TTL.toSeconds(),
                     userMapper.toResponse(user, metadata), actions);
         }
+        // This point is only reached when a real session is being issued
+        // (login/register/challenge completion), not on token refresh.
+        authWebhookEmitter.userSignedIn(user);
         refreshTokenService.enforceSessionLimit(organisation, user.getId(), client, user);
         // Dedup: if the user is logging in from the same IP+UA, reuse the existing session id
         String sessionId = sessionService.findExistingSessionId(user.getId(), ipAddress, userAgent);
@@ -908,6 +915,7 @@ public class OrganisationAuthService {
         user.markDeleted();
         userRepository.save(user);
         refreshTokenService.revokeAllForUser(user.getId());
+        authWebhookEmitter.userSessionRevoked(user, "USER_DELETED");
         audit.logPersisted(LogLevel.INFO, LogCategory.USER_MANAGEMENT, AuthAuditService.ORG_USER_DELETED,
                 identifierOf(user), organisation.getSlug(), organisation.getId(), "direct_credentials_delete");
     }
