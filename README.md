@@ -128,7 +128,7 @@ Overridable via environment variables.
 | `app.rate-limit.refresh.capacity` / `refill-per-minute` | `10` / `2` | platform + org refresh bucket |
 | `app.rate-limit.use-forwarded-for` | `false` | set `true` only behind a trusted proxy that sets `X-Forwarded-For` |
 | `app.rate-limit.store` | `in-memory` | bucket store: `in-memory` (single instance, Caffeine) or `redis` (shared store for horizontal scaling — see below) |
-| `CAVGO_AUTH_WEBHOOK_URL` | — | optional signed lifecycle webhook receiver (e.g. `https://api.gocavgo.com/main/webhooks/nexxauth/events`); tokens are RS256-signed with the org key |
+| `CAVGO_AUTH_WEBHOOK_URL` (or `CAVGO_WEBHOOK_URL`) | — | optional signed lifecycle webhook receiver (e.g. `https://api.gocavgo.com/main/webhooks/nexxauth/events`); tokens are RS256-signed with the org key |
 | `app.http.max-body-bytes` | `65536` | max request body size (larger → 413, DoS guard) |
 | — | — | actuator health served on main port (8080) as /actuator/health |
 | `spring.jpa.hibernate.ddl-auto` | `validate` | schema is owned by Flyway; Hibernate only validates |
